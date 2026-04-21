@@ -194,11 +194,28 @@ export default function Dashboard({ user }) {
           </div>
         </motion.div>
 
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-8"
+        >
+          <Link
+            id="dashboard-new-scan-cta"
+            to="/"
+            className="relative overflow-hidden flex items-center justify-center gap-2 py-4 px-6 bg-primary hover:bg-primary-hover rounded-2xl text-white font-semibold transition-all btn-glow shadow-[0_0_28px_rgba(21,102,240,0.35)]"
+          >
+            <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-[shimmer_2.7s_infinite]" />
+            <Plus size={20} />
+            <span className="relative">Lancer un nouveau scan</span>
+          </Link>
+        </motion.div>
+
         {!isPartner && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
+            transition={{ delay: 0.25 }}
             className="mb-8"
           >
             {!partnerRequested ? (
@@ -243,23 +260,6 @@ export default function Dashboard({ user }) {
             )}
           </motion.div>
         )}
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="mb-8"
-        >
-          <Link
-            id="dashboard-new-scan-cta"
-            to="/"
-            className="relative overflow-hidden flex items-center justify-center gap-2 py-4 px-6 bg-primary hover:bg-primary-hover rounded-2xl text-white font-semibold transition-all btn-glow shadow-[0_0_28px_rgba(21,102,240,0.35)]"
-          >
-            <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-[shimmer_2.7s_infinite]" />
-            <Plus size={20} />
-            <span className="relative">Lancer un nouveau scan</span>
-          </Link>
-        </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

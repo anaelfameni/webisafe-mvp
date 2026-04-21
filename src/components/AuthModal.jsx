@@ -64,7 +64,7 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
     setLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 800));
 
-    const result = onAuth(mode, {
+    const result = await onAuth(mode, {
       name,
       email,
       phone: buildInternationalPhone(phoneCountry, phone),
