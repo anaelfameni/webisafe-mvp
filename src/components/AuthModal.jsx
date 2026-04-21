@@ -79,7 +79,11 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
       if (result.redirectTo) {
         navigate(result.redirectTo);
       } else if (mode === 'signup') {
-        navigate('/dashboard');
+        navigate('/dashboard', {
+          state: {
+            welcomeNewAccount: true,
+          },
+        });
       }
       return;
     }

@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowRight, BarChart3, CheckCircle2, ExternalLink, Handshake, Plus, Trash2, Users } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowRight, BarChart3, CheckCircle2, ExternalLink, Handshake, PartyPopper, Plus, Sparkles, Trash2, Users } from 'lucide-react';
 import { useScans } from '../hooks/useScans';
 import { getScoreBadge, getScoreColor } from '../utils/calculateScore';
 import { formatDate, extractDomain } from '../utils/validators';
 import { fetchPaymentRequestsByEmail } from '../utils/paymentApi';
 import { buildValidatedPremiumMap } from '../utils/premiumAccess';
+import { shouldShowDashboardWelcome } from '../utils/dashboardWelcome';
 
 export default function Dashboard({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { scans, deleteScan, isPaid, markAsPaid } = useScans();
   const [validatedPremiumMap, setValidatedPremiumMap] = useState({});
+  const [showWelcomePopup, setShowWelcomePopup] = useState(() =>
+    shouldShowDashboardWelcome(location.state)
+  );
 
   const partnerRequested = Boolean(location.state?.partnerRequested);
   const isPartner = false;
@@ -20,6 +24,21 @@ export default function Dashboard({ user }) {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, []);
+
+  useEffect(() => {
+    if (!shouldShowDashboardWelcome(location.state)) {
+      return;
+    }
+
+    setShowWelcomePopup(true);
+    navigate(location.pathname, {
+      replace: true,
+      state: {
+        ...location.state,
+        welcomeNewAccount: false,
+      },
+    });
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     let active = true;
@@ -74,6 +93,71 @@ export default function Dashboard({ user }) {
 
   return (
     <div className="min-h-screen pt-24 pb-20 px-4">
+      <AnimatePresence>
+        {showWelcomePopup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 18 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+              className="relative w-full max-w-xl overflow-hidden rounded-[28px] border border-primary/30 bg-slate-950/95 p-0 shadow-[0_30px_120px_rgba(2,6,23,0.72)]"
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(21,102,240,0.34),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.2),transparent_34%)]" />
+              <div className="absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2.9s_infinite]" />
+
+              <div className="relative p-7 sm:p-8">
+                <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-[0_0_40px_rgba(21,102,240,0.25)]">
+                  <PartyPopper size={26} />
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl font-black text-white leading-tight mb-3">
+                  Votre compte Webisafe est bien créé
+                </h2>
+                <p className="text-sm sm:text-base text-slate-300 leading-7 mb-4">
+                  Tout est prêt. Pour lancer votre premier scan gratuit, cliquez simplement sur{' '}
+                  <span className="font-semibold text-white">Lancer un nouveau scan</span> depuis ce dashboard.
+                </p>
+                <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 mb-6">
+                  <Sparkles size={18} className="text-primary mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-slate-300 leading-6">
+                    Votre premier audit vous permettra d’obtenir un aperçu immédiat de la performance,
+                    de la sécurité, du SEO et de l’expérience mobile de votre site.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => setShowWelcomePopup(false)}
+                    className="relative overflow-hidden inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 font-bold text-white transition-all btn-glow hover:bg-primary-hover shadow-[0_0_26px_rgba(21,102,240,0.35)]"
+                  >
+                    <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-[shimmer_2.7s_infinite]" />
+                    <span className="relative">Compris</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowWelcomePopup(false);
+                      document.getElementById('dashboard-new-scan-cta')?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center',
+                      });
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3.5 font-semibold text-white transition-all hover:bg-white/10"
+                  >
+                    Me montrer le bouton
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -167,11 +251,13 @@ export default function Dashboard({ user }) {
           className="mb-8"
         >
           <Link
+            id="dashboard-new-scan-cta"
             to="/"
-            className="flex items-center justify-center gap-2 py-4 bg-primary/10 border-2 border-dashed border-primary/30 rounded-2xl text-primary font-medium hover:bg-primary/20 transition-all"
+            className="relative overflow-hidden flex items-center justify-center gap-2 py-4 px-6 bg-primary hover:bg-primary-hover rounded-2xl text-white font-semibold transition-all btn-glow shadow-[0_0_28px_rgba(21,102,240,0.35)]"
           >
+            <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-[shimmer_2.7s_infinite]" />
             <Plus size={20} />
-            Lancer un nouveau scan
+            <span className="relative">Lancer un nouveau scan</span>
           </Link>
         </motion.div>
 
