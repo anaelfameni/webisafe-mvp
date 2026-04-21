@@ -63,6 +63,18 @@ function aggregateScanner(results: PromiseSettledResult<ScannerResult>[]) {
   return results.map((result) => (result.status === 'fulfilled' ? result.value : defaultScannerResult()));
 }
 
+function findScannerErrorCode(results: PromiseSettledResult<ScannerResult>[]) {
+  for (const result of results) {
+    if (result.status !== 'rejected') continue;
+    const message = result.reason instanceof Error ? result.reason.message : String(result.reason || '');
+    if (message === 'API_KEY_MISSING') {
+      return message;
+    }
+  }
+
+  return null;
+}
+
 function buildScores(performance: ScannerResult, security: ScannerResult, seo: ScannerResult, ux: ScannerResult): CombinedScores {
   const global = clampScore(
     performance.score * 0.3 + security.score * 0.35 + seo.score * 0.2 + ux.score * 0.15
@@ -167,6 +179,14 @@ export async function POST(request: Request) {
         setTimeout(() => reject(new Error('GLOBAL_TIMEOUT')), 30_000)
       ),
     ]);
+
+    const scannerErrorCode = findScannerErrorCode(settled);
+    if (scannerErrorCode === 'API_KEY_MISSING') {
+      return buildError('API_KEY_MISSING', 'Clé API PageSpeed manquante.', {
+        details:
+          'Configurez VITE_PAGESPEED_API_KEY, VITE_GOOGLE_PAGESPEED_KEY ou GOOGLE_PAGESPEED_KEY dans Vercel.',
+      });
+    }
 
     const [performance, security, seo, ux] = aggregateScanner(settled);
     const scores = buildScores(performance, security, seo, ux);
