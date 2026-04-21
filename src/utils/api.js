@@ -128,7 +128,7 @@ export async function runFullAnalysis(url, onProgress) {
   await delay(1400);
 
   // Étape 6: Génération recommandations
-  onProgress?.({ step: 5, message: 'Génération recommandations IA...' });
+  onProgress?.({ step: 5, message: 'Génération des recommandations' });
   await delay(1200);
 
   // Combiner les données réelles et mockées

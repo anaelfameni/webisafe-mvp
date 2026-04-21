@@ -1,15 +1,18 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, BarChart3, ExternalLink, Handshake, Plus, Trash2, Users } from 'lucide-react';
+import { ArrowRight, BarChart3, CheckCircle2, ExternalLink, Handshake, Plus, Trash2, Users } from 'lucide-react';
 import { useScans } from '../hooks/useScans';
 import { getScoreBadge, getScoreColor } from '../utils/calculateScore';
 import { formatDate, extractDomain } from '../utils/validators';
+import { fetchPaymentRequestsByEmail } from '../utils/paymentApi';
+import { buildValidatedPremiumMap } from '../utils/premiumAccess';
 
 export default function Dashboard({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { scans, deleteScan, isPaid } = useScans();
+  const { scans, deleteScan, isPaid, markAsPaid } = useScans();
+  const [validatedPremiumMap, setValidatedPremiumMap] = useState({});
 
   const partnerRequested = Boolean(location.state?.partnerRequested);
   const isPartner = false;
@@ -17,6 +20,33 @@ export default function Dashboard({ user }) {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function syncValidatedPremiumAccess() {
+      if (!user?.email || scans.length === 0) {
+        if (active) setValidatedPremiumMap({});
+        return;
+      }
+
+      try {
+        const paymentRequests = await fetchPaymentRequestsByEmail(user.email, 50);
+        if (!active) return;
+
+        const nextMap = buildValidatedPremiumMap(scans, paymentRequests || []);
+        Object.keys(nextMap).forEach((scanId) => markAsPaid(scanId));
+        setValidatedPremiumMap(nextMap);
+      } catch {
+        if (active) setValidatedPremiumMap({});
+      }
+    }
+
+    syncValidatedPremiumAccess();
+    return () => {
+      active = false;
+    };
+  }, [user?.email, scans, markAsPaid]);
 
   const averageScore = useMemo(() => {
     if (scans.length === 0) return '—';
@@ -173,6 +203,7 @@ export default function Dashboard({ user }) {
                 const paid = isPaid(scan.id);
                 const badge = getScoreBadge(scan.scores?.global || 0);
                 const scoreColor = getScoreColor(scan.scores?.global || 0);
+                const premiumValidation = validatedPremiumMap[scan.id];
 
                 return (
                   <motion.div
@@ -205,6 +236,15 @@ export default function Dashboard({ user }) {
                             </span>
                           )}
                         </div>
+                        {premiumValidation && (
+                          <button
+                            onClick={() => navigate(`/rapport/${scan.id}`)}
+                            className="mt-3 inline-flex items-center gap-2 rounded-full bg-success/10 px-3 py-1.5 text-xs font-semibold text-success hover:bg-success/15 transition-all"
+                          >
+                            <CheckCircle2 size={14} />
+                            {premiumValidation.message}
+                          </button>
+                        )}
                       </div>
                     </div>
 

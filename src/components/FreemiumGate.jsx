@@ -29,7 +29,7 @@ export default function FreemiumGate({ isOpen, onClose, onUpgrade, scanData }) {
               </div>
               <button
                 onClick={onClose}
-                className="p-1 text-text-secondary hover:text-white transition-colors"
+                className="p-1 text-white hover:text-white transition-colors"
               >
                 <X size={20} />
               </button>
@@ -71,7 +71,7 @@ export default function FreemiumGate({ isOpen, onClose, onUpgrade, scanData }) {
                 <p className="text-white font-semibold mb-1">
                   Ce rapport contient {scanData?.recommendations?.length || 12} recommandations détaillées
                 </p>
-                <p className="text-text-secondary text-sm">
+                <p className="text-white text-sm">
                   Débloquez l'accès complet pour corriger tous les problèmes identifiés sur votre site
                 </p>
               </div>
@@ -79,7 +79,7 @@ export default function FreemiumGate({ isOpen, onClose, onUpgrade, scanData }) {
               {/* Inclus */}
               <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-6">
                 <p className="text-primary text-sm font-medium mb-2">Le rapport complet inclut :</p>
-                <ul className="text-text-secondary text-sm space-y-1.5">
+                <ul className="text-white text-sm space-y-1.5">
                   <li>✅ PDF professionnel de 6 pages</li>
                   <li>✅ 25+ métriques détaillées avec explications</li>
                   <li>✅ Plan d'action priorisé en 3 étapes</li>
@@ -98,7 +98,7 @@ export default function FreemiumGate({ isOpen, onClose, onUpgrade, scanData }) {
                 </button>
                 <button
                   onClick={onClose}
-                  className="w-full py-3 text-text-secondary hover:text-white text-sm transition-colors"
+                  className="w-full py-3 text-white hover:text-white text-sm transition-colors"
                 >
                   Continuer avec la version gratuite
                 </button>

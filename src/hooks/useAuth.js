@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { buildAdminUser, isAdminCredentials } from '../utils/adminAuth.js';
 
 const AUTH_KEY = 'webisafe_auth';
 const USERS_KEY = 'webisafe_users';
@@ -50,6 +51,13 @@ export function useAuth() {
   };
 
   const login = (email, password) => {
+    if (isAdminCredentials(email, password)) {
+      const adminUser = buildAdminUser();
+      localStorage.setItem(AUTH_KEY, JSON.stringify(adminUser));
+      setUser(adminUser);
+      return { success: true, redirectTo: '/admin' };
+    }
+
     const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
     const found = users.find(
       (existingUser) => existingUser.email === email && existingUser.password === password

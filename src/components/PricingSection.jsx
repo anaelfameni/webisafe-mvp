@@ -13,13 +13,13 @@ export default function PricingSection({ onScan }) {
       price: '0',
       currency: 'FCFA',
       period: '',
-      description: 'Obtenez un premier diagnostic fiable avant d’aller plus loin.',
+      description: "Obtenez un premier diagnostic fiable avant d'aller plus loin.",
       features: [
         'Score global /100',
-        'Résumé des blocages prioritaires détectés',
-        'Lecture simple des impacts sur trafic, conversions et crédibilité',
-        'Premières explications sur les problèmes visibles',
-        'Orientation claire sur les urgences à traiter',
+        'Resume des blocages prioritaires detectes',
+        'Lecture simple des impacts sur trafic, conversions et credibilite',
+        'Premieres explications sur les problemes visibles',
+        'Orientation claire sur les urgences a traiter',
         'Limite : 1 scan / jour',
       ],
       cta: 'Scanner Gratuitement',
@@ -38,10 +38,10 @@ export default function PricingSection({ onScan }) {
       description: 'Rapport professionnel complet pour comprendre et corriger ce qui freine votre site.',
       features: [
         'Rapport PDF 6 pages professionnel',
-        '25+ métriques analysées',
-        'Explications détaillées des failles et impacts business',
-        "Plan d'action priorisé en 3 étapes",
-        '1 rescan gratuit après 30 jours',
+        '25+ metriques analysees',
+        'Explications detaillees des failles et impacts business',
+        "Plan d'action priorise en 3 etapes",
+        '1 rescan gratuit apres 30 jours',
         'Support email 48h',
       ],
       cta: 'Obtenir Mon Rapport',
@@ -65,14 +65,14 @@ export default function PricingSection({ onScan }) {
       currency: 'FCFA',
       period: '/mois',
       setup: '+ 20 000 FCFA setup (premier mois)',
-      description: 'Offrez des audits à vos clients sous votre marque et créez une nouvelle source de revenus.',
+      description: 'Offrez des audits a vos clients sous votre marque et creez une nouvelle source de revenus.',
       features: [
         '10 scans premium / mois',
         'Logo agence sur les rapports PDF',
-        'Rapports hébergés sur Webisafe',
+        'Rapports heberges sur Webisafe',
         'Dashboard agence inclus',
         'Support email 48h',
-        '5 000 FCFA / scan supplémentaire',
+        '5 000 FCFA / scan supplementaire',
       ],
       cta: 'Nous Contacter',
       ctaStyle: 'bg-success text-white hover:bg-success/90',
@@ -80,7 +80,7 @@ export default function PricingSection({ onScan }) {
       popular: false,
       onClick: () =>
         window.open(
-          "https://wa.me/2250700000000?text=Bonjour, je suis intéressé par l'offre White Label Lite de Webisafe.",
+          "https://wa.me/2250595335662?text=Bonjour, je suis interesse par l'offre White Label Lite de Webisafe.",
           '_blank'
         ),
     },
@@ -95,11 +95,9 @@ export default function PricingSection({ onScan }) {
           viewport={{ once: true }}
           className="text-center mb-12"
         >
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-            Des prix adaptés à l'Afrique
-          </h2>
+          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Des prix adaptes a l'Afrique</h2>
           <p className="text-text-secondary max-w-2xl mx-auto">
-            Pas d'abonnement caché. Des tarifs pensés pour les PME africaines.
+            Pas d'abonnement cache. Des tarifs penses pour les PME africaines.
           </p>
         </motion.div>
 
@@ -112,14 +110,10 @@ export default function PricingSection({ onScan }) {
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
               className={`relative bg-card-bg border rounded-2xl p-6 lg:p-8 flex flex-col ${
-                plan.popular
-                  ? 'border-primary shadow-lg shadow-primary/10 scale-[1.02]'
-                  : 'border-border-color'
+                plan.popular ? 'border-primary shadow-lg shadow-primary/10 scale-[1.02]' : 'border-border-color'
               }`}
             >
-              <span
-                className={`inline-block self-start text-xs font-semibold px-3 py-1 rounded-full mb-4 ${plan.badgeColor}`}
-              >
+              <span className={`inline-block self-start text-xs font-semibold px-3 py-1 rounded-full mb-4 ${plan.badgeColor}`}>
                 {plan.badge}
               </span>
 
@@ -127,24 +121,18 @@ export default function PricingSection({ onScan }) {
               <p className="text-text-secondary text-sm mb-4">{plan.description}</p>
 
               <div className="mb-6">
-                {plan.oldPrice && (
-                  <span className="text-text-secondary line-through text-sm mr-2">
-                    {plan.oldPrice} FCFA
-                  </span>
-                )}
+                {plan.oldPrice && <span className="text-text-secondary line-through text-sm mr-2">{plan.oldPrice} FCFA</span>}
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="text-4xl font-bold text-white whitespace-nowrap">{plan.price}</span>
                   <span className="text-text-secondary text-sm whitespace-nowrap">{plan.currency}</span>
-                  {plan.period && (
-                    <span className="text-text-secondary text-sm whitespace-nowrap">{plan.period}</span>
-                  )}
+                  {plan.period && <span className="text-text-secondary text-sm whitespace-nowrap">{plan.period}</span>}
                 </div>
                 {plan.setup && <p className="text-text-secondary text-xs mt-1">{plan.setup}</p>}
               </div>
 
               <ul className="space-y-3 mb-8 flex-grow">
-                {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
+                {plan.features.map((feature, featureIndex) => (
+                  <li key={featureIndex} className="flex items-start gap-2 text-sm">
                     <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
                     <span className="text-text-secondary">{feature}</span>
                   </li>
@@ -155,9 +143,7 @@ export default function PricingSection({ onScan }) {
                 onClick={plan.onClick}
                 className={`relative overflow-hidden w-full py-3 px-6 rounded-full font-semibold text-sm transition-all flex items-center justify-center gap-2 ${plan.ctaStyle}`}
               >
-                {(plan.name === 'Audit Premium' || plan.name === 'Audit Gratuit' || plan.name === 'White Label Lite') && (
-                  <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-[shimmer_2.7s_infinite]" />
-                )}
+                <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-[shimmer_2.7s_infinite]" />
                 <span className="relative z-10 flex items-center gap-2">
                   {plan.ctaIcon}
                   {plan.cta}
@@ -174,12 +160,9 @@ export default function PricingSection({ onScan }) {
           viewport={{ once: true }}
           className="text-center mt-8"
         >
-          <p className="text-text-secondary text-sm">
-            💳 Paiement sécurisé via CinetPay · Wave · Orange Money · MTN MoMo
-          </p>
-          <p className="text-text-secondary/60 text-xs mt-2">
-            Engagement 3 mois minimum pour White Label Lite
-          </p>
+          <p className="text-text-secondary text-sm">Paiement securise par Wave</p>
+          <p className="text-text-secondary/80 text-xs mt-2">+225 01 70 90 77 80</p>
+          <p className="text-text-secondary/60 text-xs mt-2">Engagement 3 mois minimum pour White Label Lite</p>
         </motion.div>
       </div>
     </section>

@@ -15,14 +15,14 @@ export default function Tarifs() {
         'Pour le moment, le paiement se fait en une seule fois pour le rapport unique (35 000 FCFA). Pour le White Label Lite, le paiement est mensuel.',
     },
     {
-      question: "Que se passe-t-il après le paiement ?",
+      question: "Que se passe-t-il apres le paiement ?",
       answer:
-        "Vous recevez immédiatement accès au rapport complet en ligne, et le PDF est envoyé par email dans les 2 minutes suivant le paiement.",
+        "Une fois votre paiement Wave signale, notre equipe le verifie rapidement. Vous recevez ensuite un email de confirmation et votre rapport complet devient accessible.",
     },
     {
       question: 'Puis-je obtenir un remboursement ?',
       answer:
-        "Aucun remboursement n'est possible après la génération du rapport. Nous vous recommandons d'utiliser l'audit gratuit pour valider la pertinence de l'outil avant d'acheter.",
+        "Aucun remboursement n'est possible apres la generation du rapport. Nous vous recommandons d'utiliser l'audit gratuit pour valider la pertinence de l'outil avant d'acheter.",
     },
   ];
 
@@ -37,7 +37,7 @@ export default function Tarifs() {
           Tarifs <span className="shiny-text">transparents</span>
         </h1>
         <p className="text-text-secondary text-lg max-w-2xl mx-auto">
-          Des prix pensés pour les PME africaines. Pas d'abonnement caché, pas de surprise.
+          Des prix penses pour les PME africaines. Pas d'abonnement cache, pas de surprise.
         </p>
       </motion.div>
 
@@ -67,7 +67,7 @@ export default function Tarifs() {
           className="max-w-2xl mx-auto text-center bg-gradient-to-b from-primary/10 to-transparent border border-primary/20 rounded-2xl p-8 lg:p-12"
         >
           <h2 className="text-2xl lg:text-3xl font-bold text-white mb-4">
-            Prêt à améliorer votre site ?
+            Pret a ameliorer votre site ?
           </h2>
           <p className="text-text-secondary mb-6">
             Lancez votre premier audit gratuit en 60 secondes. Aucune inscription requise.
@@ -80,7 +80,7 @@ export default function Tarifs() {
             <ArrowRight size={18} />
           </button>
           <p className="text-text-secondary/60 text-xs mt-3">
-            Commencez par un audit gratuit — aucune carte bancaire requise
+            Commencez par un audit gratuit - aucune carte bancaire requise
           </p>
         </motion.div>
       </section>

@@ -6,6 +6,8 @@ import AuthModal from './components/AuthModal';
 import Home from './pages/Home';
 import Analyse from './pages/Analyse';
 import Rapport from './pages/Rapport';
+import Payment from './pages/Payment';
+import Admin from './pages/Admin';
 import Tarifs from './pages/Tarifs';
 import Contact from './pages/Contact';
 import Dashboard from './pages/Dashboard';
@@ -15,6 +17,7 @@ import { useAuth } from './hooks/useAuth';
 
 function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, handleAuth }) {
   const location = useLocation();
+  const isAdminRoute = location.pathname === '/admin';
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -32,14 +35,16 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
 
   return (
     <div className="min-h-screen bg-dark-navy text-text-primary font-inter">
-      <Header
-        user={user}
-        onLogout={logout}
-        onAuthClick={(mode = 'login') => {
-          setAuthMode(mode);
-          setShowAuth(true);
-        }}
-      />
+      {!isAdminRoute && (
+        <Header
+          user={user}
+          onLogout={logout}
+          onAuthClick={(mode = 'login') => {
+            setAuthMode(mode);
+            setShowAuth(true);
+          }}
+        />
+      )}
 
       <main>
         <Routes>
@@ -56,6 +61,8 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
             }
           />
           <Route path="/analyse" element={<Analyse />} />
+          <Route path="/payment" element={<Payment user={user} />} />
+          <Route path="/admin" element={<Admin user={user} />} />
           <Route path="/rapport/:id" element={<Rapport />} />
           <Route path="/tarifs" element={<Tarifs />} />
           <Route path="/contact" element={<Contact />} />
@@ -65,14 +72,16 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
         </Routes>
       </main>
 
-      <Footer />
+      {!isAdminRoute && <Footer />}
 
-      <AuthModal
-        isOpen={showAuth}
-        initialMode={authMode}
-        onClose={() => setShowAuth(false)}
-        onAuth={handleAuth}
-      />
+      {!isAdminRoute && (
+        <AuthModal
+          isOpen={showAuth}
+          initialMode={authMode}
+          onClose={() => setShowAuth(false)}
+          onAuth={handleAuth}
+        />
+      )}
     </div>
   );
 }

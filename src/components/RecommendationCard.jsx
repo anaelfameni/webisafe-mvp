@@ -20,8 +20,8 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
       {isLocked && (
         <div className="absolute inset-0 bg-card-bg/60 backdrop-blur-sm z-10 flex items-center justify-center">
           <div className="text-center p-4">
-            <Lock size={24} className="text-text-secondary mx-auto mb-2" />
-            <p className="text-text-secondary text-sm">Contenu premium</p>
+            <Lock size={24} className="text-white mx-auto mb-2" />
+            <p className="text-white text-sm">Contenu premium</p>
           </div>
         </div>
       )}
@@ -31,14 +31,14 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
         <span className={`text-xs font-semibold px-3 py-1 rounded-full ${config.color}/10 ${config.textColor}`}>
           {config.label}
         </span>
-        <span className="text-text-secondary text-xs">{recommendation.difficulty} · {recommendation.time}</span>
+        <span className="text-white text-xs">{recommendation.difficulty} · {recommendation.time}</span>
       </div>
 
       {/* Title */}
       <h4 className="text-white font-semibold mb-2">{recommendation.title}</h4>
 
       {/* Description */}
-      <p className="text-text-secondary text-sm mb-3 leading-relaxed">
+      <p className="text-white text-sm mb-3 leading-relaxed">
         {recommendation.description || recommendation.impact}
       </p>
 

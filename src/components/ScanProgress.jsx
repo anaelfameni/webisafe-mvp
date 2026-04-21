@@ -8,7 +8,7 @@ const SCAN_STEPS = [
   'Vérification sécurité...',
   'Audit SEO technique...',
   'Test expérience mobile...',
-  'Génération recommandations IA...',
+  'Génération des recommandations',
 ];
 
 const FACTS = [

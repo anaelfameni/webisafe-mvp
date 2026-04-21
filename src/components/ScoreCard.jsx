@@ -26,7 +26,7 @@ export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewD
         </div>
         <div className="text-right">
           <span className="text-2xl font-bold" style={{ color }}>{score}</span>
-          <span className="text-text-secondary text-sm">/100</span>
+          <span className="text-white text-sm">/100</span>
         </div>
       </div>
 
@@ -45,10 +45,10 @@ export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewD
       <div className="space-y-2.5">
         {metrics.map((metric, index) => (
           <div key={index} className="flex items-center justify-between text-sm">
-            <span className="text-text-secondary">{metric.label}</span>
+            <span className="text-white">{metric.label}</span>
             <div className="flex items-center gap-2">
               {index >= 2 && !isPaid ? (
-                <span className="premium-blur text-text-secondary">{metric.value}</span>
+                <span className="premium-blur text-white">{metric.value}</span>
               ) : (
                 <span className="text-text-primary">{metric.value}</span>
               )}

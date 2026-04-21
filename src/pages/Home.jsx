@@ -23,6 +23,7 @@ export default function Home({ user, onAuthRequest }) {
       onAuthRequest();
       return;
     }
+
     const params = new URLSearchParams({ url });
     if (email) params.set('email', email);
     navigate(`/analyse?${params.toString()}`);
@@ -32,53 +33,50 @@ export default function Home({ user, onAuthRequest }) {
     {
       icon: '🐌',
       title: 'Site Lent',
-      description: 'Un délai de 1 seconde = 7% de conversions perdues. Votre site fait-il fuir vos clients ?',
-      stat: '60%',
+      description: 'Un delai de 1 seconde = 7% de conversions perdues. Votre site fait-il fuir vos clients ?',
       statLabel: 'Baisse de trafic',
     },
     {
       icon: '🔒',
-      title: 'Faille Sécurité',
-      description: '73% des sites africains ont une vulnérabilité critique non détectée.',
-      stat: '73%',
-      statLabel: 'Risques de perte de données',
+      title: 'Faille Securite',
+      description: '73% des sites africains ont une vulnerabilite critique non detectee.',
+      statLabel: 'Risques de perte de donnees',
     },
     {
       icon: '📉',
       title: 'SEO Invisible',
-      description: 'Si Google ne vous trouve pas, vos clients non plus. Votre site est-il indexé correctement ?',
-      stat: '53%',
+      description: 'Si Google ne vous trouve pas, vos clients non plus. Votre site est-il indexe correctement ?',
       statLabel: 'Perte de clients',
     },
   ];
 
   const solutionCards = [
     { icon: <Zap size={24} />, title: 'Performance', description: 'Score vitesse, Core Web Vitals, temps de chargement, poids de la page', color: 'text-warning' },
-    { icon: <Shield size={24} />, title: 'Sécurité', description: 'Headers HTTP, certificat SSL, détection malware, failles OWASP', color: 'text-danger' },
+    { icon: <Shield size={24} />, title: 'Securite', description: 'Headers HTTP, certificat SSL, detection malware, failles OWASP', color: 'text-danger' },
     { icon: <Search size={24} />, title: 'SEO', description: 'Meta tags, structure H1, sitemap, indexation Google, Open Graph', color: 'text-success' },
-    { icon: <Smartphone size={24} />, title: 'UX Mobile', description: 'Responsive design, taille texte, éléments tactiles, vitesse mobile', color: 'text-primary' },
+    { icon: <Smartphone size={24} />, title: 'UX Mobile', description: 'Responsive design, taille texte, elements tactiles, vitesse mobile', color: 'text-primary' },
   ];
 
   const testimonials = [
     {
-      name: 'Kouassi Aimé',
-      location: "Abidjan, Côte d'Ivoire",
+      name: 'Kouassi Aime',
+      location: "Abidjan, Cote d'Ivoire",
       role: 'Directeur, AgenceDigital.ci',
-      text: "Webisafe nous a permis d'identifier 12 failles de sécurité sur notre site. Le rapport est clair, en français, et le plan d'action nous a fait gagner 3 semaines.",
+      text: "Webisafe nous a permis d'identifier 12 failles de securite sur notre site. Le rapport est clair, en francais, et le plan d'action nous a fait gagner 3 semaines.",
       stars: 5,
     },
     {
       name: 'Fatou Diallo',
-      location: 'Dakar, Sénégal',
+      location: 'Dakar, Senegal',
       role: 'Fondatrice, ShopSenegal',
-      text: "Notre site mettait 8 secondes à charger. Grâce aux recommandations Webisafe, on est passé à 2.3 secondes. Nos ventes ont augmenté de 35% le mois suivant.",
+      text: "Notre site mettait 8 secondes a charger. Grace aux recommandations Webisafe, on est passe a 2.3 secondes. Nos ventes ont augmente de 35% le mois suivant.",
       stars: 5,
     },
     {
       name: 'Paul Mbarga',
       location: 'Douala, Cameroun',
       role: 'CEO, TechCam Solutions',
-      text: "Le meilleur rapport qualité/prix du marché. 35 000 FCFA pour un audit aussi complet, c'est imbattable face aux outils occidentaux à 100€/mois.",
+      text: "Le meilleur rapport qualite/prix du marche. 35 000 FCFA pour un audit aussi complet, c'est imbattable face aux outils occidentaux a 100 EUR/mois.",
       stars: 5,
     },
   ];
@@ -87,27 +85,27 @@ export default function Home({ user, onAuthRequest }) {
     {
       question: "Comment Webisafe analyse-t-il mon site sans risque ?",
       answer:
-        "Webisafe effectue uniquement des analyses passives à partir des éléments publics de votre site : performances, headers, balises, structure SEO et signaux d'expérience utilisateur. Nous ne modifions rien sur votre site et n'accédons à aucune donnée privée.",
+        "Webisafe effectue uniquement des analyses passives a partir des elements publics de votre site : performances, headers, balises, structure SEO et signaux d'experience utilisateur. Nous ne modifions rien sur votre site et n'accedons a aucune donnee privee.",
     },
     {
       question: "Combien de temps dure l'analyse ?",
       answer:
-        "L'analyse complète prend entre 30 et 90 secondes selon la taille de votre site et la vitesse de votre serveur. Vous recevez les résultats directement sur la page, en temps réel.",
+        "L'analyse complete prend entre 30 et 90 secondes selon la taille de votre site et la vitesse de votre serveur. Vous recevez les resultats directement sur la page, en temps reel.",
     },
     {
-      question: 'Mes données sont-elles sécurisées ?',
+      question: 'Mes donnees sont-elles securisees ?',
       answer:
-        "Oui. Nous ne stockons pas le contenu de votre site. Seuls les résultats de l'audit sont conservés pour votre historique. Vos données ne sont jamais partagées avec des tiers.",
+        "Oui. Nous ne stockons pas le contenu de votre site. Seuls les resultats de l'audit sont conserves pour votre historique. Vos donnees ne sont jamais partagees avec des tiers.",
     },
     {
-      question: 'Le rapport est-il en français ?',
+      question: 'Le rapport est-il en francais ?',
       answer:
-        "Oui, 100% en français. Toutes les recommandations sont rédigées dans un langage simple et actionnable, sans jargon technique. Chaque problème est expliqué avec son impact business et une solution pas-à-pas.",
+        "Oui, 100% en francais. Toutes les recommandations sont redigees dans un langage simple et actionnable, sans jargon technique. Chaque probleme est explique avec son impact business et une solution pas-a-pas.",
     },
     {
       question: 'Quels paiements acceptez-vous ?',
       answer:
-        'Nous acceptons Wave, Orange Money, MTN MoMo et les cartes bancaires via notre partenaire CinetPay. Le paiement est sécurisé et instantané.',
+        'Nous acceptons le paiement via Wave. Envoyez 35 000 FCFA au +225 01 70 90 77 80 et votre rapport sera disponible des que votre paiement sera confirme.',
     },
   ];
 
@@ -153,7 +151,7 @@ export default function Home({ user, onAuthRequest }) {
             transition={{ delay: 0.4, duration: 1.2, ease: 'easeOut' }}
             className="text-text-secondary text-lg lg:text-xl mb-6 max-w-2xl mx-auto"
           >
-            Performance · Sécurité · SEO · UX
+            Performance · Securite · SEO · UX
           </motion.p>
 
           <motion.div
@@ -164,11 +162,11 @@ export default function Home({ user, onAuthRequest }) {
           >
             {[
               '60% des sites africains +4s de chargement',
-              '73% des sites africains ont une faille sécurité critique',
+              '73% des sites africains ont une faille securite critique',
               '53% des visiteurs quittent un site lent',
-            ].map((stat, i) => (
+            ].map((stat, index) => (
               <span
-                key={i}
+                key={index}
                 className="text-xs px-3 py-1.5 bg-danger/10 text-danger/80 rounded-full border border-danger/20"
               >
                 {stat}
@@ -184,7 +182,7 @@ export default function Home({ user, onAuthRequest }) {
             transition={{ delay: 1.2, duration: 1.2 }}
             className="text-text-secondary/60 text-sm mt-6"
           >
-            ⭐ Déjà 50+ sites analysés en Côte d'Ivoire
+            Deja 50+ sites analyses en Cote d'Ivoire
           </motion.p>
         </div>
       </section>
@@ -193,10 +191,10 @@ export default function Home({ user, onAuthRequest }) {
         <div className="max-w-7xl mx-auto">
           <motion.div {...animationProps} className="text-center mb-12">
             <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-              Votre site vous fait peut-être perdre des clients
+              Votre site vous fait peut-etre perdre des clients
             </h2>
             <p className="text-text-secondary max-w-2xl mx-auto">
-              Sans le savoir, votre site web repousse peut être vos visiteurs. Découvrez pourquoi.
+              Sans le savoir, votre site web repousse peut etre vos visiteurs. Decouvrez pourquoi.
             </p>
           </motion.div>
 
@@ -226,9 +224,7 @@ export default function Home({ user, onAuthRequest }) {
       <section id="features" className="py-20 px-4 bg-card-bg/30">
         <div className="max-w-7xl mx-auto">
           <motion.div {...animationProps} className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-              Ce que Webisafe analyse
-            </h2>
+            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Ce que Webisafe analyse</h2>
             <p className="text-text-secondary max-w-2xl mx-auto">
               4 piliers essentiels pour un site web performant et professionnel
             </p>
@@ -244,9 +240,7 @@ export default function Home({ user, onAuthRequest }) {
                 transition={{ delay: index * 0.2, duration: 1.2, ease: 'easeOut' }}
                 className="bg-card-bg border border-border-color rounded-2xl p-6 card-hover text-center"
               >
-                <div
-                  className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-4 ${card.color}`}
-                >
+                <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-4 ${card.color}`}>
                   {card.icon}
                 </div>
                 <h3 className="text-lg font-bold text-white mb-2">{card.title}</h3>
@@ -260,12 +254,8 @@ export default function Home({ user, onAuthRequest }) {
       <section className="py-20 px-4">
         <div className="max-w-5xl mx-auto">
           <motion.div {...animationProps} className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-              Aperçu d'un rapport Webisafe
-            </h2>
-            <p className="text-text-secondary">
-              Un rapport complet, en français, avec des recommandations actionnables
-            </p>
+            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Apercu d'un rapport Webisafe</h2>
+            <p className="text-text-secondary">Un rapport complet, en francais, avec des recommandations actionnables</p>
           </motion.div>
 
           <motion.div
@@ -277,9 +267,7 @@ export default function Home({ user, onAuthRequest }) {
           >
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-border-color">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center font-bold text-white text-sm">
-                  W
-                </div>
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center font-bold text-white text-sm">W</div>
                 <div>
                   <p className="text-white font-semibold text-sm">Rapport Webisafe</p>
                   <p className="text-text-secondary text-xs">exemple-site.ci · 19 avril 2025</p>
@@ -300,11 +288,11 @@ export default function Home({ user, onAuthRequest }) {
               <div className="lg:col-span-4 grid grid-cols-2 gap-4">
                 {[
                   { name: '⚡ Performance', score: 68, color: 'bg-warning' },
-                  { name: '🔒 Sécurité', score: 45, color: 'bg-danger' },
+                  { name: '🔒 Securite', score: 45, color: 'bg-danger' },
                   { name: '🔍 SEO', score: 82, color: 'bg-success' },
                   { name: '📱 UX Mobile', score: 71, color: 'bg-primary' },
-                ].map((cat, i) => (
-                  <div key={i}>
+                ].map((cat, index) => (
+                  <div key={index}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-text-secondary text-sm">{cat.name}</span>
                       <span className="text-white font-semibold text-sm">{cat.score}/100</span>
@@ -321,10 +309,10 @@ export default function Home({ user, onAuthRequest }) {
               <p className="text-white font-semibold text-sm mb-3">Remarques prioritaires :</p>
               {[
                 { priority: '🟢', title: 'Texte ok sur mobile' },
-                { priority: '🟢', title: 'Images compressées' },
+                { priority: '🟢', title: 'Images compressees' },
                 { priority: '🟠', title: 'Meta description absente' },
-              ].map((rec, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 bg-dark-navy rounded-lg">
+              ].map((rec, index) => (
+                <div key={index} className="flex items-center gap-3 p-3 bg-dark-navy rounded-lg">
                   <span>{rec.priority}</span>
                   <span className="text-text-primary text-sm">{rec.title}</span>
                 </div>
@@ -334,11 +322,11 @@ export default function Home({ user, onAuthRequest }) {
                 <div className="premium-blur space-y-3">
                   <div className="flex items-center gap-3 p-3 bg-dark-navy rounded-lg">
                     <span>🔴</span>
-                    <span className="text-text-primary text-sm">Headers de sécurité manquants</span>
+                    <span className="text-text-primary text-sm">Headers de securite manquants</span>
                   </div>
                   <div className="flex items-center gap-3 p-3 bg-dark-navy rounded-lg">
                     <span>🔴</span>
-                    <span className="text-text-primary text-sm">Sitemap.xml non trouvé</span>
+                    <span className="text-text-primary text-sm">Sitemap.xml non trouve</span>
                   </div>
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -350,7 +338,7 @@ export default function Home({ user, onAuthRequest }) {
                     className="flex items-center gap-2 px-5 py-2.5 bg-primary/90 text-white text-sm font-medium rounded-full btn-glow hover:bg-primary transition-all"
                   >
                     <Eye size={16} />
-                    Débloquer le rapport complet
+                    Debloquer le rapport complet
                     <ArrowRight size={16} />
                   </button>
                 </div>
@@ -372,13 +360,11 @@ export default function Home({ user, onAuthRequest }) {
             viewport={{ once: true }}
             className="text-center mb-12"
           >
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-              Ils font confiance à Webisafe
-            </h2>
+            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Ils font confiance a Webisafe</h2>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {testimonials.map((t, index) => (
+            {testimonials.map((testimonial, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 30 }}
@@ -388,24 +374,21 @@ export default function Home({ user, onAuthRequest }) {
                 className="bg-card-bg border border-border-color rounded-2xl p-6 card-hover"
               >
                 <div className="flex items-center gap-1 mb-3">
-                  {Array.from({ length: t.stars }).map((_, i) => (
-                    <Star key={i} size={14} className="text-warning" fill="currentColor" />
+                  {Array.from({ length: testimonial.stars }).map((_, starIndex) => (
+                    <Star key={starIndex} size={14} className="text-warning" fill="currentColor" />
                   ))}
                 </div>
-                <p className="text-text-secondary text-sm leading-relaxed mb-4 italic">"{t.text}"</p>
+                <p className="text-text-secondary text-sm leading-relaxed mb-4 italic">"{testimonial.text}"</p>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
                     <span className="text-primary font-bold text-sm">
-                      {t.name
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')}
+                      {testimonial.name.split(' ').map((name) => name[0]).join('')}
                     </span>
                   </div>
                   <div>
-                    <p className="text-white text-sm font-semibold">{t.name}</p>
+                    <p className="text-white text-sm font-semibold">{testimonial.name}</p>
                     <p className="text-text-secondary text-xs">
-                      {t.role} · {t.location}
+                      {testimonial.role} · {testimonial.location}
                     </p>
                   </div>
                 </div>
@@ -423,7 +406,7 @@ export default function Home({ user, onAuthRequest }) {
             viewport={{ once: true }}
             className="text-center mb-12"
           >
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Questions fréquentes</h2>
+            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Questions frequentes</h2>
           </motion.div>
 
           <FAQAccordion items={faqItems} />
@@ -437,9 +420,7 @@ export default function Home({ user, onAuthRequest }) {
           viewport={{ once: true }}
           className="max-w-2xl mx-auto text-center bg-gradient-to-b from-primary/10 to-transparent border border-primary/20 rounded-2xl p-8 lg:p-12"
         >
-          <h2 className="text-2xl lg:text-3xl font-bold text-white mb-4">
-            Prêt à améliorer votre site ?
-          </h2>
+          <h2 className="text-2xl lg:text-3xl font-bold text-white mb-4">Pret a ameliorer votre site ?</h2>
           <p className="text-text-secondary mb-6">
             Lancez votre premier audit gratuit en 60 secondes. Aucune inscription requise.
           </p>

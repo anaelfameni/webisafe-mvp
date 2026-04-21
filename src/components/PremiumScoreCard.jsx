@@ -62,13 +62,13 @@ export default function PremiumScoreCard({ score, ctaButton, compact = false, ba
                         boxShadow: isActive ? `0 0 8px ${seg.glowColor}` : 'none',
                       }}
                     />
-                    <span className={`text-xs font-medium w-[52px] shrink-0 tabular-nums ${isActive ? 'text-white/80' : 'text-white/35'}`}>
+                    <span className={`text-xs font-medium w-[52px] shrink-0 tabular-nums ${isActive ? 'text-white/80' : 'text-white'}`}>
                       {seg.range}
                     </span>
                     <span className={`text-[13px] font-bold flex-1 tracking-wide ${isActive ? 'text-white' : 'text-white/75'}`}>
                       {seg.label}
                     </span>
-                    <span className={`text-[11px] text-right hidden sm:block ${isActive ? 'text-white/70 font-medium' : 'text-white/30'}`}>
+                    <span className={`text-[11px] text-right hidden sm:block ${isActive ? 'text-white/70 font-medium' : 'text-white'}`}>
                       {seg.desc}
                     </span>
                   </div>
@@ -81,8 +81,8 @@ export default function PremiumScoreCard({ score, ctaButton, compact = false, ba
         <div className="w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-10 mt-4 mb-4" />
 
         <div className="flex items-center justify-between w-full z-10">
-          <span className="text-xs text-white/25">webisafe.ci · Analyse complète</span>
-          <span className="text-xs text-white/20">Analysé le {formattedDate}</span>
+          <span className="text-xs text-white">webisafe.ci · Analyse complète</span>
+          <span className="text-xs text-white">Analysé le {formattedDate}</span>
         </div>
 
         {ctaButton && <div className="mt-8 w-full flex justify-center z-10">{ctaButton}</div>}

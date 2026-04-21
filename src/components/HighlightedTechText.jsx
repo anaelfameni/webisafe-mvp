@@ -1,8 +1,8 @@
 const TERM_PATTERNS = [
-  { pattern: /\b(HTTPS|SSL|HSTS|Content-Security-Policy|CSP|X-Frame-Options|headers?)\b/gi, className: 'text-danger font-semibold' },
-  { pattern: /\b(LCP|FID|CLS|Core Web Vitals|TTFB)\b/gi, className: 'text-warning font-semibold' },
-  { pattern: /\b(SEO|meta description|balise Title|balise H1|canonical|Open Graph|sitemap\.xml|robots\.txt|attribut ALT)\b/gi, className: 'text-success font-semibold' },
-  { pattern: /\b(UX Mobile|responsive|viewport|éléments tactiles|interactivité|expérience mobile)\b/gi, className: 'text-primary font-semibold' },
+  { pattern: /\b(HTTPS|SSL|HSTS|Content-Security-Policy|CSP|X-Frame-Options|headers?)\b/gi, className: 'text-white font-bold' },
+  { pattern: /\b(LCP|FID|CLS|Core Web Vitals|TTFB)\b/gi, className: 'text-white font-bold' },
+  { pattern: /\b(SEO|meta description|balise Title|balise H1|canonical|Open Graph|sitemap\.xml|robots\.txt|attribut ALT)\b/gi, className: 'text-white font-bold' },
+  { pattern: /\b(UX Mobile|responsive|viewport|éléments tactiles|interactivité|expérience mobile)\b/gi, className: 'text-white font-bold' },
 ];
 
 function splitWithMatches(text, pattern) {
