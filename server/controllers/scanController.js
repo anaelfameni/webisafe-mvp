@@ -1,31 +1,3 @@
-// ✅ VÉRIFICATION PRÉLIMINAIRE : site accessible ?
-try {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  const preCheck = await fetch(url, {
-    method: 'HEAD',
-    signal: controller.signal,
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
-  });
-  clearTimeout(timeout);
-
-  // Si le site répond avec une erreur serveur grave
-  if (preCheck.status >= 500) {
-    return res.status(200).json({
-      success: false,
-      error: 'Site inaccessible ou en erreur serveur',
-      code: 'SITE_UNREACHABLE',
-    });
-  }
-} catch (err) {
-  // DNS introuvable, timeout, connexion refusée
-  return res.status(200).json({
-    success: false,
-    error: 'Ce site est inaccessible ou l\'URL est incorrecte.',
-    code: 'SITE_UNREACHABLE',
-  });
-}
-
 import { randomUUID } from 'crypto';
 import { scanPerformance } from '../scanners/performanceScanner.js';
 import { scanSecurity } from '../scanners/securityScanner.js';
@@ -35,7 +7,6 @@ import { calculateGlobalScore, getGrade } from '../utils/scoreCalculator.js';
 
 /**
  * Enveloppe chaque scanner dans une Promise avec timeout global de sécurité.
- * La gestion fine du timeout est déjà dans chaque scanner via AbortController.
  */
 async function safeRun(label, fn) {
   try {
@@ -56,8 +27,33 @@ export async function handleScan(req, res) {
   const { url } = req.body;
   const scanId = randomUUID();
   const startMs = Date.now();
-
   console.log(`\n[SCAN] Démarrage — id=${scanId} url=${url}`);
+
+  // ✅ VÉRIFICATION PRÉLIMINAIRE : site accessible ?
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const preCheck = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
+    });
+    clearTimeout(timeout);
+
+    if (preCheck.status >= 500) {
+      return res.status(200).json({
+        success: false,
+        error: 'Site inaccessible ou en erreur serveur',
+        code: 'SITE_UNREACHABLE',
+      });
+    }
+  } catch (err) {
+    return res.status(200).json({
+      success: false,
+      error: 'Ce site est inaccessible ou l\'URL est incorrecte.',
+      code: 'SITE_UNREACHABLE',
+    });
+  }
 
   const psKey = process.env.GOOGLE_PAGESPEED_KEY;
   const vtKey = process.env.VIRUSTOTAL_API_KEY;
@@ -77,13 +73,13 @@ export async function handleScan(req, res) {
     safeRun('UX/Mobile', () => scanUXMobile(url, psKey)),
   ]);
 
-  // ── Extraction des valeurs (Promise.allSettled ne rejette jamais) ─────────
+  // ── Extraction des valeurs ─────────────────────────────────────────────────
   const perf = perfResult.value?.ok ? perfResult.value.data : null;
   const sec = secResult.value?.ok ? secResult.value.data : null;
   const seo = seoResult.value?.ok ? seoResult.value.data : null;
   const ux = uxResult.value?.ok ? uxResult.value.data : null;
 
-  // ── Scores individuels (null si scanner échoué) ───────────────────────────
+  // ── Scores individuels ─────────────────────────────────────────────────────
   const scores = {
     performance: perf?.score ?? null,
     security: sec?.score ?? null,
@@ -91,7 +87,7 @@ export async function handleScan(req, res) {
     ux: ux?.score ?? null,
   };
 
-  // ── Score global pondéré ─────────────────────────────────────────────────
+  // ── Score global pondéré ───────────────────────────────────────────────────
   const globalScore = calculateGlobalScore(
     scores.performance,
     scores.security,
@@ -102,7 +98,7 @@ export async function handleScan(req, res) {
   const scanDurationMs = Date.now() - startMs;
   console.log(`[SCAN] ✅ Terminé en ${scanDurationMs}ms — score global : ${globalScore}`);
 
-  // ── Réponse complète ──────────────────────────────────────────────────────
+  // ── Réponse complète ───────────────────────────────────────────────────────
   return res.json({
     success: true,
     scan_id: scanId,
