@@ -4,7 +4,14 @@ import { fetchJsonWithTimeout } from '../utils/http.ts';
 export interface PageSpeedBundle {
   lighthouseResult?: {
     categories?: Record<string, { score?: number }>;
-    audits?: Record<string, { score?: number; numericValue?: number; details?: Record<string, unknown>; displayValue?: string }>;
+    audits?: Record<string, { 
+      score?: number; 
+      numericValue?: number; 
+      details?: Record<string, unknown>; 
+      displayValue?: string;
+      title?: string;
+      description?: string;
+    }>;
   };
 }
 

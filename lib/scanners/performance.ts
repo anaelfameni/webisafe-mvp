@@ -51,13 +51,28 @@ function auditScore(audits: Record<string, { score?: number }> | undefined, key:
   return typeof raw === 'number' ? raw : null;
 }
 
+const AUDIT_METADATA: Record<string, { difficulte: 'facile' | 'moyenne' | 'difficile'; temps: string; impact_financier: number }> = {
+  'uses-optimized-images': { difficulte: 'facile', temps: '2 à 4 heures', impact_financier: 150000 },
+  'render-blocking-resources': { difficulte: 'moyenne', temps: '4 à 8 heures', impact_financier: 200000 },
+  'unused-javascript': { difficulte: 'moyenne', temps: '1 journée', impact_financier: 180000 },
+  'unused-css-rules': { difficulte: 'moyenne', temps: '4 à 6 heures', impact_financier: 120000 },
+  'uses-text-compression': { difficulte: 'facile', temps: '1 à 2 heures', impact_financier: 90000 },
+  'uses-long-cache-ttl': { difficulte: 'facile', temps: '1 heure', impact_financier: 80000 },
+  'offscreen-images': { difficulte: 'facile', temps: '2 heures', impact_financier: 110000 },
+  'unminified-javascript': { difficulte: 'facile', temps: '1 heure', impact_financier: 70000 },
+  'unminified-css': { difficulte: 'facile', temps: '1 heure', impact_financier: 60000 },
+  'modern-image-formats': { difficulte: 'facile', temps: '2 à 3 heures', impact_financier: 140000 },
+  'server-response-time': { difficulte: 'difficile', temps: '1 à 2 jours', impact_financier: 300000 },
+  'redirects': { difficulte: 'moyenne', temps: '2 heures', impact_financier: 100000 },
+};
+
 function hasOpportunity(
-  audits: Record<string, { score?: number }> | undefined,
+  audits: PageSpeedBundle['lighthouseResult']['audits'],
   key: string,
   threshold = 0.9
 ) {
-  const score = auditScore(audits, key);
-  return score !== null && score < threshold;
+  const score = audits?.[key]?.score;
+  return typeof score === 'number' && score < threshold;
 }
 
 export function buildPerformanceAnalysis(
@@ -93,176 +108,95 @@ export function buildPerformanceAnalysis(
   const poidsPageScore = pageWeightScore(totalPageMb);
   const score = clampScore(pageSpeedScore * 0.4 + coreWebVitalsScore * 0.4 + poidsPageScore * 0.2);
 
-  if (lcp > 4000) {
+  // 1. Findings de base pour les métriques Core Web Vitals
+  if (lcp > 2500) {
     findings.push(
       createFinding({
         categorie: 'performance',
-        titre: 'Temps de rendu principal trop long',
-        severite: lcp > 6000 ? 'critique' : 'majeure',
-        description: `Le Largest Contentful Paint atteint ${Math.round(lcp)} ms, au-dessus des 2500 ms recommandés. Le contenu principal apparaît trop tard pour une expérience mobile confortable.`,
-        impact_business: 'Les visiteurs attendent trop longtemps avant de voir le contenu clé, ce qui réduit l’engagement et la conversion.',
-        impact_financier_fcfa: 180000,
-        description_courte: `LCP de ${Math.round(lcp)} ms : le contenu principal met trop de temps à s’afficher.`,
-        temps_resolution: '1 à 2 jours',
+        titre: 'Temps de rendu principal (LCP) suboptimal',
+        severite: lcp > 4000 ? 'majeure' : 'mineure',
+        description: audits?.['largest-contentful-paint']?.description || `Le contenu principal met ${Math.round(lcp)} ms à s'afficher.`,
+        impact_business: 'Réduit le taux de conversion et augmente le taux de rebond car les visiteurs attendent trop longtemps.',
+        impact_financier_fcfa: lcp > 4000 ? 180000 : 90000,
       })
     );
   }
 
-  if (totalPageMb > 3 || networkRequests > 100) {
+  if (cls > 0.1) {
     findings.push(
       createFinding({
         categorie: 'performance',
-        titre: 'Page trop lourde pour un usage mobile fluide',
-        severite: totalPageMb > 5 || networkRequests > 140 ? 'critique' : 'majeure',
-        description: `PageSpeed remonte environ ${totalPageMb} MB transférés et ${networkRequests} requêtes réseau. Cette charge ralentit fortement le chargement sur mobile.`,
-        impact_business: 'Une page lourde dégrade l’expérience utilisateur, le référencement mobile et la probabilité de conversion.',
-        impact_financier_fcfa: 220000,
-        description_courte: `${totalPageMb} MB et ${networkRequests} requêtes : le chargement mobile est pénalisé.`,
+        titre: 'Instabilité de la mise en page (CLS)',
+        severite: cls > 0.25 ? 'majeure' : 'mineure',
+        description: audits?.['cumulative-layout-shift']?.description || `La page subit des décalages visuels pendant le chargement (${cls.toFixed(3)}).`,
+        impact_business: 'Frustre les utilisateurs et peut provoquer des erreurs de clic involontaires.',
+        impact_financier_fcfa: cls > 0.25 ? 120000 : 60000,
       })
     );
   }
 
-  if (totalBlockingTime > 300) {
+  if (totalBlockingTime > 200) {
     findings.push(
       createFinding({
         categorie: 'performance',
-        titre: 'JavaScript bloque trop longtemps l’interaction',
+        titre: 'Interactivité retardée (TBT)',
         severite: totalBlockingTime > 600 ? 'critique' : 'majeure',
-        description: `Le Total Blocking Time atteint ${Math.round(totalBlockingTime)} ms. La page devient interactive trop tard à cause de tâches JavaScript trop longues.`,
-        impact_business: 'Les utilisateurs ont l’impression que le site ne répond pas, ce qui augmente les abandons sur les parcours clés.',
+        description: audits?.['total-blocking-time']?.description || `Le JavaScript bloque le thread principal pendant ${Math.round(totalBlockingTime)} ms.`,
+        impact_business: 'Donne une impression de lenteur et de non-réponse du site aux interactions.',
         impact_financier_fcfa: 160000,
-        description_courte: `TBT de ${Math.round(totalBlockingTime)} ms : l’interactivité est retardée.`,
       })
     );
   }
 
-  if (cls > 0.25) {
+  // 2. Boucle dynamique sur les opportunités PageSpeed
+  const opportunities = Object.entries(audits || {})
+    .filter(([key, audit]) => {
+      return (
+        typeof audit.score === 'number' &&
+        audit.score < 0.9 &&
+        (audit.details?.overallSavingsBytes || audit.details?.overallSavingsMs || 0) > 0
+      );
+    })
+    .sort((a, b) => {
+      const savingsA = (a[1].details?.overallSavingsBytes || 0) + (a[1].details?.overallSavingsMs || 0) * 1000;
+      const savingsB = (b[1].details?.overallSavingsBytes || 0) + (b[1].details?.overallSavingsMs || 0) * 1000;
+      return savingsB - savingsA;
+    })
+    .slice(0, 6);
+
+  opportunities.forEach(([key, audit]) => {
+    const meta = AUDIT_METADATA[key] || { difficulte: 'moyenne', temps: '4 heures', impact_financier: 100000 };
+    
     findings.push(
       createFinding({
         categorie: 'performance',
-        titre: 'Mise en page instable pendant le chargement',
-        severite: 'majeure',
-        description: `Le Cumulative Layout Shift atteint ${cls.toFixed(3)}, au-dessus du seuil recommandé de 0.1. Des éléments se déplacent pendant le chargement.`,
-        impact_business: 'Les décalages visuels créent des clics involontaires et diminuent la confiance dans le site.',
-        impact_financier_fcfa: 90000,
-        description_courte: `CLS de ${cls.toFixed(3)} : la page manque de stabilité visuelle.`,
+        titre: audit.title || key,
+        severite: (audit.score || 0) < 0.5 ? 'majeure' : 'mineure',
+        description: audit.description || 'Audit de performance Google PageSpeed.',
+        impact_business: 'Impact direct sur la vitesse de chargement perçue et le score SEO Google.',
+        impact_financier_fcfa: meta.impact_financier,
+        description_courte: audit.title,
       })
     );
-  }
 
-  if (hasOpportunity(audits, 'uses-optimized-images') && imageSavingsMb > 0.1) {
     recommendations.push(
       createRecommendation({
         ordre: recommendations.length + 1,
         categorie: 'performance',
-        action: 'Optimiser les images les plus lourdes',
-        justification: `PageSpeed estime un gain d’environ ${imageSavingsMb} MB sur les images non optimisées.`,
-        impact: 'Chargement plus rapide, meilleur score mobile et affichage principal accéléré.',
-        difficulte: 'facile',
-        temps: '2 à 4 heures',
-        etapes: [
-          'Identifier les images responsables du plus gros poids transféré.',
-          'Convertir les formats compatibles vers WebP ou AVIF.',
-          'Servir des tailles adaptées selon mobile et desktop.',
-        ],
+        action: audit.title || key,
+        justification: audit.description || 'Optimisation recommandée par Lighthouse.',
+        impact: `Gain potentiel de ${audit.displayValue || 'performance'}.`,
+        difficulte: meta.difficulte,
+        temps: meta.temps,
       })
     );
-  }
+  });
 
-  if (hasOpportunity(audits, 'render-blocking-resources') && renderBlockingSavingsMs > 0) {
-    recommendations.push(
-      createRecommendation({
-        ordre: recommendations.length + 1,
-        categorie: 'performance',
-        action: 'Supprimer les ressources bloquantes au rendu',
-        justification: `PageSpeed estime un gain d’environ ${Math.round(renderBlockingSavingsMs)} ms si les CSS/JS bloquants sont différés ou allégés.`,
-        impact: 'Le contenu visible apparaît plus vite et le FCP/LCP s’améliorent.',
-        difficulte: 'moyenne',
-        temps: '4 à 8 heures',
-        etapes: [
-          'Repérer les feuilles CSS et scripts chargés avant le premier écran.',
-          'Différer ou charger en async les scripts non critiques.',
-          'Extraire le CSS critique du premier écran.',
-        ],
-      })
-    );
-  }
-
-  if (hasOpportunity(audits, 'unused-javascript') && jsSavingsMb > 0.05) {
-    recommendations.push(
-      createRecommendation({
-        ordre: recommendations.length + 1,
-        categorie: 'performance',
-        action: 'Réduire le JavaScript inutilisé',
-        justification: `PageSpeed estime environ ${jsSavingsMb} MB de JavaScript évitable.`,
-        impact: 'Moins de blocage main-thread et une interactivité plus rapide.',
-        difficulte: 'moyenne',
-        temps: '1 journée',
-        etapes: [
-          'Identifier les bundles ou librairies chargés mais peu utilisés.',
-          'Découper le code par page ou par fonctionnalité.',
-          'Retirer les scripts tiers non essentiels au premier affichage.',
-        ],
-      })
-    );
-  }
-
-  if (hasOpportunity(audits, 'unused-css-rules') && cssSavingsMb > 0.02) {
-    recommendations.push(
-      createRecommendation({
-        ordre: recommendations.length + 1,
-        categorie: 'performance',
-        action: 'Nettoyer le CSS inutilisé',
-        justification: `PageSpeed remonte environ ${cssSavingsMb} MB de CSS non utilisé.`,
-        impact: 'Moins de données téléchargées et rendu plus rapide.',
-        difficulte: 'moyenne',
-        temps: '4 à 6 heures',
-        etapes: [
-          'Repérer les styles jamais utilisés dans les écrans critiques.',
-          'Supprimer ou purger le CSS mort au build.',
-          'Vérifier les régressions visuelles sur les pages principales.',
-        ],
-      })
-    );
-  }
-
-  if (hasOpportunity(audits, 'uses-text-compression') && compressionSavingsMb > 0.02) {
-    recommendations.push(
-      createRecommendation({
-        ordre: recommendations.length + 1,
-        categorie: 'performance',
-        action: 'Activer la compression texte HTTP',
-        justification: `PageSpeed estime un gain d’environ ${compressionSavingsMb} MB sur les ressources texte non compressées.`,
-        impact: 'Réduction du poids transféré pour HTML, CSS et JavaScript.',
-        difficulte: 'facile',
-        temps: '1 à 2 heures',
-        etapes: [
-          'Activer Brotli ou Gzip sur le CDN ou le serveur.',
-          'Vérifier la compression sur HTML, CSS, JS et JSON.',
-          'Contrôler que les en-têtes de cache restent cohérents après déploiement.',
-        ],
-      })
-    );
-  }
-
-  if (hasOpportunity(audits, 'uses-long-cache-ttl')) {
-    recommendations.push(
-      createRecommendation({
-        ordre: recommendations.length + 1,
-        categorie: 'performance',
-        action: 'Allonger la durée de cache des assets statiques',
-        justification: 'PageSpeed signale que certains fichiers statiques ne bénéficient pas encore d’un cache long efficace.',
-        impact: 'Accélération des visites récurrentes et baisse de la consommation de bande passante.',
-        difficulte: 'facile',
-        temps: '1 à 2 heures',
-        etapes: [
-          'Ajouter des en-têtes de cache longs sur les assets versionnés.',
-          'Conserver une stratégie d’invalidation via hash de fichiers.',
-          'Vérifier les headers sur les images, polices et bundles JS/CSS.',
-        ],
-      })
-    );
-  }
+  // 3. Tri final : Mineures d'abord, puis Majeures, puis Critiques (comme demandé par le USER)
+  findings.sort((a, b) => {
+    const rank = { mineure: 1, majeure: 2, critique: 3 } as Record<string, number>;
+    return rank[a.severite] - rank[b.severite];
+  });
 
   return {
     score,
@@ -320,23 +254,7 @@ export async function scanPerformance(context: ScanContext): Promise<ScannerResu
   );
 
   if (!pageSpeedBundle) {
-    apisFailed.push('PageSpeed');
-    partial = true;
-    return {
-      score: 0,
-      metrics: {
-        pageSpeed_score: 0,
-        core_web_vitals: {},
-        poids_page: {},
-        temps_chargement: {},
-        recommendations: {},
-      },
-      findings: [],
-      recommendations: [],
-      apisUsed,
-      apisFailed,
-      partial,
-    };
+    throw new Error('SCAN_FAILED_PAGESPEED');
   }
 
   apisUsed.push('PageSpeed');

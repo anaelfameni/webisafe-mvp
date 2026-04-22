@@ -172,6 +172,9 @@ ${JSON.stringify(args.recommendations, null, 2)}
 MÉTRIQUES :
 ${JSON.stringify(args.metrics, null, 2)}
 
+Ton rôle est également de réécrire les titres et descriptions des failles détectées pour les rendre plus professionnelles, persuasives et intelligibles pour un chef d'entreprise (ton expert et rassurant). 
+Inspire-toi de la structure des anciens textes explicatifs fictifs (focus sur l'impact business et la clarté).
+
 Retourne uniquement un JSON valide respectant cette structure :
 ${JSON.stringify(fallback, null, 2)}
             `.trim(),
