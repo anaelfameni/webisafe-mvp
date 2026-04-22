@@ -46,7 +46,7 @@ export default function Analyse() {
       setScanId(id);
       setScanData(storedScan);
       setHasPaid(isPaid(id));
-      persistScanRecord(storedScan).catch(() => null);
+      // persistScanRecord(storedScan).catch(() => null); // Désactivé temporairement
       setScanState('results');
     } catch (error) {
       console.error('Erreur scan:', error);
@@ -262,7 +262,7 @@ export default function Analyse() {
                       <div className="text-center py-6">
                         <p className="text-white text-sm mb-4">
                           <Lock size={14} className="inline mr-1" />
-                          {blurredRecs.length} corrections critiques et supplementaires disponibles
+                          {blurredRecsCount} corrections critiques et supplementaires disponibles
                         </p>
                         <button
                           onClick={() => setShowFreemiumGate(true)}
