@@ -12,7 +12,6 @@ import { runFullAnalysis } from '../utils/api';
 import { useScans } from '../hooks/useScans';
 import { persistScanRecord } from '../utils/paymentApi';
 import { normalizeURL, extractDomain } from '../utils/validators';
-import { buildScanConclusion } from '../utils/scanConclusion';
 
 export default function Analyse() {
   const [searchParams] = useSearchParams();
@@ -84,37 +83,36 @@ export default function Analyse() {
   };
 
   const getPerformanceMetrics = (data) => [
-    { label: 'Temps de chargement', value: data.performance.loadTime, status: parseFloat(data.performance.loadTime) < 3 ? 'pass' : 'fail' },
-    { label: 'Taille de la page', value: data.performance.pageSize },
-    { label: 'LCP', value: data.performance.lcp, status: data.performance.status?.lcp },
-    { label: 'FID', value: data.performance.fid, status: data.performance.status?.fid },
-    { label: 'CLS', value: data.performance.cls, status: data.performance.status?.cls },
+    { label: 'LCP', value: `${data.performance.core_web_vitals.lcp.value}ms`, status: data.performance.core_web_vitals.lcp.rating === 'good' ? 'pass' : 'fail' },
+    { label: 'CLS', value: data.performance.core_web_vitals.cls.value, status: data.performance.core_web_vitals.cls.rating === 'good' ? 'pass' : 'fail' },
+    { label: 'FCP', value: `${data.performance.core_web_vitals.fcp.value}ms`, status: data.performance.core_web_vitals.fcp.rating === 'good' ? 'pass' : 'fail' },
+    { label: 'Taille Page', value: `${data.performance.poids_page_mb}MB` },
+    { label: 'Requetes', value: data.performance.nb_requetes },
   ];
 
   const getSecurityMetrics = (data) => [
-    { label: 'HTTPS', value: data.security.https ? 'Active' : 'Non active', status: data.security.https ? 'pass' : 'fail' },
-    { label: 'Certificat SSL', value: data.security.sslValid ? `Valide (${data.security.sslDays}j)` : 'Invalide', status: data.security.sslValid ? 'pass' : 'fail' },
-    { label: 'HSTS', value: data.security.hsts ? 'Active' : 'Absent', status: data.security.hsts ? 'pass' : 'fail' },
-    { label: 'CSP', value: data.security.csp ? 'Present' : 'Absent', status: data.security.csp ? 'pass' : 'fail' },
+    { label: 'HTTPS', value: data.summary.https_enabled ? 'Active' : 'Non active', status: data.summary.https_enabled ? 'pass' : 'fail' },
+    { label: 'SSL Grade', value: data.security.ssl_grade, status: data.security.ssl_grade === 'A+' || data.security.ssl_grade === 'A' ? 'pass' : 'fail' },
+    { label: 'Headers Manquants', value: data.security.headers_manquants.length > 0 ? data.security.headers_manquants.join(', ') : 'Aucun', status: data.security.headers_manquants.length === 0 ? 'pass' : 'warn' },
     { label: 'Malware', value: data.security.malware ? 'Detecte !' : 'Aucun', status: data.security.malware ? 'fail' : 'pass' },
+    { label: 'Failles OWASP', value: data.security.failles_owasp_count, status: data.security.failles_owasp_count === 0 ? 'pass' : 'fail' },
   ];
 
   const getSeoMetrics = (data) => [
-    { label: 'Balise Title', value: data.seo.titleOk ? `OK (${data.seo.titleLength} car.)` : 'Absente', status: data.seo.titleOk ? 'pass' : 'fail' },
-    { label: 'Meta Description', value: data.seo.descriptionOk ? 'Presente' : 'Absente', status: data.seo.descriptionOk ? 'pass' : 'fail' },
-    { label: 'Images sans ALT', value: `${data.seo.altMissing} image(s)`, status: data.seo.altMissing === 0 ? 'pass' : data.seo.altMissing < 5 ? 'warn' : 'fail' },
-    { label: 'Sitemap.xml', value: data.seo.sitemapOk ? 'Trouve' : 'Non trouve', status: data.seo.sitemapOk ? 'pass' : 'fail' },
-    { label: 'Robots.txt', value: data.seo.robotsTxtOk ? 'Trouve' : 'Non trouve', status: data.seo.robotsTxtOk ? 'pass' : 'fail' },
+    { label: 'Indexation Google', value: data.seo.indexed ? 'Oui' : 'Non', status: data.seo.indexed ? 'pass' : 'fail' },
+    { label: 'Sitemap', value: data.seo.sitemap_present ? 'Trouvee' : 'Absente', status: data.seo.sitemap_present ? 'pass' : 'fail' },
+    { label: 'Meta Tags', value: data.seo.meta_tags_ok ? 'OK' : 'Incomplets', status: data.seo.meta_tags_ok ? 'pass' : 'fail' },
+    { label: 'Open Graph', value: data.seo.open_graph ? 'Present' : 'Absent', status: data.seo.open_graph ? 'pass' : 'fail' },
   ];
 
   const getUxMetrics = (data) => [
     { label: 'Responsive', value: data.ux.responsive ? 'Oui' : 'Non', status: data.ux.responsive ? 'pass' : 'fail' },
-    { label: 'Texte lisible', value: data.ux.textReadable ? 'Oui' : 'Non', status: data.ux.textReadable ? 'pass' : 'fail' },
-    { label: 'Elements tactiles', value: data.ux.tapTargets ? 'Espaces' : 'Trop proches', status: data.ux.tapTargets ? 'pass' : 'fail' },
-    { label: 'Interactivite', value: data.ux.timeToInteractive },
+    { label: 'Taille Texte', value: `${data.ux.taille_texte_px}px`, status: data.ux.taille_texte_px >= 12 ? 'pass' : 'fail' },
+    { label: 'Elements Tactiles', value: data.ux.elements_tactiles_ok ? 'Optimises' : 'Trop proches', status: data.ux.elements_tactiles_ok ? 'pass' : 'fail' },
+    { label: 'Score Vitesse Mobile', value: `${data.ux.vitesse_mobile}/100`, status: data.ux.vitesse_mobile >= 70 ? 'pass' : 'warn' },
   ];
 
-  const conclusionText = scanData ? buildScanConclusion(scanData) : '';
+  const conclusionText = scanData?.summary?.resume_executif || '';
 
   if (!url) {
     return (
@@ -165,11 +163,6 @@ export default function Analyse() {
         >
           <h1 className="text-4xl lg:text-5xl font-bold text-white mb-3">Resultats de l'audit</h1>
           <p className="text-lg text-white">{extractDomain(url)}</p>
-          {scanData?.isPartial && (
-            <p className="inline-block mt-3 bg-warning/10 border border-warning/20 text-warning text-xs px-3 py-1 rounded-full">
-              Resultats fictifs pour la demo
-            </p>
-          )}
         </motion.div>
 
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
@@ -196,7 +189,7 @@ export default function Analyse() {
           <ScoreCard title="Performance" icon="⚡" score={scanData.scores.performance} metrics={getPerformanceMetrics(scanData)} isPaid={hasPaid} onViewDetails={handleViewDetails} />
           <ScoreCard title="Securite" icon="🔒" score={scanData.scores.security} metrics={getSecurityMetrics(scanData)} isPaid={hasPaid} onViewDetails={handleViewDetails} />
           <ScoreCard title="SEO" icon="🔍" score={scanData.scores.seo} metrics={getSeoMetrics(scanData)} isPaid={hasPaid} onViewDetails={handleViewDetails} />
-          <ScoreCard title="UX Mobile" icon="📱" score={scanData.scores.ux} metrics={getUxMetrics(scanData)} isPaid={hasPaid} onViewDetails={handleViewDetails} />
+          <ScoreCard title="UX Mobile" icon="📱" score={scanData.scores.ux_mobile} metrics={getUxMetrics(scanData)} isPaid={hasPaid} onViewDetails={handleViewDetails} />
         </div>
 
         <motion.div
@@ -246,10 +239,8 @@ export default function Analyse() {
 
           <div className="space-y-4">
             {(() => {
-              const critiqueRecs = scanData.recommendations.filter((rec) => rec.priority === 'CRITIQUE');
-              const otherRecs = scanData.recommendations.filter((rec) => rec.priority !== 'CRITIQUE');
-              const visibleRecs = hasPaid ? scanData.recommendations : otherRecs.slice(0, 3);
-              const blurredRecs = hasPaid ? [] : [...critiqueRecs, ...otherRecs.slice(3)];
+              const visibleRecs = hasPaid ? scanData.ai_analysis.recommandations_prioritaires : scanData.recommendations_preview;
+              const blurredRecsCount = 6; // Estimation pour le flou
 
               return (
                 <>
@@ -257,12 +248,12 @@ export default function Analyse() {
                     <RecommendationCard key={`visible_${index}`} recommendation={rec} index={index} isLocked={false} />
                   ))}
 
-                  {!hasPaid && blurredRecs.length > 0 && (
+                  {!hasPaid && (
                     <>
-                      {blurredRecs.slice(0, 3).map((rec, index) => (
+                      {[1, 2, 3].map((_, index) => (
                         <RecommendationCard
                           key={`blurred_${index}`}
-                          recommendation={rec}
+                          recommendation={{ action: 'Contenu premium', impact: 'Significatif', difficulte: 'Moyenne', temps: '2h' }}
                           index={index + visibleRecs.length}
                           isLocked={true}
                         />

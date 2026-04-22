@@ -42,69 +42,47 @@ function buildFallbackAiAnalysis(args: {
   recommendations: ScanRecommendation[];
   metrics: Record<string, unknown>;
 }): AiAnalysis {
-  const { context, scores, findings, recommendations } = args;
-  const critical = findings.filter((item) => item.severite === 'critique');
-  const major = findings.filter((item) => item.severite === 'majeure');
-  const minor = findings.filter((item) => item.severite === 'mineure');
-  const sector = detectSector(context.target.normalizedUrl, context.snapshot?.html || '');
-  const estimatedImpact = findings.reduce((sum, item) => sum + item.impact_financier_fcfa, 0);
-  const scoreBenchmark = sector === 'e-commerce' ? 72 : sector === 'finance' ? 76 : 68;
-
   return {
-    resume_executif: `Le site obtient ${scores.global}/100 avec un niveau ${scores.interpretation.toLowerCase()}. Les points les plus sensibles concernent ${critical[0]?.categorie || 'la sécurité et la performance'}, avec des effets directs sur la confiance, la conversion et la visibilité organique.`,
-    statut_urgence: determineUrgency(findings, scores),
-    failles_critiques: critical,
-    failles_majeures: major,
-    failles_mineures: minor,
-    points_forts: [
-      scores.performance >= 70 ? 'Les performances globales restent correctes sur plusieurs indicateurs clés.' : 'Le site répond et reste exploitable, ce qui permet d’envisager des optimisations progressives.',
-      scores.seo >= 70 ? 'La base SEO comporte déjà plusieurs signaux utiles pour les moteurs de recherche.' : 'La structure actuelle peut être améliorée sans refonte complète.',
-      context.target.httpsEnabled ? 'Le site est servi en HTTPS, ce qui constitue une base saine pour renforcer la sécurité.' : 'La présence d’un domaine stable facilite la mise à niveau de la sécurité et du SEO.',
-    ],
+    resume_executif: "L'analyse détaillée par IA n'a pas pu être générée pour ce rapport.",
+    statut_urgence: determineUrgency(args.findings, args.scores),
+    failles_critiques: args.findings.filter(f => f.severite === 'critique'),
+    failles_majeures: args.findings.filter(f => f.severite === 'majeure'),
+    failles_mineures: args.findings.filter(f => f.severite === 'mineure'),
+    points_forts: [],
     impact_total: {
-      financier_annuel_fcfa: estimatedImpact || 250000,
-      utilisateurs_potentiellement_affectes: estimatedImpact > 500000 ? '10 000+' : '1 000+',
-      perte_conversions_estimee: scores.performance < 60 || scores.ux_mobile < 60 ? '10% à 20%' : '5% à 10%',
-      risque_reputation: critical.length > 0 ? 'élevé' : major.length > 2 ? 'moyen' : 'faible',
-      conformite_rgpd: scores.security >= 70,
-      penalites_seo: scores.seo < 60 ? 'Risque de déclassement et indexation partielle' : 'Risque modéré si aucun correctif n’est mené',
-      impact_mobile: scores.ux_mobile < 60 ? 'La majorité des visiteurs mobiles peut rencontrer des frictions.' : 'L’expérience mobile reste exploitable mais optimisable.',
+      financier_annuel_fcfa: 0,
+      utilisateurs_potentiellement_affectes: "N/A",
+      perte_conversions_estimee: "N/A",
+      risque_reputation: "Inconnu",
+      conformite_rgpd: false,
+      penalites_seo: "Données insuffisantes",
+      impact_mobile: "Données insuffisantes",
     },
-    recommandations_prioritaires: recommendations.slice(0, 5).map((item, index) => ({
+    recommandations_prioritaires: args.recommendations.slice(0, 5).map((item, index) => ({
       ...item,
       ordre: index + 1,
-      cout_estime_fcfa: item.cout_estime_fcfa || 50000,
+      cout_estime_fcfa: item.cout_estime_fcfa || 0,
       temps_implementation: item.temps_implementation || item.temps,
-      roi_estime: item.roi_estime || item.impact,
-      kpi_mesure: item.kpi_mesure || `Amélioration visible du score ${item.categorie}`,
-      etapes: item.etapes || ['Préparer la correction', 'Déployer dans l’environnement de test', 'Contrôler le résultat après mise en production'],
+      roi_estime: item.roi_estime || "N/A",
+      kpi_mesure: item.kpi_mesure || "N/A",
+      etapes: item.etapes || [],
     })),
-    feuille_de_route: fallbackRoadmap(recommendations),
-    comparaison_secteur: {
-      secteur: sector,
-      position: scores.global >= scoreBenchmark + 10 ? 'top 10%' : scores.global >= scoreBenchmark ? 'moyenne' : 'en-dessous moyenne',
-      percentile: Math.max(5, Math.min(95, scores.global)),
-      score_moyen_secteur: scoreBenchmark,
-      ecart: scores.global - scoreBenchmark,
-      commentaire: `Pour un acteur du secteur ${sector}, le score de référence retenu est autour de ${scoreBenchmark}/100. Le site se situe actuellement ${scores.global >= scoreBenchmark ? 'au niveau ou au-dessus' : 'en-dessous'} de ce repère.`,
+    feuille_de_route: {
+      immediat_24h: [],
+      semaine_1: [],
+      mois_1: [],
+      trimestre_1: [],
     },
-    opportunites_business: [
-      'Accélérer les pages stratégiques pour réduire le rebond mobile et améliorer la conversion.',
-      'Renforcer la sécurité visible pour rassurer les prospects, partenaires et moteurs de recherche.',
-      'Corriger les signaux SEO bloquants pour capter davantage de trafic organique qualifié.',
-    ],
-    ressources_supplementaires: [
-      {
-        titre: 'Guide Web Vitals Google',
-        url: 'https://web.dev/vitals/',
-        pertinence: 'Utile pour comprendre les métriques de performance qui influencent l’expérience réelle.',
-      },
-      {
-        titre: 'Mozilla Observatory',
-        url: 'https://observatory.mozilla.org/',
-        pertinence: 'Permet de suivre les progrès sur les headers et la posture de sécurité HTTP.',
-      },
-    ],
+    comparaison_secteur: {
+      secteur: "Inconnu",
+      position: "Inconnue",
+      percentile: 0,
+      score_moyen_secteur: 0,
+      ecart: 0,
+      commentaire: "Données sectorielles indisponibles sans analyse IA.",
+    },
+    opportunites_business: [],
+    ressources_supplementaires: [],
   };
 }
 

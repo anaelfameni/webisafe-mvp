@@ -60,7 +60,15 @@ function defaultScannerResult(): ScannerResult {
 }
 
 function aggregateScanner(results: PromiseSettledResult<ScannerResult>[]) {
-  return results.map((result) => (result.status === 'fulfilled' ? result.value : defaultScannerResult()));
+  const values = [];
+  for (const res of results) {
+    if (res.status === 'rejected') {
+      const message = res.reason instanceof Error ? res.reason.message : String(res.reason || 'SCAN_FAILED');
+      throw new Error(message);
+    }
+    values.push(res.value);
+  }
+  return values;
 }
 
 function findScannerErrorCode(results: PromiseSettledResult<ScannerResult>[]) {
@@ -199,7 +207,6 @@ export async function POST(request: Request) {
     const indexedGoogle = Boolean((seo.metrics as { indexation?: { indexed?: boolean } }).indexation?.indexed);
     const apisUsed = Array.from(new Set([...performance.apisUsed, ...security.apisUsed, ...seo.apisUsed, ...ux.apisUsed]));
     const apisFailed = Array.from(new Set([...performance.apisFailed, ...security.apisFailed, ...seo.apisFailed, ...ux.apisFailed]));
-    const partialScan = performance.partial || security.partial || seo.partial || ux.partial || apisFailed.length > 0;
     const aiAnalysis = await buildAiAnalysis({
       context,
       scores,
@@ -251,7 +258,7 @@ export async function POST(request: Request) {
       scan_duration_ms: scanDurationMs,
       apis_used: apisUsed,
       apis_failed: apisFailed,
-      partial_scan: partialScan,
+      partial_scan: false,
       paid: false,
       created_at: createdAt,
       expires_at: expiresAt,
