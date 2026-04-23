@@ -16,15 +16,18 @@
     "vite": "^8.0.4"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.104.0",
     "@vitejs/plugin-react": "^6.0.1",
     "axios": "^1.15.0",
     "cheerio": "^1.2.0",
-    "framer-motion": "^10.18.0",
+    "framer-motion": "^12.38.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^1.8.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-router-dom": "^6.30.3"
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^6.30.3",
+    "resend": "^6.12.2"
   }
 }

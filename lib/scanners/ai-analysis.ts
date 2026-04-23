@@ -25,7 +25,7 @@ function determineUrgency(findings: ScanFinding[], scores: CombinedScores) {
   return 'satisfaisant';
 }
 
-function fallbackRoadmap(recommendations: ScanRecommendation[]) {
+function buildRoadmap(recommendations: ScanRecommendation[]) {
   const actions = recommendations.map((item) => item.action);
   return {
     immediat_24h: actions.slice(0, 2),
@@ -67,12 +67,7 @@ function buildFallbackAiAnalysis(args: {
       kpi_mesure: item.kpi_mesure || "N/A",
       etapes: item.etapes || [],
     })),
-    feuille_de_route: {
-      immediat_24h: [],
-      semaine_1: [],
-      mois_1: [],
-      trimestre_1: [],
-    },
+    feuille_de_route: buildRoadmap(args.recommendations),
     comparaison_secteur: {
       secteur: "Inconnu",
       position: "Inconnue",

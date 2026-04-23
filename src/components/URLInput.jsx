@@ -66,13 +66,12 @@ export default function URLInput({ onScan, loading }) {
           value={url}
           onChange={handleUrlChange}
           placeholder="https://votresite.ci"
-          className={`w-full pl-12 pr-4 py-4 bg-card-bg border-2 rounded-xl text-white text-lg placeholder:text-text-secondary/50 focus:outline-none transition-all ${
-            urlValid === true
+          className={`w-full pl-12 pr-4 py-4 bg-card-bg border-2 rounded-xl text-white text-lg placeholder:text-text-secondary/50 focus:outline-none transition-all ${urlValid === true
               ? 'border-success focus:border-success'
               : urlValid === false
-              ? 'border-danger focus:border-danger'
-              : 'border-border-color focus:border-primary'
-          }`}
+                ? 'border-danger focus:border-danger'
+                : 'border-border-color focus:border-primary'
+            }`}
           disabled={loading}
         />
         {urlValid === true && (
@@ -93,13 +92,12 @@ export default function URLInput({ onScan, loading }) {
           value={email}
           onChange={handleEmailChange}
           placeholder="votre@email.com — Recevoir les résultats"
-          className={`w-full px-4 py-3 bg-card-bg border-2 rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none transition-all text-sm ${
-            emailValid === true
+          className={`w-full px-4 py-3 bg-card-bg border-2 rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none transition-all text-sm ${emailValid === true
               ? 'border-success/50 focus:border-success'
               : emailValid === false
-              ? 'border-danger/50 focus:border-danger'
-              : 'border-border-color focus:border-primary'
-          }`}
+                ? 'border-danger/50 focus:border-danger'
+                : 'border-border-color focus:border-primary'
+            }`}
           disabled={loading}
         />
       </div>

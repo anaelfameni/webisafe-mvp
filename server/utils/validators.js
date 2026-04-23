@@ -1,3 +1,6 @@
+/**
+ * Valide une URL simplement
+ */
 export function isValidURL(url) {
   try {
     const normalized = url.startsWith('http') ? url : 'https://' + url;
@@ -8,10 +11,16 @@ export function isValidURL(url) {
   }
 }
 
+/**
+ * Valide un email
+ */
 export function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+/**
+ * Normalise une URL (ajoute https:// si absent)
+ */
 export function normalizeURL(url) {
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     return 'https://' + url;
@@ -19,40 +28,24 @@ export function normalizeURL(url) {
   return url;
 }
 
-export function extractDomain(url) {
-  try {
-    const normalized = url.startsWith('http') ? url : 'https://' + url;
-    const parsed = new URL(normalized);
-    return parsed.hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
-}
-
-export function formatDate(dateString) {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
+/**
+ * Valide et normalise une URL (version détaillée)
+ */
 export function validateUrl(url) {
   if (!url || typeof url !== 'string') {
     return { valid: false, error: 'URL manquante ou invalide' };
   }
+
   let normalized = url.trim();
+
   if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
     normalized = 'https://' + normalized;
   }
+
   try {
     const parsed = new URL(normalized);
     if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return { valid: false, error: 'Protocole invalide' };
+      return { valid: false, error: 'Protocole invalide, utilisez http ou https' };
     }
     if (!parsed.hostname.includes('.')) {
       return { valid: false, error: 'Nom de domaine invalide' };
@@ -63,26 +56,33 @@ export function validateUrl(url) {
   }
 }
 
+/**
+ * Vérifie si un site est accessible
+ */
 export async function checkUrlAccessible(url) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch(url, {
       method: 'HEAD',
       signal: controller.signal,
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
     });
+
     clearTimeout(timeout);
+
     if (response.status >= 500) {
       return { accessible: false, error: 'Le site retourne une erreur serveur' };
     }
+
     return { accessible: true };
   } catch (err) {
     return {
       accessible: false,
       error: err.name === 'AbortError'
-        ? 'Le site met trop de temps a repondre'
-        : 'Ce site est inaccessible ou URL incorrecte',
+        ? 'Le site met trop de temps à répondre (timeout)'
+        : "Ce site est inaccessible ou l'URL est incorrecte",
     };
   }
 }

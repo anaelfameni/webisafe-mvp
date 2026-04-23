@@ -14,6 +14,10 @@ import Dashboard from './pages/Dashboard';
 import Partenaire from './pages/Partenaire';
 import PartenaireConfirmation from './pages/PartenaireConfirmation';
 import { useAuth } from './hooks/useAuth';
+import CGU from './pages/CGU';
+import Confidentialite from './pages/Confidentialite';
+import APropos from './pages/APropos';
+import NotFound from './pages/NotFound';
 
 function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, handleAuth }) {
   const location = useLocation();
@@ -69,6 +73,10 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
           <Route path="/dashboard" element={<Dashboard user={user} />} />
           <Route path="/partenaire" element={<Partenaire user={user} />} />
           <Route path="/partenaire/confirmation" element={<PartenaireConfirmation user={user} />} />
+          <Route path="/cgu" element={<CGU />} />
+          <Route path="/confidentialite" element={<Confidentialite />} />
+          <Route path="/a-propos" element={<APropos />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
 

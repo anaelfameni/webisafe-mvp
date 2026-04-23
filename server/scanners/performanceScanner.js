@@ -1,5 +1,5 @@
 const PAGESPEED_BASE = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
-const TIMEOUT_MS = 15_000;
+const TIMEOUT_MS = 25_000;
 
 /**
  * Scan de performance via Google PageSpeed Insights (Mobile).
@@ -63,9 +63,10 @@ export async function scanPerformance(url, apiKey) {
       // Score estimé selon la réactivité du serveur
       // < 300ms → bon serveur, >= 2000ms → lent
       const fallbackScore =
-        ttfb < 300 ? 65 :
-          ttfb < 800 ? 50 :
-            ttfb < 2000 ? 35 : 20;
+  ttfb < 300  ? 75 :
+  ttfb < 600  ? 65 :
+  ttfb < 1000 ? 55 :
+  ttfb < 2000 ? 45 : 30;
 
       console.log(`[PERFORMANCE] Fallback TTFB ${ttfb}ms → score estimé ${fallbackScore}`);
 

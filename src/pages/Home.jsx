@@ -2,13 +2,14 @@ import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Zap, Shield, Search, Smartphone, Star, ArrowRight, TrendingDown, Eye } from 'lucide-react';
+import toast from 'react-hot-toast';
 import URLInput from '../components/URLInput';
 import PricingSection from '../components/PricingSection';
 import FAQAccordion from '../components/FAQAccordion';
 import PartnerCTA from '../components/PartnerCTA';
 import ScoreGaugeChart from '../components/ScoreGaugeChart';
 
-export default function Home({ user, onAuthRequest }) {
+export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -18,13 +19,27 @@ export default function Home({ user, onAuthRequest }) {
     }
   }, [location.state]);
 
+  const normalizeUrl = (input) => {
+    let normalized = input.trim();
+    if (!normalized) return null;
+    if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+      normalized = 'https://' + normalized;
+    }
+    try {
+      new URL(normalized);
+      return normalized;
+    } catch {
+      return null;
+    }
+  };
+
   const handleScan = (url, email) => {
-    if (!user) {
-      onAuthRequest();
+    const normalized = normalizeUrl(url);
+    if (!normalized) {
+      toast.error('Entrez une URL valide (ex: monsite.ci)');
       return;
     }
-
-    const params = new URLSearchParams({ url });
+    const params = new URLSearchParams({ url: normalized });
     if (email) params.set('email', email);
     navigate(`/analyse?${params.toString()}`);
   };
@@ -182,7 +197,7 @@ export default function Home({ user, onAuthRequest }) {
             transition={{ delay: 1.2, duration: 1.2 }}
             className="text-text-secondary/60 text-sm mt-6"
           >
-            Deja 50+ sites analyses en Cote d'Ivoire
+            Aucune inscription requise · Resultats en 30 secondes · 100% gratuit
           </motion.p>
         </div>
       </section>
@@ -331,10 +346,7 @@ export default function Home({ user, onAuthRequest }) {
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <button
-                    onClick={() => {
-                      const hero = document.getElementById('hero');
-                      hero?.scrollIntoView({ behavior: 'smooth' });
-                    }}
+                    onClick={() => document.getElementById('hero')?.scrollIntoView({ behavior: 'smooth' })}
                     className="flex items-center gap-2 px-5 py-2.5 bg-primary/90 text-white text-sm font-medium rounded-full btn-glow hover:bg-primary transition-all"
                   >
                     <Eye size={16} />

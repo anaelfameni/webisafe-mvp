@@ -1,21 +1,75 @@
 <!DOCTYPE html>
 <html lang="fr">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Webisafe — Analysez votre site web en 60 secondes. Performance, Sécurité, SEO, UX Mobile. Le premier outil d'audit web pour l'Afrique francophone." />
-    <meta name="keywords" content="audit web, performance site, sécurité web, SEO, Afrique, Côte d'Ivoire, analyse site" />
-    <meta name="author" content="Webisafe" />
-    <meta property="og:title" content="Webisafe — Audit Web pour l'Afrique" />
-    <meta property="og:description" content="Analysez votre site web en 60 secondes. Performance · Sécurité · SEO · UX Mobile." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://webisafe.ci" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <title>Webisafe — Audit Web Automatisé pour l'Afrique Francophone</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- SEO Core -->
+  <title>Webisafe — Audit de site web pour PME africaines</title>
+  <meta name="description"
+    content="Analysez votre site en 60 secondes. Performance, sécurité et SEO optimisés pour l'Afrique. Résultats immédiats, recommandations en français." />
+  <meta name="keywords"
+    content="audit web, performance site, sécurité web, SEO, Afrique, Côte d'Ivoire, analyse site" />
+  <meta name="author" content="Webisafe" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://webisafe.vercel.app" />
+
+  <!-- Open Graph (partage WhatsApp, Facebook, LinkedIn) -->
+  <meta property="og:title" content="Webisafe — Auditez votre site web en 60 secondes" />
+  <meta property="og:description"
+    content="Performance, Sécurité, SEO et UX Mobile. L'outil d'audit conçu pour les entreprises africaines." />
+  <meta property="og:image" content="https://webisafe.vercel.app/og-image.png" />
+  <meta property="og:url" content="https://webisafe.vercel.app/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="fr_FR" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Webisafe — Audit web pour PME africaines" />
+  <meta name="twitter:description" content="Analysez votre site en 60 secondes. Gratuit." />
+  <meta name="twitter:image" content="https://webisafe.tech/og-image.png" />
+</head>
+
+<body>
+  <div id="root">
+    <style>
+      .initial-loader {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #060e1a;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(59, 130, 246, 0.3);
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 16px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+    <div class="initial-loader">
+      <div class="spinner"></div>
+      <div style="color: rgba(255,255,255,0.6); font-size: 14px;">
+        Chargement de Webisafe...
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>
