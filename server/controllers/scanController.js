@@ -10,6 +10,7 @@ import { validateUrl, checkUrlAccessible } from '../utils/validators.js';
 import { supabase } from '../config/supabase.js';
 import { sendScanResultEmail } from '../services/emailService.js';
 
+// ── Helper : exécute un scanner sans faire planter tout le scan ───────────────
 async function safeRun(label, fn) {
   try {
     const result = await fn();
@@ -21,8 +22,66 @@ async function safeRun(label, fn) {
   }
 }
 
+// ── Helper : sauvegarde DB sans faire planter le scan si Supabase est absent ──
+async function saveToDb(scanId, normalizedUrl, globalScore, results, email) {
+  if (!supabase) {
+    console.warn('[SCAN] Supabase non configuré → sauvegarde désactivée');
+    return;
+  }
+  try {
+    const { error: dbError } = await supabase
+      .from('scans')
+      .insert({
+        id: scanId,
+        url: normalizedUrl,
+        score: globalScore,
+        results_json: results,
+        paid: false,
+        user_email: email || null,
+      });
+
+    if (dbError) {
+      console.error('[SCAN] ⚠️  Erreur sauvegarde DB :', dbError.message);
+    } else {
+      console.log(`[SCAN] 💾 Sauvegardé en DB — id=${scanId}`);
+    }
+  } catch (err) {
+    // Ne fait jamais planter le scan si la DB est indisponible
+    console.error('[SCAN] ⚠️  Exception sauvegarde DB :', err.message);
+  }
+}
+
+// ── Helper : lecture cache sans faire planter le scan si Supabase est absent ──
+async function readCache(normalizedUrl) {
+  if (!supabase) {
+    console.warn('[SCAN] Supabase non configuré → cache désactivé');
+    return null;
+  }
+  try {
+    const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    const { data, error } = await supabase
+      .from('scans')
+      .select('id,url,score,results_json,created_at')
+      .eq('url', normalizedUrl)
+      .gt('created_at', oneHourAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[SCAN] ⚠️  Erreur lecture cache Supabase :', error.message);
+      return null;
+    }
+    return data ?? null;
+  } catch (err) {
+    console.error('[SCAN] ⚠️  Exception lecture cache :', err.message);
+    return null;
+  }
+}
+
+// ── Controller principal ──────────────────────────────────────────────────────
 export async function handleScan(req, res) {
-  const { url, email } = req.body;
+  const { url, email } = req.body ?? {};
 
   // ── 1) Validation URL ─────────────────────────────────────────────────────
   const validation = validateUrl(url);
@@ -38,7 +97,14 @@ export async function handleScan(req, res) {
   const normalizedUrl = validation.url;
 
   // ── 2) Accessibilité ──────────────────────────────────────────────────────
-  const accessibility = await checkUrlAccessible(normalizedUrl);
+  let accessibility;
+  try {
+    accessibility = await checkUrlAccessible(normalizedUrl);
+  } catch (err) {
+    console.error('[SCAN] ⚠️  checkUrlAccessible a planté :', err.message);
+    accessibility = { accessible: false, error: 'Impossible de vérifier le site' };
+  }
+
   if (!accessibility.accessible) {
     return res.status(422).json({
       success: false,
@@ -49,48 +115,31 @@ export async function handleScan(req, res) {
   }
 
   // ── 3) Cache 1 heure (Supabase) ───────────────────────────────────────────
-  const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
-
-  if (supabase) {
-    const { data: cachedScan, error: cacheError } = await supabase
-      .from('scans')
-      .select('id,url,score,results_json,created_at')
-      .eq('url', normalizedUrl)
-      .gt('created_at', oneHourAgo)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (cacheError) {
-      console.error('[SCAN] ⚠️  Erreur lecture cache Supabase :', cacheError.message);
-    }
-
-    if (cachedScan?.results_json) {
-      console.log(`[SCAN] ♻️  Cache hit pour ${normalizedUrl}`);
-      return res.json({
-        ...cachedScan.results_json,
-        success: true,
-        cached: true,
-        scan_id: cachedScan.id,
-      });
-    }
-  } else {
-    console.warn('[SCAN] Supabase désactivé → pas de cache');
+  const cachedScan = await readCache(normalizedUrl);
+  if (cachedScan?.results_json) {
+    console.log(`[SCAN] ♻️  Cache hit pour ${normalizedUrl}`);
+    return res.json({
+      ...cachedScan.results_json,
+      success: true,
+      cached: true,
+      scan_id: cachedScan.id,
+    });
   }
 
-  // ── 4) Clés API ───────────────────────────────────────────────────────────
+  // ── 4) Clé API Google PageSpeed ───────────────────────────────────────────
   const psKey = process.env.GOOGLE_PAGESPEED_KEY;
-  const vtKey = process.env.VIRUSTOTAL_API_KEY; // peut être vide (le scanner gère)
+  const vtKey = process.env.VIRUSTOTAL_API_KEY ?? null;
 
   if (!psKey) {
+    console.error('[SCAN] ❌ GOOGLE_PAGESPEED_KEY manquante');
     return res.status(500).json({
       success: false,
-      error: 'Clé GOOGLE_PAGESPEED_KEY manquante dans .env',
+      error: 'Configuration serveur incomplète (clé API manquante)',
       type: 'CONFIG_ERROR',
     });
   }
 
-  // ── 5) Exécution scans ────────────────────────────────────────────────────
+  // ── 5) Exécution des 4 scanners en parallèle ─────────────────────────────
   const scanId = randomUUID();
   const startMs = Date.now();
   console.log(`\n[SCAN] Démarrage — id=${scanId} url=${normalizedUrl}`);
@@ -125,6 +174,7 @@ export async function handleScan(req, res) {
     const scanDurationMs = Date.now() - startMs;
     console.log(`[SCAN] ✅ Terminé en ${scanDurationMs}ms — score global : ${globalScore}`);
 
+    // ── 6) Construction de la réponse ─────────────────────────────────────
     const results = {
       success: true,
       scan_id: scanId,
@@ -151,15 +201,12 @@ export async function handleScan(req, res) {
           observatory_score: sec.observatory_score,
           ssl_grade: sec.ssl_grade,
           security_grade: sec.security_grade ?? null,
-
           headers_presents: sec.headers_presents ?? [],
           headers_manquants: sec.headers_manquants ?? [],
           cookie_issues: sec.cookie_issues ?? [],
-
           ssl_details: sec.ssl_details ?? null,
           sensitive_files: sec.sensitive_files ?? null,
           failles_owasp_count: sec.failles_owasp_count ?? 0,
-
           partial: sec.partial ?? false,
         } : null,
 
@@ -169,6 +216,7 @@ export async function handleScan(req, res) {
           h1_count: seo.h1_count,
           has_viewport: seo.has_viewport,
           has_open_graph: seo.has_open_graph,
+          has_sitemap: seo.has_sitemap ?? false,
           partial: seo.partial ?? false,
         } : null,
 
@@ -195,26 +243,10 @@ export async function handleScan(req, res) {
       scan_duration_ms: scanDurationMs,
     };
 
-    // ── 6) Sauvegarde DB (alignée sur ton schéma Supabase) ───────────────────
-    // Table scans:
-    // id (uuid), url (text), score (integer), results_json (jsonb),
-    // paid (boolean), user_email (varchar), created_at (timestamptz)
-    const { error: dbError } = await supabase
-      .from('scans')
-      .insert({
-        id: scanId,
-        url: normalizedUrl,
-        score: globalScore,
-        results_json: results,
-        paid: false,
-        user_email: email || null,
-      });
+    // ── 7) Sauvegarde DB (ne bloque pas la réponse si ça échoue) ──────────
+    await saveToDb(scanId, normalizedUrl, globalScore, results, email);
 
-    if (dbError) {
-      console.error('[SCAN] ⚠️  Erreur sauvegarde DB :', dbError.message);
-    }
-
-    // ── 7) Email (si fourni) ────────────────────────────────────────────────
+    // ── 8) Email optionnel (si fourni, fire-and-forget) ───────────────────
     if (email) {
       sendScanResultEmail(email, {
         url: normalizedUrl,
@@ -224,22 +256,22 @@ export async function handleScan(req, res) {
     }
 
     return res.json(results);
+
   } catch (error) {
     console.error('[SCAN] ❌ Erreur fatale :', error);
     return res.status(500).json({
       success: false,
       error: "Erreur lors de l'analyse",
       type: 'SCAN_ERROR',
-      suggestion: 'Réessayez dans quelques instants. Si le problème persiste, contactez le support.',
+      suggestion: 'Réessayez dans quelques instants.',
     });
   }
 }
 
-// ── Construit la liste d'alertes critiques pour l'UI ──────────────────────────
+// ── Construit la liste d'alertes critiques pour l'UI ─────────────────────────
 function buildCriticalAlerts(sec, ux, perf) {
   const alerts = [];
 
-  // Fichiers sensibles exposés
   if (sec?.sensitive_files?.critical) {
     alerts.push({
       severity: 'critical',
@@ -250,7 +282,6 @@ function buildCriticalAlerts(sec, ux, perf) {
     });
   }
 
-  // Malware détecté
   if (sec?.malware_detected === true) {
     alerts.push({
       severity: 'critical',
@@ -260,7 +291,6 @@ function buildCriticalAlerts(sec, ux, perf) {
     });
   }
 
-  // Serveur loin de l'Afrique (selon ton performanceScanner)
   if (perf?.server_location?.latency_warning?.warning) {
     alerts.push({
       severity: 'warning',
@@ -272,9 +302,8 @@ function buildCriticalAlerts(sec, ux, perf) {
     });
   }
 
-  // Problèmes UX critiques
   if (ux?.critical_count > 0) {
-    const criticalIssues = (ux.issues || []).filter(i => i.severity === 'high');
+    const criticalIssues = (ux.issues ?? []).filter((i) => i.severity === 'high');
     for (const issue of criticalIssues) {
       alerts.push({
         severity: 'high',
