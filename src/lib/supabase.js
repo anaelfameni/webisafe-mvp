@@ -1,6 +1,19 @@
-import { createClient } from "@supabase/supabase-js";
+// server/config/supabase.js
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://xdaanhookclpmdgfibxw.supabase.co";
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYWFuaG9va2NscG1kZ2ZpYnh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NDM4NzksImV4cCI6MjA5MjAxOTg3OX0.re3k3zqJrvUVX_J_LknyMguhV5_UZcwdhYIDAA8ZbTU";
+const supabaseUrl = process.env.SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// On force la service_role. Pas de fallback anon (sinon RLS revient)
+if (!supabaseUrl) {
+    throw new Error('[DB] SUPABASE_URL manquante dans .env');
+}
+if (!serviceRoleKey) {
+    throw new Error('[DB] SUPABASE_SERVICE_ROLE_KEY manquante dans .env (clé service_role requise côté backend)');
+}
+
+export const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+});
+
+console.log('[DB] Supabase connecté — service_role ✅ (bypass RLS)');x

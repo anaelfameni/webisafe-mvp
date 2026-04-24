@@ -91,20 +91,25 @@ export function calculateUXScore(data) {
 }
 
 export function getScoreColor(score) {
-  if (score >= 75) return '#22C55E';
-  if (score >= 50) return '#F97316';
+  if (score >= 90) return '#3b82f6';
+  if (score >= 70) return '#22C55E';
+  if (score >= 50) return '#eab308';
+  if (score >= 30) return '#F97316';
   return '#EF4444';
 }
 
 export function getScoreLabel(score) {
-  if (score >= 90) return 'Excellent !';
-  if (score >= 75) return 'Bon état général';
+  if (score >= 90) return 'Excellent';
+  if (score >= 70) return 'Bon état général';
   if (score >= 50) return 'À améliorer';
+  if (score >= 30) return 'Mauvais';
   return 'Améliorations urgentes nécessaires';
 }
 
 export function getScoreBadge(score) {
-  if (score >= 75) return { text: 'Bon', color: 'text-success bg-success/10' };
-  if (score >= 50) return { text: 'Moyen', color: 'text-warning bg-warning/10' };
+  if (score >= 90) return { text: 'Excellent', color: 'text-blue-400 bg-blue-400/10' };
+  if (score >= 70) return { text: 'Bon', color: 'text-success bg-success/10' };
+  if (score >= 50) return { text: 'Acceptable', color: 'text-warning bg-warning/10' };
+  if (score >= 30) return { text: 'Mauvais', color: 'text-orange-400 bg-orange-400/10' };
   return { text: 'Critique', color: 'text-danger bg-danger/10' };
 }

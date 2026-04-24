@@ -19,13 +19,40 @@ function normalizeCategory(category) {
   return CATEGORY_LABELS[category] || 'le site';
 }
 
+function safeTitle(recommendation) {
+  // Champs explicites en priorité
+  if (recommendation.title) return recommendation.title;
+  if (recommendation.label) return recommendation.label;
+  if (recommendation.name) return recommendation.name;
+
+  // Extraire la partie significative de l'action (avant ":" ou "(")
+  // Ex: "Optimiser le LCP (actuellement 5443ms...)" → "Optimiser le LCP"
+  // Ex: "Ajouter les headers de sécurité manquants : HSTS, CSP..." → "Ajouter les headers de sécurité manquants"
+  if (recommendation.action) {
+    const raw = String(recommendation.action).trim();
+    const shortened = raw.split(/[:(]/)[0].trim();
+    if (shortened.length > 3) {
+      return shortened.charAt(0).toUpperCase() + shortened.slice(1);
+    }
+  }
+
+  // Dernier recours basé sur la catégorie
+  const categoryFallbacks = {
+    security: 'Sécurité insuffisante',
+    performance: 'Performance dégradée',
+    seo: 'Référencement à améliorer',
+    ux: 'Expérience mobile défaillante',
+  };
+  return categoryFallbacks[recommendation.category] || 'Point à corriger';
+}
+
 function lowerFirst(text = '') {
   if (!text) return '';
   return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 function ensureSentence(text = '') {
-  const clean = String(text).trim();
+  const clean = String(text ?? '').trim();
   if (!clean) return '';
   return /[.!?]$/.test(clean) ? clean : `${clean}.`;
 }
@@ -40,13 +67,21 @@ function buildIntroduction(recommendations) {
   const criticalCount = recommendations.filter((item) => item.priority === 'CRITIQUE').length;
   const importantCount = recommendations.filter((item) => item.priority === 'IMPORTANT').length;
 
-  return `Votre audit premium met en évidence une vue complète des freins techniques, business et de confiance qui affectent actuellement votre site. Les anomalies détectées ne se limitent pas à quelques réglages isolés : elles peuvent ralentir votre acquisition, dégrader votre crédibilité et fragiliser vos conversions si elles ne sont pas traitées dans le bon ordre. Avec ${criticalCount} point(s) critique(s) et ${importantCount} point(s) important(s), la priorité est de corriger les risques les plus sensibles avant d'optimiser le reste de manière structurée.`;
+  const base =
+    'Votre audit premium met en évidence une vue complète des freins techniques, business et de confiance qui affectent actuellement votre site. Les anomalies détectées ne se limitent pas à quelques réglages isolés : elles peuvent ralentir votre acquisition, dégrader votre crédibilité et fragiliser vos conversions si elles ne sont pas traitées dans le bon ordre.';
+
+  const suffix = 'La priorité est de corriger les risques les plus sensibles avant d\'optimiser le reste de manière structurée.';
+
+  // N'affiche le décompte que si au moins l'un des deux est > 0
+  if (criticalCount === 0 && importantCount === 0) {
+    return `${base} ${suffix}`;
+  }
+
+  return `${base} Avec ${criticalCount} point(s) critique(s) et ${importantCount} point(s) important(s), ${lowerFirst(suffix)}`;
 }
 
 function buildCriticalParagraph(index, recommendation) {
-  return `${index}. ${recommendation.title} est un point critique sur ${normalizeCategory(
-    recommendation.category
-  )}. ${ensureSentence(recommendation.description)} La conséquence la plus directe est la suivante : ${ensureSentence(
+  return `${index}. ${safeTitle(recommendation)}\n${ensureSentence(recommendation.description)} La conséquence la plus directe est la suivante : ${ensureSentence(
     recommendation.impact
   )} Tant que cette faille reste ouverte, elle peut provoquer une perte immédiate de confiance, exposer votre activité à un incident visible pour vos visiteurs et créer un impact négatif sur vos demandes, vos ventes ou votre image. La correction recommandée consiste à ${lowerFirst(
     ensureActionSentence(recommendation.action)
@@ -54,9 +89,7 @@ function buildCriticalParagraph(index, recommendation) {
 }
 
 function buildImportantParagraph(index, recommendation) {
-  return `${index}. ${recommendation.title} constitue un problème important sur ${normalizeCategory(
-    recommendation.category
-  )}. ${ensureSentence(recommendation.description)} La conséquence concrète est la suivante : ${ensureSentence(
+  return `${index}. ${safeTitle(recommendation)}\n${ensureSentence(recommendation.description)} La conséquence concrète est la suivante : ${ensureSentence(
     recommendation.impact
   )} Même si ce point n'est pas au niveau d'une urgence critique, il peut ralentir le parcours utilisateur, affaiblir votre visibilité commerciale ou réduire la confiance accordée à votre site. La bonne approche est la suivante : ${ensureSentence(
     recommendation.action
@@ -64,9 +97,7 @@ function buildImportantParagraph(index, recommendation) {
 }
 
 function buildImprovementParagraph(index, recommendation) {
-  return `${index}. ${recommendation.title} correspond à une amélioration utile pour renforcer ${normalizeCategory(
-    recommendation.category
-  )}. ${ensureSentence(recommendation.description)} Ce point n'est pas le plus urgent, mais il limite malgré tout votre potentiel, car ${ensureSentence(
+  return `${index}. ${safeTitle(recommendation)}\n${ensureSentence(recommendation.description)} Ce point n'est pas le plus urgent, mais il limite malgré tout votre potentiel, car ${ensureSentence(
     recommendation.impact
   )} Une mise à niveau cohérente peut être menée ainsi : ${ensureSentence(
     recommendation.action

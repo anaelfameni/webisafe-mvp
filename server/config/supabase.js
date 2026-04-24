@@ -1,28 +1,17 @@
-// Stub Supabase — cache désactivé si pas de config
-// Pour activer : npm install @supabase/supabase-js et renseigner .env
+﻿import { createClient } from '@supabase/supabase-js';
 
-const noopClient = {
-  from: () => ({
-    select: () => ({ eq: () => ({ gt: () => ({ order: () => ({ limit: () => ({ single: () => ({ data: null, error: null }) }) }) }) }) }),
-    insert: () => ({ select: () => ({ single: () => ({ data: { id: 'local-' + Date.now() }, error: null }) }) }),
-  }),
-};
+const supabaseUrl    = process.env.SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_ANON_KEY;
-
-let supabase = noopClient;
-
-if (url && key) {
-  try {
-    const { createClient } = await import('@supabase/supabase-js');
-    supabase = createClient(url, key);
-    console.log('[DB] Supabase connecté');
-  } catch {
-    console.warn('[DB] @supabase/supabase-js non installé — cache désactivé');
-  }
-} else {
-  console.warn('[DB] SUPABASE_URL/KEY manquantes — cache désactivé');
+if (!supabaseUrl) {
+  throw new Error('[DB] SUPABASE_URL manquante dans .env');
+}
+if (!serviceRoleKey) {
+  throw new Error('[DB] SUPABASE_SERVICE_ROLE_KEY manquante dans .env');
 }
 
-export { supabase };
+export const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  auth: { persistSession: false },
+});
+
+console.log('[DB] Supabase connecte — service_role OK (bypass RLS)');

@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 const segments = [
   { id: 'critique', label: 'CRITIQUE', desc: 'Action urgente requise', range: '0-30', min: 0, max: 30, color: '#ef4444', glowColor: 'rgba(239, 68, 68, 0.4)', gradient: ['#ef4444', '#dc2626'], percent: 30 },
   { id: 'mauvais', label: 'MAUVAIS', desc: 'Corrections necessaires', range: '30-50', min: 30, max: 50, color: '#f97316', glowColor: 'rgba(249, 115, 22, 0.4)', gradient: ['#f97316', '#ea580c'], percent: 20 },
-  { id: 'acceptable', label: 'ACCEPTABLE', desc: 'Ameliorations recommandees', range: '50-75', min: 50, max: 75, color: '#eab308', glowColor: 'rgba(234, 179, 8, 0.4)', gradient: ['#eab308', '#ca8a04'], percent: 25 },
-  { id: 'bon', label: 'BON', desc: 'Optimisations mineures', range: '75-90', min: 75, max: 90, color: '#22c55e', glowColor: 'rgba(34, 197, 94, 0.4)', gradient: ['#22c55e', '#16a34a'], percent: 15 },
+  { id: 'acceptable', label: 'ACCEPTABLE', desc: 'Ameliorations recommandees', range: '50-70', min: 50, max: 70, color: '#eab308', glowColor: 'rgba(234, 179, 8, 0.4)', gradient: ['#eab308', '#ca8a04'], percent: 20 },
+  { id: 'bon', label: 'BON', desc: 'Optimisations mineures', range: '70-90', min: 70, max: 90, color: '#22c55e', glowColor: 'rgba(34, 197, 94, 0.4)', gradient: ['#22c55e', '#16a34a'], percent: 20 },
   { id: 'excellent', label: 'EXCELLENT', desc: 'Site tres bien protege', range: '90-100', min: 90, max: 100, color: '#3b82f6', glowColor: 'rgba(59, 130, 246, 0.4)', gradient: ['#60a5fa', '#3b82f6'], percent: 10 },
 ];
 
@@ -118,8 +118,8 @@ export default function ScoreGaugeChart({
       ? 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-6 sm:translate-y-10'
       : 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-8 sm:translate-y-10'
     : badgeLiftMobile
-    ? 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-8 sm:translate-y-12'
-    : 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-10 sm:translate-y-12';
+      ? 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-8 sm:translate-y-12'
+      : 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-10 sm:translate-y-12';
 
   return (
     <div className={containerClass}>

@@ -34,8 +34,8 @@ export function calculateGlobalScore(performance, security, seo, ux) {
 export function getGrade(score) {
   if (score === null || score === undefined) return { grade: '?', label: 'Non mesuré', color: '#6b7280' };
   if (score >= 90) return { grade: 'A', label: 'Excellent', color: '#22c55e' };
-  if (score >= 75) return { grade: 'B', label: 'Bon', color: '#84cc16' };
-  if (score >= 60) return { grade: 'C', label: 'Moyen', color: '#f59e0b' };
+  if (score >= 70) return { grade: 'B', label: 'Bon', color: '#22c55e' };
+if (score >= 50) return { grade: 'C', label: 'Acceptable', color: '#eab308' };
   if (score >= 40) return { grade: 'D', label: 'Faible', color: '#f97316' };
   return { grade: 'F', label: 'Critique', color: '#ef4444' };
 }

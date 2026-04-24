@@ -2,10 +2,11 @@ import { motion } from 'framer-motion';
 import { getScoreColor, getScoreBadge } from '../utils/calculateScore';
 import { ChevronRight, Lock } from 'lucide-react';
 
-export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewDetails }) {
-  const color = getScoreColor(score);
-  const badge = getScoreBadge(score);
-  const progressWidth = `${score}%`;
+export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewDetails, extra }) {
+  const safeScore   = score ?? 0;
+  const color       = getScoreColor(safeScore);
+  const badge       = getScoreBadge(safeScore);
+  const progressWidth = `${safeScore}%`;
 
   return (
     <motion.div
@@ -25,12 +26,14 @@ export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewD
           </div>
         </div>
         <div className="text-right">
-          <span className="text-2xl font-bold" style={{ color }}>{score}</span>
-          <span className="text-white text-sm">/100</span>
+          <span className="text-2xl font-bold" style={{ color }}>
+            {score ?? 'N/A'}
+          </span>
+          {score != null && <span className="text-white text-sm">/100</span>}
         </div>
       </div>
 
-      {/* Score bar */}
+      {/* Barre de progression */}
       <div className="h-2 bg-dark-navy rounded-full overflow-hidden mb-4">
         <motion.div
           initial={{ width: 0 }}
@@ -41,7 +44,7 @@ export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewD
         />
       </div>
 
-      {/* Metrics */}
+      {/* Métriques */}
       <div className="space-y-2.5">
         {metrics.map((metric, index) => (
           <div key={index} className="flex items-center justify-between text-sm">
@@ -62,20 +65,18 @@ export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewD
         ))}
       </div>
 
-      {/* View details button */}
+      {/* Extra (headers manquants, issues UX, géo...) */}
+      {extra && <div className="mt-3 pt-3 border-t border-white/5">{extra}</div>}
+
+      {/* Bouton détails */}
       <button
         onClick={onViewDetails}
         className="flex items-center gap-1 mt-4 text-primary text-sm font-medium hover:gap-2 transition-all"
       >
         {isPaid ? (
-          <>
-            Voir détails <ChevronRight size={16} />
-          </>
+          <>Voir détails <ChevronRight size={16} /></>
         ) : (
-          <>
-            <Lock size={14} />
-            Voir détails <ChevronRight size={16} />
-          </>
+          <><Lock size={14} /> Voir détails <ChevronRight size={16} /></>
         )}
       </button>
     </motion.div>

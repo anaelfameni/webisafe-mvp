@@ -16,10 +16,11 @@
     "vite": "^8.0.4"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.104.0",
+    "@supabase/supabase-js": "^2.104.1",
     "@vitejs/plugin-react": "^6.0.1",
     "axios": "^1.15.0",
     "cheerio": "^1.2.0",
+    "dotenv": "^17.4.2",
     "framer-motion": "^12.38.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
