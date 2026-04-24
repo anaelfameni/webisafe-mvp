@@ -49,33 +49,33 @@ export async function handleScan(req, res) {
   }
 
   // ── 3) Cache 1 heure (Supabase) ───────────────────────────────────────────
-  // IMPORTANT: ton schéma Supabase utilise results_json (jsonb) et user_email
   const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
 
-  const { data: cachedScan, error: cacheError } = await supabase
-    .from('scans')
-    .select('id,url,score,results_json,created_at')
-    .eq('url', normalizedUrl)
-    .gt('created_at', oneHourAgo)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  if (supabase) {
+    const { data: cachedScan, error: cacheError } = await supabase
+      .from('scans')
+      .select('id,url,score,results_json,created_at')
+      .eq('url', normalizedUrl)
+      .gt('created_at', oneHourAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (cacheError) {
-    console.error('[SCAN] ⚠️  Erreur lecture cache Supabase :', cacheError.message);
-  }
+    if (cacheError) {
+      console.error('[SCAN] ⚠️  Erreur lecture cache Supabase :', cacheError.message);
+    }
 
-  if (cachedScan?.results_json) {
-    console.log(`[SCAN] ♻️  Cache hit pour ${normalizedUrl}`);
-
-    // On renvoie results_json tel quel (il contient déjà scores/metrics/etc.)
-    // et on force cached=true + scan_id cohérent avec l’ID DB.
-    return res.json({
-      ...cachedScan.results_json,
-      success: true,
-      cached: true,
-      scan_id: cachedScan.id,
-    });
+    if (cachedScan?.results_json) {
+      console.log(`[SCAN] ♻️  Cache hit pour ${normalizedUrl}`);
+      return res.json({
+        ...cachedScan.results_json,
+        success: true,
+        cached: true,
+        scan_id: cachedScan.id,
+      });
+    }
+  } else {
+    console.warn('[SCAN] Supabase désactivé → pas de cache');
   }
 
   // ── 4) Clés API ───────────────────────────────────────────────────────────
