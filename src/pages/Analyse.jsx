@@ -92,8 +92,8 @@ const ServerLocationBadge = ({ serverLocation }) => {
   return (
     <div
       className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border ${isWarning
-          ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-200'
-          : 'bg-green-500/10 border-green-500/30 text-green-200'
+        ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-200'
+        : 'bg-green-500/10 border-green-500/30 text-green-200'
         }`}
     >
       <MapPin size={12} className="flex-shrink-0" />
@@ -274,7 +274,6 @@ export default function Analyse() {
   const navigate = useNavigate();
   const { saveScan, isPaid } = useScans();
 
-  // ← Récupère l'état d'authentification
   const { isAuthenticated, user, signup, login } = useAuth();
 
   const url = searchParams.get('url') || '';
@@ -360,20 +359,22 @@ export default function Analyse() {
     setShowFreemiumGate(false);
 
     if (isAuthenticated) {
-      // Client déjà connecté → on saute l'étape de création de compte
       setTimeout(() => setShowWaveModal(true), 150);
     } else {
-      // Client non connecté → on lui demande de créer un compte
       setTimeout(() => setShowAuthModal(true), 150);
     }
   }, [isAuthenticated]);
 
   /**
    * Étape 2 : AuthModal soumis avec succès
-   * → Crée ou connecte le compte via useAuth
-   * → Ouvre WaveCheckoutModal
+   * → Crée ou connecte le compte via useAuth (synchrone, localStorage)
+   * → Ferme AuthModal
+   * → Ouvre WaveCheckoutModal après un court délai
+   *
+   * IMPORTANT : on ne retourne PAS de redirectTo ici,
+   * ce qui empêche AuthModal de faire navigate() et de quitter la page.
    */
-  const handleAuthSuccess = useCallback(async (mode, formData) => {
+  const handleAuthSuccess = useCallback((mode, formData) => {
     let result;
 
     if (mode === 'signup') {
@@ -388,21 +389,24 @@ export default function Analyse() {
       result = login(formData.email, formData.password);
     }
 
+    // Échec : on renvoie l'erreur à AuthModal qui l'affiche
     if (!result.success) {
       return { success: false, error: result.error };
     }
 
-    // Enregistre l'email pour pré-remplir WaveCheckoutModal
+    // Succès : on enregistre l'email pour pré-remplir WaveCheckoutModal
     if (formData?.email) {
       setUserEmail(formData.email);
     }
 
+    // On ferme AuthModal depuis ici (le parent contrôle)
     setShowAuthModal(false);
 
-    // Petit délai pour que la fermeture de AuthModal soit fluide
+    // Petit délai pour que l'animation de fermeture soit fluide
+    // avant d'ouvrir WaveCheckoutModal
     setTimeout(() => setShowWaveModal(true), 200);
 
-    // On retourne success sans redirectTo pour rester sur la page
+    // PAS de redirectTo → AuthModal ne navigue nulle part
     return { success: true };
   }, [signup, login]);
 
@@ -705,11 +709,7 @@ export default function Analyse() {
         scanData={scanData}
       />
 
-      {/*
-        2. AuthModal — affiché uniquement si non connecté
-           initialMode="signup" pour diriger vers la création de compte
-           onAuth connecte/crée le compte puis ouvre WaveCheckoutModal
-      */}
+      {/* 2. AuthModal — affiché uniquement si non connecté */}
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}

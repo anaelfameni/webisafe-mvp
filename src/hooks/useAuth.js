@@ -1,36 +1,180 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { buildAdminUser, isAdminCredentials } from '../utils/adminAuth.js';
 
 const AUTH_KEY = 'webisafe_auth';
 const USERS_KEY = 'webisafe_users';
+const AUTH_EVENT = 'webisafe-auth-change';
+
+/**
+ * État global partagé entre toutes les instances de useAuth().
+ * Sans ça, chaque composant qui appelle useAuth() garde son propre user,
+ * ce qui provoque le bug : compte créé mais autre composant encore "déconnecté".
+ */
+let authUser = null;
+let authLoaded = false;
+const listeners = new Set();
+
+function isBrowser() {
+  return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+}
+
+function safeParse(json, fallback) {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function readStoredAuth() {
+  if (!isBrowser()) return null;
+
+  const stored = localStorage.getItem(AUTH_KEY);
+  if (!stored) return null;
+
+  const parsed = safeParse(stored, null);
+
+  if (!parsed || typeof parsed !== 'object') {
+    localStorage.removeItem(AUTH_KEY);
+    return null;
+  }
+
+  return parsed;
+}
+
+function ensureAuthLoaded() {
+  if (authLoaded) return;
+  authUser = readStoredAuth();
+  authLoaded = true;
+}
+
+function notifyAuthChanged() {
+  listeners.forEach((listener) => {
+    try {
+      listener(authUser);
+    } catch {
+      // ignore
+    }
+  });
+
+  if (isBrowser()) {
+    window.dispatchEvent(
+      new CustomEvent(AUTH_EVENT, {
+        detail: authUser,
+      })
+    );
+  }
+}
+
+function setGlobalUser(user) {
+  authUser = user || null;
+  authLoaded = true;
+
+  if (isBrowser()) {
+    if (authUser) {
+      localStorage.setItem(AUTH_KEY, JSON.stringify(authUser));
+    } else {
+      localStorage.removeItem(AUTH_KEY);
+    }
+  }
+
+  notifyAuthChanged();
+}
+
+function getUsers() {
+  if (!isBrowser()) return [];
+  return safeParse(localStorage.getItem(USERS_KEY) || '[]', []);
+}
+
+function saveUsers(users) {
+  if (!isBrowser()) return;
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function removePassword(user) {
+  if (!user) return null;
+  const { password: _password, ...safeUser } = user;
+  return safeUser;
+}
 
 export function useAuth() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  ensureAuthLoaded();
+
+  const [user, setUser] = useState(authUser);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(AUTH_KEY);
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem(AUTH_KEY);
-      }
-    }
+    ensureAuthLoaded();
+    setUser(authUser);
     setLoading(false);
+
+    const listener = (nextUser) => {
+      setUser(nextUser);
+      setLoading(false);
+    };
+
+    listeners.add(listener);
+
+    const handleCustomAuthChange = (event) => {
+      setUser(event.detail || null);
+      setLoading(false);
+    };
+
+    const handleStorageChange = (event) => {
+      if (event.key === AUTH_KEY) {
+        authUser = readStoredAuth();
+        notifyAuthChanged();
+      }
+    };
+
+    if (isBrowser()) {
+      window.addEventListener(AUTH_EVENT, handleCustomAuthChange);
+      window.addEventListener('storage', handleStorageChange);
+    }
+
+    return () => {
+      listeners.delete(listener);
+
+      if (isBrowser()) {
+        window.removeEventListener(AUTH_EVENT, handleCustomAuthChange);
+        window.removeEventListener('storage', handleStorageChange);
+      }
+    };
   }, []);
 
   const signup = (name, email, phone, password, phoneCountry) => {
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const cleanEmail = normalizeEmail(email);
 
-    if (users.find((existingUser) => existingUser.email === email)) {
+    if (!name || !String(name).trim()) {
+      return { success: false, error: 'Le nom est requis' };
+    }
+
+    if (!cleanEmail) {
+      return { success: false, error: 'L’email est requis' };
+    }
+
+    if (!password || String(password).length < 4) {
+      return { success: false, error: 'Le mot de passe doit contenir au moins 4 caractères' };
+    }
+
+    const users = getUsers();
+
+    const emailAlreadyUsed = users.some(
+      (existingUser) => normalizeEmail(existingUser.email) === cleanEmail
+    );
+
+    if (emailAlreadyUsed) {
       return { success: false, error: 'Cet email est déjà utilisé' };
     }
 
     const newUser = {
       id: `user_${Date.now()}`,
-      name,
-      email,
+      name: String(name).trim(),
+      email: cleanEmail,
       phone,
       phoneCountry,
       password,
@@ -41,69 +185,112 @@ export function useAuth() {
     };
 
     users.push(newUser);
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    saveUsers(users);
 
-    const { password: _password, ...safeUser } = newUser;
-    localStorage.setItem(AUTH_KEY, JSON.stringify(safeUser));
-    setUser(safeUser);
+    const safeUser = removePassword(newUser);
 
-    return { success: true };
+    /**
+     * Important :
+     * On connecte immédiatement l’utilisateur ET on synchronise toutes les instances du hook.
+     */
+    setGlobalUser(safeUser);
+
+    return { success: true, user: safeUser };
   };
 
   const login = (email, password) => {
-    if (isAdminCredentials(email, password)) {
+    const cleanEmail = normalizeEmail(email);
+
+    if (isAdminCredentials(cleanEmail, password)) {
       const adminUser = buildAdminUser();
-      localStorage.setItem(AUTH_KEY, JSON.stringify(adminUser));
-      setUser(adminUser);
-      return { success: true, redirectTo: '/admin' };
+
+      setGlobalUser(adminUser);
+
+      return {
+        success: true,
+        user: adminUser,
+        redirectTo: '/admin',
+      };
     }
 
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const users = getUsers();
+
     const found = users.find(
-      (existingUser) => existingUser.email === email && existingUser.password === password
+      (existingUser) =>
+        normalizeEmail(existingUser.email) === cleanEmail &&
+        existingUser.password === password
     );
 
     if (!found) {
       return { success: false, error: 'Email ou mot de passe incorrect' };
     }
 
-    const { password: _password, ...safeUser } = found;
-    localStorage.setItem(AUTH_KEY, JSON.stringify(safeUser));
-    setUser(safeUser);
+    const safeUser = removePassword(found);
 
-    return { success: true };
+    /**
+     * Important :
+     * Connexion globale partagée dans toute l’application.
+     */
+    setGlobalUser(safeUser);
+
+    return { success: true, user: safeUser };
   };
 
   const logout = () => {
-    localStorage.removeItem(AUTH_KEY);
-    setUser(null);
+    setGlobalUser(null);
   };
 
   const updateUser = (updates) => {
-    const updated = { ...user, ...updates };
-    localStorage.setItem(AUTH_KEY, JSON.stringify(updated));
-    setUser(updated);
+    ensureAuthLoaded();
 
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const index = users.findIndex((existingUser) => existingUser.id === updated.id);
+    if (!authUser) return;
+
+    const updatedUser = {
+      ...authUser,
+      ...updates,
+    };
+
+    setGlobalUser(updatedUser);
+
+    const users = getUsers();
+    const index = users.findIndex((existingUser) => existingUser.id === updatedUser.id);
+
     if (index !== -1) {
-      users[index] = { ...users[index], ...updates };
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+      users[index] = {
+        ...users[index],
+        ...updates,
+      };
+
+      saveUsers(users);
     }
   };
 
   const canScan = () => {
-    if (!user) return true;
+    ensureAuthLoaded();
+
+    if (!authUser) return true;
+
     const today = new Date().toDateString();
-    if (user.lastScanDate !== today) return true;
-    return (user.scansToday || 0) < 3;
+
+    if (authUser.lastScanDate !== today) return true;
+
+    return (authUser.scansToday || 0) < 3;
   };
 
   const recordScan = () => {
-    if (!user) return;
+    ensureAuthLoaded();
+
+    if (!authUser) return;
+
     const today = new Date().toDateString();
-    const scansToday = user.lastScanDate === today ? (user.scansToday || 0) + 1 : 1;
-    updateUser({ scansToday, lastScanDate: today });
+
+    const scansToday =
+      authUser.lastScanDate === today ? (authUser.scansToday || 0) + 1 : 1;
+
+    updateUser({
+      scansToday,
+      lastScanDate: today,
+    });
   };
 
   return {

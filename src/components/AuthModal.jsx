@@ -14,11 +14,13 @@ import {
 export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'login' }) {
   const navigate = useNavigate();
   const [mode, setMode] = useState(initialMode);
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneCountry, setPhoneCountry] = useState(DEFAULT_PHONE_COUNTRY);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+
   const [showPassword, setShowPassword] = useState(false);
   const [showCountryMenu, setShowCountryMenu] = useState(false);
   const [error, setError] = useState('');
@@ -53,6 +55,7 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
     event.preventDefault();
     setError('');
 
+    // Validation téléphone seulement en signup
     if (mode === 'signup') {
       const localPhone = normalizePhoneDigits(phone);
       if (localPhone.length < 6) {
@@ -62,34 +65,45 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
     }
 
     setLoading(true);
+
+    // Petit délai UX (optionnel)
     await new Promise((resolve) => setTimeout(resolve, 800));
 
-    const result = await onAuth(mode, {
-      name,
-      email,
-      phone: buildInternationalPhone(phoneCountry, phone),
-      phoneCountry,
-      password,
-    });
-
-    if (result.success) {
+    let result;
+    try {
+      result = await onAuth(mode, {
+        name,
+        email,
+        phone: buildInternationalPhone(phoneCountry, phone),
+        phoneCountry,
+        password,
+      });
+    } catch (e) {
       setLoading(false);
-      onClose();
+      setError("Une erreur est survenue. Veuillez réessayer.");
+      return;
+    }
+
+    if (result?.success) {
+      setLoading(false);
       resetForm();
+
+      // ✅ Fix : on ferme la modal par défaut après succès
+      // Le parent peut empêcher la fermeture en renvoyant { close: false }
+      if (result.close !== false) {
+        onClose();
+      }
+
+      // Navigation uniquement si le parent la demande explicitement
       if (result.redirectTo) {
         navigate(result.redirectTo);
-      } else if (mode === 'signup') {
-        navigate('/dashboard', {
-          state: {
-            welcomeNewAccount: true,
-          },
-        });
       }
+
       return;
     }
 
     setLoading(false);
-    setError(result.error);
+    setError(result?.error || 'Email ou mot de passe incorrect');
   };
 
   const selectedCountry = findCountryByCode(phoneCountry);
@@ -118,6 +132,7 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
               <button
                 onClick={onClose}
                 className="p-1 text-text-secondary hover:text-white transition-colors"
+                type="button"
               >
                 <X size={20} />
               </button>
@@ -160,13 +175,16 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
                             alt={`Drapeau ${selectedCountry.name}`}
                             className="h-4 w-6 rounded-[2px] object-cover shadow-sm flex-shrink-0"
                           />
-                          <span className="min-w-0 flex-1 truncate text-left">{selectedCountry.name}</span>
-                          <span className="text-primary text-xs font-medium">{selectedCountry.dialCode}</span>
+                          <span className="min-w-0 flex-1 truncate text-left">
+                            {selectedCountry.name}
+                          </span>
+                          <span className="text-primary text-xs font-medium">
+                            {selectedCountry.dialCode}
+                          </span>
                           <ChevronDown
                             size={14}
-                            className={`text-text-secondary transition-transform ${
-                              showCountryMenu ? 'rotate-180' : ''
-                            }`}
+                            className={`text-text-secondary transition-transform ${showCountryMenu ? 'rotate-180' : ''
+                              }`}
                           />
                         </button>
 
@@ -187,11 +205,10 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
                                       setPhoneCountry(country.code);
                                       setShowCountryMenu(false);
                                     }}
-                                    className={`w-full px-3 py-2.5 flex items-center gap-3 text-left transition-colors ${
-                                      country.code === phoneCountry
+                                    className={`w-full px-3 py-2.5 flex items-center gap-3 text-left transition-colors ${country.code === phoneCountry
                                         ? 'bg-primary/12 text-white'
                                         : 'text-slate-200 hover:bg-white/5'
-                                    }`}
+                                      }`}
                                   >
                                     <img
                                       src={getFlagImageUrl(country.code)}
@@ -199,8 +216,12 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
                                       loading="lazy"
                                       className="h-4 w-6 rounded-[2px] object-cover shadow-sm flex-shrink-0"
                                     />
-                                    <span className="min-w-0 flex-1 truncate text-sm">{country.name}</span>
-                                    <span className="text-xs text-primary font-medium">{country.dialCode}</span>
+                                    <span className="min-w-0 flex-1 truncate text-sm">
+                                      {country.name}
+                                    </span>
+                                    <span className="text-xs text-primary font-medium">
+                                      {country.dialCode}
+                                    </span>
                                   </button>
                                 ))}
                               </div>

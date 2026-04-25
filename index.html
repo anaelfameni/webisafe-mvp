@@ -3,57 +3,131 @@
 
 <head>
   <meta charset="UTF-8" />
+
+  <!-- Responsive / Mobile -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#060e1a" />
+  <meta name="format-detection" content="telephone=no" />
+
+  <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- SEO Core -->
-  <title>Webisafe — Audit de site web pour PME africaines</title>
+  <title>Webisafe — Audit de site web gratuit pour PME africaines | Résultats en 60s</title>
   <meta name="description"
-    content="Analysez votre site en 60 secondes. Performance, sécurité et SEO optimisés pour l'Afrique. Résultats immédiats, recommandations en français." />
+    content="Webisafe analyse la vitesse, le SEO, la sécurité et l'expérience mobile de votre site. Rapport gratuit, clair et actionnable en moins d'une minute. Conçu pour les PME africaines." />
   <meta name="keywords"
-    content="audit web, performance site, sécurité web, SEO, Afrique, Côte d'Ivoire, analyse site" />
+    content="audit site web gratuit, audit web Afrique, performance site web, sécurité web, SEO PME Afrique, audit site Côte d'Ivoire, audit site Sénégal, vitesse site web Afrique, Webisafe" />
   <meta name="author" content="Webisafe" />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://webisafe.vercel.app" />
+  <link rel="canonical" href="https://webisafe.vercel.app/" />
 
-  <!-- Open Graph (partage WhatsApp, Facebook, LinkedIn) -->
-  <meta property="og:title" content="Webisafe — Auditez votre site web en 60 secondes" />
+  <!-- Open Graph : WhatsApp, Facebook, LinkedIn -->
+  <meta property="og:title" content="Webisafe — Audit gratuit pour PME africaines" />
   <meta property="og:description"
-    content="Performance, Sécurité, SEO et UX Mobile. L'outil d'audit conçu pour les entreprises africaines." />
+    content="Découvrez pourquoi votre site perd des clients. Analysez gratuitement la vitesse, le SEO, la sécurité et le mobile de votre site en 60 secondes." />
   <meta property="og:image" content="https://webisafe.vercel.app/og-image.png" />
   <meta property="og:url" content="https://webisafe.vercel.app/" />
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="fr_FR" />
+  <meta property="og:site_name" content="Webisafe" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Webisafe — Audit web pour PME africaines" />
-  <meta name="twitter:description" content="Analysez votre site en 60 secondes. Gratuit." />
-  <meta name="twitter:image" content="https://webisafe.tech/og-image.png" />
+  <meta name="twitter:title" content="Webisafe — Audit gratuit pour PME africaines" />
+  <meta name="twitter:description"
+    content="Analyse gratuite de votre site en 60 secondes : vitesse, SEO, sécurité et UX mobile." />
+  <meta name="twitter:image" content="https://webisafe.vercel.app/og-image.png" />
+
+  <!-- Préconnexion Google Fonts si tu utilises Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function (c, l, a, r, i, t, y) {
+      c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) };
+      t = l.createElement(r);
+      t.async = 1;
+      t.src = "https://www.clarity.ms/tag/" + i;
+      y = l.getElementsByTagName(r)[0];
+      y.parentNode.insertBefore(t, y);
+    })(window, document, "clarity", "script", "wgy1jsiw5k");
+  </script>
+
+  <!-- Données structurées simples pour Google -->
+  <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Webisafe",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "url": "https://webisafe.vercel.app/",
+        "description": "Webisafe analyse la vitesse, le SEO, la sécurité et l'expérience mobile des sites web des PME africaines.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "XOF"
+        }
+      }
+    </script>
 </head>
 
 <body>
   <div id="root">
     <style>
       .initial-loader {
-        height: 100vh;
+        min-height: 100vh;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         background-color: #060e1a;
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 24px;
+        text-align: center;
+      }
+
+      .initial-logo {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 800;
+        font-size: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 0 32px rgba(59, 130, 246, 0.35);
       }
 
       .spinner {
         width: 40px;
         height: 40px;
-        border: 3px solid rgba(59, 130, 246, 0.3);
+        border: 3px solid rgba(59, 130, 246, 0.25);
         border-top-color: #3b82f6;
         border-radius: 50%;
         animation: spin 1s linear infinite;
         margin-bottom: 16px;
+      }
+
+      .initial-title {
+        color: #ffffff;
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+
+      .initial-text {
+        color: rgba(255, 255, 255, 0.65);
+        font-size: 14px;
+        line-height: 1.6;
+        margin: 0;
+        max-width: 360px;
       }
 
       @keyframes spin {
@@ -62,13 +136,31 @@
         }
       }
     </style>
+
     <div class="initial-loader">
+      <div class="initial-logo">W</div>
       <div class="spinner"></div>
-      <div style="color: rgba(255,255,255,0.6); font-size: 14px;">
-        Chargement de Webisafe...
-      </div>
+      <h1 class="initial-title">Webisafe</h1>
+      <p class="initial-text">
+        Chargement de votre outil d'audit web pour PME africaines...
+      </p>
     </div>
   </div>
+
+  <!-- Fallback si JavaScript est désactivé -->
+  <noscript>
+    <div
+      style="background:#060e1a;color:white;min-height:100vh;padding:32px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+      <h1 style="font-size:28px;margin-bottom:12px;">
+        Webisafe — Audit de site web gratuit pour PME africaines
+      </h1>
+      <p style="font-size:16px;line-height:1.6;color:rgba(255,255,255,0.75);max-width:640px;">
+        Webisafe analyse la vitesse, le SEO, la sécurité et l'expérience mobile de votre site.
+        Pour utiliser l'outil d'audit gratuit, veuillez activer JavaScript dans votre navigateur.
+      </p>
+    </div>
+  </noscript>
+
   <script type="module" src="/src/main.jsx"></script>
 </body>
 
