@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -15,6 +15,8 @@ import {
   Zap,
   MapPin,
   X,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 
 import PremiumScoreCard from '../components/PremiumScoreCard';
@@ -28,15 +30,21 @@ import { formatDate, extractDomain } from '../utils/validators';
 import { buildPremiumExplanationParagraphs } from '../utils/premiumExplanation';
 import { fetchLatestPaymentRequest, fetchRemoteScan } from '../utils/paymentApi';
 import { REPORT_FIX_WHATSAPP, WAVE_SUPPORT_WHATSAPP } from '../utils/wavePayment';
+import { isKnownLargeSite, getLargeSiteDisclaimer } from '../utils/knownSites';
+import { runFullAnalysis } from '../utils/api';
 
-// ── UI helpers ───────────────────────────────────────────────────────────────
+// ── Helpers UI ────────────────────────────────────────────────────────────────
 function MetricRow({ label, value, status }) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-border-color last:border-0">
       <span className="text-text-secondary text-sm">{label}</span>
       <div className="flex items-center gap-2">
         <span className="text-text-primary text-sm font-medium">{value ?? 'N/A'}</span>
-        {status && <span>{status === 'pass' ? '✅' : status === 'warn' ? '⚠️' : '❌'}</span>}
+        {status && (
+          <span>
+            {status === 'pass' ? '✅' : status === 'warn' ? '⚠️' : '❌'}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -50,9 +58,7 @@ function SeverityPill({ severity }) {
       : s === 'medium'
         ? 'bg-orange-500/15 border-orange-500/30 text-orange-300'
         : 'bg-white/5 border-white/10 text-white/60';
-
   const label = s === 'high' ? 'Critique' : s === 'medium' ? 'Avertissement' : 'Info';
-
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold ${cls}`}>
       {label}
@@ -62,9 +68,7 @@ function SeverityPill({ severity }) {
 
 function CriticalAlertsBanner({ alerts }) {
   const [dismissed, setDismissed] = useState([]);
-
   if (!Array.isArray(alerts) || alerts.length === 0) return null;
-
   const visible = alerts.filter((_, i) => !dismissed.includes(i));
   if (visible.length === 0) return null;
 
@@ -73,12 +77,7 @@ function CriticalAlertsBanner({ alerts }) {
     high: 'bg-orange-500/15 border-orange-500/40 text-orange-300',
     warning: 'bg-yellow-500/15 border-yellow-500/40 text-yellow-200',
   };
-
-  const SEVERITY_ICON = {
-    critical: '🚨',
-    high: '⚠️',
-    warning: '🌍',
-  };
+  const SEVERITY_ICON = { critical: '🚨', high: '⚠️', warning: '🌍' };
 
   return (
     <div className="space-y-3 mb-8">
@@ -87,7 +86,6 @@ function CriticalAlertsBanner({ alerts }) {
           if (dismissed.includes(i)) return null;
           const style = SEVERITY_STYLE[alert.severity] ?? SEVERITY_STYLE.warning;
           const icon = SEVERITY_ICON[alert.severity] ?? '⚠️';
-
           return (
             <motion.div
               key={`${alert.title}-${i}`}
@@ -122,24 +120,18 @@ function CriticalAlertsBanner({ alerts }) {
 
 function ServerLocationBox({ serverLocation }) {
   if (!serverLocation) return null;
-
   const isWarning = serverLocation?.latency_warning?.warning;
-
   return (
-    <div
-      className={`rounded-2xl border p-4 ${isWarning ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-green-500/10 border-green-500/30'
-        }`}
-    >
+    <div className={`rounded-2xl border p-4 ${isWarning ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-green-500/10 border-green-500/30'}`}>
       <div className="flex items-start gap-3">
-        <div className="mt-0.5">
-          <MapPin size={16} className={isWarning ? 'text-yellow-200' : 'text-green-200'} />
-        </div>
+        <MapPin size={16} className={`mt-0.5 ${isWarning ? 'text-yellow-200' : 'text-green-200'}`} />
         <div className="min-w-0">
           <p className="text-white font-semibold text-sm">
             Serveur : {serverLocation.city}, {serverLocation.country}
           </p>
-          {serverLocation.isp && <p className="text-white/60 text-xs mt-0.5">ISP : {serverLocation.isp}</p>}
-          {serverLocation.ip && <p className="text-white/40 text-xs mt-0.5">IP : {serverLocation.ip}</p>}
+          {serverLocation.isp && (
+            <p className="text-white/60 text-xs mt-0.5">ISP : {serverLocation.isp}</p>
+          )}
           {serverLocation.latency_warning?.message && (
             <p className={`text-xs mt-2 ${isWarning ? 'text-yellow-200/90' : 'text-green-200/90'}`}>
               {serverLocation.latency_warning.message}
@@ -157,7 +149,39 @@ function ServerLocationBox({ serverLocation }) {
   );
 }
 
-// ── Normalisation (compat ancien + nouveau format) ────────────────────────────
+// ── Disclaimer grands sites ───────────────────────────────────────────────────
+function LargeSiteDisclaimer({ url, score }) {
+  const disclaimer = isKnownLargeSite(url) ? getLargeSiteDisclaimer(score) : null;
+  if (!disclaimer) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-sm text-blue-300"
+    >
+      <span className="font-semibold">ℹ️ {disclaimer.title} : </span>
+      {disclaimer.message}
+    </motion.div>
+  );
+}
+
+// ── Formatage date du scan ────────────────────────────────────────────────────
+function formatScanDate(isoString) {
+  if (!isoString) return null;
+  try {
+    return new Date(isoString).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return null;
+  }
+}
+
+// ── Normalisation scan ────────────────────────────────────────────────────────
 function normalizeScan(scan) {
   if (!scan || typeof scan !== 'object') return null;
 
@@ -169,79 +193,50 @@ function normalizeScan(scan) {
   const seoM = metrics.seo ?? null;
   const uxM = metrics.ux ?? null;
 
-  // Global score
   const globalScore =
     Number.isFinite(Number(scan.global_score)) ? Number(scan.global_score)
       : Number.isFinite(Number(scores.global)) ? Number(scores.global)
         : null;
 
-  // UX score might be stored as scores.ux (backend) OR scores.ux_mobile (older UI)
   const uxScore =
     Number.isFinite(Number(scores.ux)) ? Number(scores.ux)
       : Number.isFinite(Number(scores.ux_mobile)) ? Number(scores.ux_mobile)
-        : (Number.isFinite(Number(uxM?.accessibility_score)) ? Number(uxM.accessibility_score) : null);
+        : Number.isFinite(Number(uxM?.accessibility_score)) ? Number(uxM.accessibility_score)
+          : null;
 
-  // Server location can be present in metrics or in older UI wrapper
   const serverLocation =
-    perfM?.server_location ??
-    scan.performance?.server_location ??
-    null;
+    perfM?.server_location ?? scan.performance?.server_location ?? null;
 
-  // Opportunities can be present in metrics or in older UI wrapper
   const opportunities =
-    perfM?.opportunities ??
-    scan.performance?.opportunities ??
-    [];
+    perfM?.opportunities ?? scan.performance?.opportunities ?? [];
 
-  // UX issues
-  const uxIssues =
-    uxM?.issues ??
-    scan.ux?.issues ??
-    [];
+  const uxIssues = uxM?.issues ?? scan.ux?.issues ?? [];
+  const missingHeaders = secM?.headers_manquants ?? scan.security?.headers_manquants ?? [];
+  const cookieIssues = secM?.cookie_issues ?? scan.security?.cookie_issues ?? [];
+  const sensitiveFiles = secM?.sensitive_files ?? scan.security?.sensitive_files ?? null;
+  const criticalAlerts = Array.isArray(scan.critical_alerts) ? scan.critical_alerts : [];
 
-  // Security missing headers (backend now returns objects {header,message})
-  const missingHeaders =
-    secM?.headers_manquants ??
-    scan.security?.headers_manquants ??
-    [];
-
-  // Cookie issues
-  const cookieIssues =
-    secM?.cookie_issues ??
-    scan.security?.cookie_issues ??
-    [];
-
-  // Sensitive files
-  const sensitiveFiles =
-    secM?.sensitive_files ??
-    scan.security?.sensitive_files ??
+  // Date du scan : priorité au champ backend scanned_at
+  const scannedAt =
+    scan.scanned_at ??
+    scan.scanDate ??
+    scan.created_at ??
     null;
-
-  // Critical alerts
-  const criticalAlerts =
-    Array.isArray(scan.critical_alerts) ? scan.critical_alerts : [];
 
   return {
     raw: scan,
     globalScore,
     grade: scan.grade ?? null,
-
+    scannedAt,
     scores: {
       global: globalScore,
       performance: scores.performance ?? null,
       security: scores.security ?? null,
       seo: scores.seo ?? null,
       ux: uxScore,
-      ux_mobile: uxScore, // pour compat UI existante
+      ux_mobile: uxScore,
     },
-
-    metrics: {
-      performance: perfM,
-      security: secM,
-      seo: seoM,
-      ux: uxM,
-    },
-
+    metrics: { performance: perfM, security: secM, seo: seoM, ux: uxM },
     criticalAlerts,
     serverLocation,
     opportunities,
@@ -252,7 +247,7 @@ function normalizeScan(scan) {
   };
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
+// ── Page principale ───────────────────────────────────────────────────────────
 export default function Rapport() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -263,21 +258,18 @@ export default function Rapport() {
   const [activeSection, setActiveSection] = useState('overview');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isRescanning, setIsRescanning] = useState(false);
 
   useEffect(() => {
     let active = true;
 
     async function bootstrap() {
       setLoading(true);
-
       const localScan = getScan(id);
       const locallyPaid = isPaid(id);
 
       if (localScan && active) {
-        setScan({
-          ...localScan,
-          paid: Boolean(localScan.paid || locallyPaid),
-        });
+        setScan({ ...localScan, paid: Boolean(localScan.paid || locallyPaid) });
       }
 
       try {
@@ -287,31 +279,21 @@ export default function Rapport() {
         ]);
 
         if (!active) return;
-
         if (latestPayment) setPaymentRequest(latestPayment);
 
         const resolvedScan = remoteScan || localScan;
-
-        if (!resolvedScan) {
-          navigate('/');
-          return;
-        }
+        if (!resolvedScan) { navigate('/'); return; }
 
         const unlocked =
-          Boolean(resolvedScan.paid || locallyPaid) || latestPayment?.status === 'validated';
+          Boolean(resolvedScan.paid || locallyPaid) ||
+          latestPayment?.status === 'validated';
 
         if (unlocked) markAsPaid(id);
 
-        const hydratedScan = {
-          ...resolvedScan,
-          id,
-          paid: unlocked,
-        };
-
+        const hydratedScan = { ...resolvedScan, id, paid: unlocked };
         setScan(hydratedScan);
         saveScan(hydratedScan);
       } catch {
-        if (!active && !localScan) return;
         if (!localScan) navigate('/');
       } finally {
         if (active) setLoading(false);
@@ -322,34 +304,52 @@ export default function Rapport() {
     return () => { active = false; };
   }, [getScan, id, isPaid, markAsPaid, navigate, saveScan]);
 
+  // Polling paiement
   useEffect(() => {
     if (!scan || scan.paid) return undefined;
-
     const interval = window.setInterval(async () => {
       try {
         const [remoteScan, latestPayment] = await Promise.all([
           fetchRemoteScan(id).catch(() => null),
           fetchLatestPaymentRequest(id).catch(() => null),
         ]);
-
         if (latestPayment) setPaymentRequest(latestPayment);
-
         const unlocked =
-          Boolean(remoteScan?.paid || isPaid(id)) || latestPayment?.status === 'validated';
-
+          Boolean(remoteScan?.paid || isPaid(id)) ||
+          latestPayment?.status === 'validated';
         if (unlocked && (remoteScan || scan)) {
           markAsPaid(id);
           const hydratedScan = { ...(remoteScan || scan), id, paid: true };
           setScan(hydratedScan);
           saveScan(hydratedScan);
         }
-      } catch {
-        return null;
-      }
+      } catch { /* silencieux */ }
     }, 30000);
-
     return () => window.clearInterval(interval);
   }, [id, isPaid, markAsPaid, saveScan, scan]);
+
+  // ── Rescan ────────────────────────────────────────────────────────────────
+  const handleRescan = useCallback(async () => {
+    if (!scan?.url || isRescanning) return;
+    setIsRescanning(true);
+    try {
+      const freshData = await runFullAnalysis(scan.url, () => { });
+      if (freshData?.success) {
+        const freshScan = {
+          ...freshData,
+          id,
+          paid: scan.paid,
+          scanned_at: new Date().toISOString(),
+        };
+        setScan(freshScan);
+        saveScan(freshScan);
+      }
+    } catch (e) {
+      console.error('Rescan error:', e);
+    } finally {
+      setIsRescanning(false);
+    }
+  }, [scan, isRescanning, id, saveScan]);
 
   const norm = useMemo(() => normalizeScan(scan), [scan]);
 
@@ -389,7 +389,6 @@ export default function Rapport() {
           <p className="mt-4 text-sm leading-7 text-white/70">
             Votre paiement est en cours de vérification. Vous recevrez un email dès que votre rapport premium sera prêt.
           </p>
-
           {paymentRequest?.payment_code && (
             <div className="mt-6 rounded-2xl border border-primary/20 bg-[#0F172A] px-5 py-4">
               <p className="text-xs uppercase tracking-[0.22em] text-white/40">Code de paiement</p>
@@ -398,14 +397,12 @@ export default function Rapport() {
               </p>
             </div>
           )}
-
           <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/70 p-5 text-left">
             <p className="text-sm font-semibold text-white">Vérification automatique active</p>
             <p className="mt-2 text-sm text-white/65">
               Cette page se rechargera silencieusement toutes les 30 secondes jusqu'à validation.
             </p>
           </div>
-
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <a
               href={`https://wa.me/${WAVE_SUPPORT_WHATSAPP}?text=${encodeURIComponent(
@@ -431,12 +428,8 @@ export default function Rapport() {
   }
 
   const handleDownloadPDF = () => {
-    try {
-      generatePDF(scan);
-    } catch (error) {
-      console.error('Erreur PDF:', error);
-      alert(`Erreur lors de la génération du PDF: ${error.message}`);
-    }
+    try { generatePDF(scan); }
+    catch (error) { console.error('Erreur PDF:', error); }
   };
 
   const handleShare = () => {
@@ -458,13 +451,8 @@ export default function Rapport() {
   const premiumNarrative = buildPremiumExplanationParagraphs(scan.recommendations || []);
 
   const scanDateText = (() => {
-    // compat : scan.scanDate, scan.created_at (db), sinon date locale
-    const d = scan.scanDate || scan.created_at || null;
-    try {
-      return d ? formatDate(d) : formatDate(new Date().toISOString());
-    } catch {
-      return '';
-    }
+    const d = norm?.scannedAt || scan.scanDate || scan.created_at || null;
+    return formatScanDate(d) || formatDate(new Date().toISOString());
   })();
 
   const perfM = norm?.metrics?.performance ?? {};
@@ -474,7 +462,9 @@ export default function Rapport() {
 
   return (
     <div className="min-h-screen pt-24 pb-20 px-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
+
+        {/* ── Header ─────────────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -485,8 +475,7 @@ export default function Rapport() {
               onClick={() => navigate(-1)}
               className="flex items-center gap-1 text-white hover:text-primary text-sm mb-2 transition-colors"
             >
-              <ArrowLeft size={16} />
-              Retour
+              <ArrowLeft size={16} /> Retour
             </button>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center font-bold text-white">
@@ -494,17 +483,42 @@ export default function Rapport() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">
-                  RAPPORT D'AUDIT PREMIUM - {extractDomain(scan.url)}
+                  RAPPORT D'AUDIT PREMIUM — {extractDomain(scan.url)}
                 </h1>
-                <p className="text-white text-xs">{scanDateText}</p>
+                {/* Date + durée du scan */}
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-white/50 text-xs">🕐 Analysé le {scanDateText}</p>
+                  {scan.scan_duration_ms && (
+                    <p className="text-white/30 text-xs">
+                      · en {(scan.scan_duration_ms / 1000).toFixed(1)}s
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 flex-wrap justify-end ml-auto">
             <span className="rounded-full border border-success/30 bg-success/10 px-3 py-2 text-xs font-semibold text-success">
               Rapport Premium Activé
             </span>
+
+            {/* Bouton Relancer le scan */}
+            <button
+              onClick={handleRescan}
+              disabled={isRescanning}
+              title="Relancer l'analyse pour obtenir des données fraîches"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border-color hover:border-primary/50 text-text-secondary hover:text-white text-sm transition-all disabled:opacity-50"
+            >
+              {isRescanning
+                ? <Loader2 size={14} className="animate-spin" />
+                : <RefreshCw size={14} />
+              }
+              <span className="hidden sm:inline">
+                {isRescanning ? 'Analyse...' : 'Relancer'}
+              </span>
+            </button>
+
             <button
               onClick={handleDownloadPDF}
               className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl font-medium text-sm transition-all btn-glow"
@@ -522,9 +536,13 @@ export default function Rapport() {
           </div>
         </motion.div>
 
-        {/* Alertes critiques (Premium = complet) */}
+        {/* ── Disclaimer grands sites ─────────────────────────────────────── */}
+        <LargeSiteDisclaimer url={scan.url} score={norm?.globalScore ?? 0} />
+
+        {/* ── Alertes critiques ───────────────────────────────────────────── */}
         <CriticalAlertsBanner alerts={norm?.criticalAlerts ?? []} />
 
+        {/* ── Navigation sections ─────────────────────────────────────────── */}
         <div className="flex flex-wrap gap-2 mb-8 p-1 bg-card-bg rounded-xl border border-border-color">
           {sections.map((section) => (
             <button
@@ -534,8 +552,8 @@ export default function Rapport() {
                 document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth' });
               }}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${activeSection === section.id
-                ? 'bg-primary text-white'
-                : 'text-white hover:text-white hover:bg-dark-navy'
+                  ? 'bg-primary text-white'
+                  : 'text-white hover:text-white hover:bg-dark-navy'
                 }`}
             >
               {section.icon}
@@ -544,7 +562,7 @@ export default function Rapport() {
           ))}
         </div>
 
-        {/* ── OVERVIEW ───────────────────────────────────────────────────────── */}
+        {/* ── OVERVIEW ───────────────────────────────────────────────────── */}
         <section id="overview" className="mb-12">
           <PremiumScoreCard
             score={norm?.scores?.global ?? scan?.scores?.global ?? scan?.global_score ?? 0}
@@ -552,7 +570,6 @@ export default function Rapport() {
             badgeLiftMobile={true}
           />
 
-          {/* Badge serveur */}
           {norm?.serverLocation && (
             <div className="mt-4">
               <ServerLocationBox serverLocation={norm.serverLocation} />
@@ -584,7 +601,7 @@ export default function Rapport() {
           </div>
         </section>
 
-        {/* ── NARRATIVE ─────────────────────────────────────────────────────── */}
+        {/* ── NARRATIVE ──────────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 18, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -605,7 +622,6 @@ export default function Rapport() {
                     Ce que révèle votre audit premium
                   </h2>
                 </div>
-
                 <div className="scan-conclusion-pulse self-start rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-medium text-primary shadow-[0_0_25px_rgba(21,102,240,0.18)]">
                   Priorités de correction
                 </div>
@@ -617,8 +633,7 @@ export default function Rapport() {
                 {premiumNarrative.map((paragraph, index) => (
                   <p
                     key={index}
-                    className={`max-w-4xl text-sm md:text-[15px] leading-7 ${index === 0 ? 'text-white/92' : 'text-white'
-                      }`}
+                    className={`max-w-4xl text-sm md:text-[15px] leading-7 ${index === 0 ? 'text-white/92' : 'text-white'}`}
                   >
                     <HighlightedTechText text={paragraph} />
                   </p>
@@ -642,14 +657,14 @@ export default function Rapport() {
           </div>
         </motion.div>
 
-        {/* ── PERFORMANCE ───────────────────────────────────────────────────── */}
+        {/* ── PERFORMANCE ────────────────────────────────────────────────── */}
         <section id="performance" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">⚡ Performance</h2>
 
             {perfM?.partial && (
               <div className="mb-4 rounded-xl border border-yellow-500/25 bg-yellow-500/10 p-4 text-yellow-200 text-xs">
-                Scan Performance en mode fallback (partial=true) — score estimé (TTFB). PageSpeed a échoué ou a expiré.
+                Données partielles — PageSpeed n'a pas pu analyser ce site complètement. Le score est estimé.
               </div>
             )}
 
@@ -667,15 +682,18 @@ export default function Rapport() {
             <MetricRow label="TTI" value={perfM?.tti != null ? `${Math.round(perfM.tti)} ms` : 'N/A'} />
             <MetricRow label="Poids page" value={perfM?.page_weight_mb != null ? `${perfM.page_weight_mb} MB` : 'N/A'} />
 
-            {/* Opportunités PSI */}
             {Array.isArray(norm?.opportunities) && norm.opportunities.length > 0 && (
               <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/60 p-5">
-                <p className="text-white font-semibold text-sm mb-3">Top optimisations recommandées (PageSpeed)</p>
+                <p className="text-white font-semibold text-sm mb-3">
+                  Top optimisations recommandées (PageSpeed)
+                </p>
                 <div className="space-y-3">
                   {norm.opportunities.map((op, i) => (
                     <div key={i} className="rounded-xl border border-white/10 bg-card-bg/30 p-4">
                       <p className="text-white text-sm font-semibold">{op.title}</p>
-                      {op.description && <p className="text-white/60 text-xs mt-1">{op.description}</p>}
+                      {op.description && (
+                        <p className="text-white/60 text-xs mt-1">{op.description}</p>
+                      )}
                       {op.savings_ms != null && (
                         <p className="text-primary text-xs mt-2">
                           Gain estimé : ~{Math.round(op.savings_ms)} ms
@@ -689,44 +707,38 @@ export default function Rapport() {
           </div>
         </section>
 
-        {/* ── SECURITY ───────────────────────────────────────────────────────── */}
+        {/* ── SECURITY ───────────────────────────────────────────────────── */}
         <section id="security" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">🔒 Sécurité</h2>
 
-            <MetricRow
-              label="Score Sécurité"
-              value={`${norm?.scores?.security ?? 'N/A'}/100`}
-            />
-
+            <MetricRow label="Score Sécurité" value={`${norm?.scores?.security ?? 'N/A'}/100`} />
             <MetricRow
               label="SSL Grade"
               value={secM?.ssl_grade ?? 'N/A'}
               status={
-                secM?.ssl_grade === 'A+' || secM?.ssl_grade === 'A'
-                  ? 'pass'
-                  : secM?.ssl_grade === 'B'
-                    ? 'warn'
-                    : secM?.ssl_grade
-                      ? 'fail'
-                      : null
+                secM?.ssl_grade === 'A+' || secM?.ssl_grade === 'A' ? 'pass'
+                  : secM?.ssl_grade === 'B' ? 'warn'
+                    : secM?.ssl_grade ? 'fail' : null
               }
             />
-
-            <MetricRow
-              label="Grade Headers"
-              value={secM?.security_grade ?? 'N/A'}
-            />
-
             <MetricRow
               label="Malware (VirusTotal)"
-              value={secM?.malware_detected === true ? '🚨 Détecté' : secM?.malware_detected === false ? 'Aucun' : 'N/A'}
-              status={secM?.malware_detected === true ? 'fail' : secM?.malware_detected === false ? 'pass' : null}
+              value={
+                secM?.malware_detected === true ? '🚨 Détecté'
+                  : secM?.malware_detected === false ? 'Aucun'
+                    : 'N/A'
+              }
+              status={
+                secM?.malware_detected === true ? 'fail'
+                  : secM?.malware_detected === false ? 'pass'
+                    : null
+              }
             />
-
             <MetricRow
-              label="Observatory (Mozilla)"
-              value={secM?.observatory_score != null ? `${secM.observatory_score}/100` : 'N/A'}
+              label="HTTPS"
+              value={secM?.https ? 'Activé' : 'Non activé'}
+              status={secM?.https ? 'pass' : 'fail'}
             />
 
             {/* Fichiers sensibles */}
@@ -747,7 +759,9 @@ export default function Rapport() {
             {/* Headers manquants */}
             {Array.isArray(norm?.missingHeaders) && norm.missingHeaders.length > 0 && (
               <div className="mt-6 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-5">
-                <p className="text-orange-200 font-semibold text-sm">Headers de sécurité manquants</p>
+                <p className="text-orange-200 font-semibold text-sm">
+                  Headers de sécurité manquants ({norm.missingHeaders.length})
+                </p>
                 <div className="mt-3 space-y-2">
                   {norm.missingHeaders.map((h, i) => (
                     <div key={i} className="rounded-xl border border-white/10 bg-card-bg/30 p-4">
@@ -777,25 +791,15 @@ export default function Rapport() {
                 </ul>
               </div>
             )}
-
-            {/* SSL details */}
-            {secM?.ssl_details?.error && (
-              <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/60 p-5">
-                <p className="text-white/70 text-xs">
-                  SSL Labs : {secM.ssl_details.error} (normal en développement)
-                </p>
-              </div>
-            )}
           </div>
         </section>
 
-        {/* ── SEO ────────────────────────────────────────────────────────────── */}
+        {/* ── SEO ────────────────────────────────────────────────────────── */}
         <section id="seo" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">🔍 SEO</h2>
 
             <MetricRow label="Score SEO" value={`${norm?.scores?.seo ?? 'N/A'}/100`} />
-
             <MetricRow
               label="Title"
               value={seoM?.has_title ? 'Présent' : 'Absent'}
@@ -808,8 +812,13 @@ export default function Rapport() {
             />
             <MetricRow
               label="H1"
-              value={seoM?.h1_count != null ? `${seoM.h1_count}` : 'N/A'}
+              value={seoM?.h1_count != null ? String(seoM.h1_count) : 'N/A'}
               status={seoM?.h1_count === 1 ? 'pass' : seoM?.h1_count === 0 ? 'fail' : 'warn'}
+            />
+            <MetricRow
+              label="Sitemap"
+              value={seoM?.has_sitemap ? 'Présent' : 'Absent'}
+              status={seoM?.has_sitemap ? 'pass' : 'fail'}
             />
             <MetricRow
               label="Viewport"
@@ -817,23 +826,41 @@ export default function Rapport() {
               status={seoM?.has_viewport ? 'pass' : 'fail'}
             />
             <MetricRow
+              label="Canonical"
+              value={seoM?.has_canonical ? 'Présente' : 'Absente'}
+              status={seoM?.has_canonical ? 'pass' : 'warn'}
+            />
+            <MetricRow
               label="Open Graph"
               value={seoM?.has_open_graph ? 'Présent' : 'Absent'}
               status={seoM?.has_open_graph ? 'pass' : 'warn'}
             />
+            <MetricRow
+              label="Indexable"
+              value={seoM?.is_indexable ? 'Oui' : 'Bloqué (noindex)'}
+              status={seoM?.is_indexable ? 'pass' : 'fail'}
+            />
           </div>
         </section>
 
-        {/* ── UX ─────────────────────────────────────────────────────────────── */}
+        {/* ── UX ─────────────────────────────────────────────────────────── */}
         <section id="ux" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">📱 UX Mobile</h2>
 
             <MetricRow label="Score UX" value={`${norm?.scores?.ux ?? 'N/A'}/100`} />
             <MetricRow label="Grade UX" value={uxM?.grade ?? 'N/A'} />
-            <MetricRow label="Tap targets" value={uxM?.tap_targets_ok === true ? 'OK' : uxM?.tap_targets_ok === false ? 'À améliorer' : 'N/A'} />
+            <MetricRow
+              label="Responsive (Viewport)"
+              value={uxM?.issues?.find(i => i.message?.includes('viewport')) ? 'Absent' : 'OK'}
+              status={uxM?.issues?.find(i => i.message?.includes('viewport')) ? 'fail' : 'pass'}
+            />
+            <MetricRow
+              label="Compression (gzip/brotli)"
+              value={uxM?.issues?.find(i => i.message?.includes('Compression')) ? 'Désactivée' : 'Active'}
+              status={uxM?.issues?.find(i => i.message?.includes('Compression')) ? 'fail' : 'pass'}
+            />
 
-            {/* Liste des issues UX */}
             {Array.isArray(norm?.uxIssues) && norm.uxIssues.length > 0 && (
               <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/60 p-5">
                 <p className="text-white font-semibold text-sm mb-3">
@@ -846,8 +873,9 @@ export default function Rapport() {
                         <p className="text-white text-sm font-semibold">{issue.message}</p>
                         <SeverityPill severity={issue.severity} />
                       </div>
-                      {issue.impact && <p className="text-white/65 text-xs mt-1">Impact : {issue.impact}</p>}
-                      {issue.type && <p className="text-white/35 text-[11px] mt-1">Code : {issue.type}</p>}
+                      {issue.impact && (
+                        <p className="text-white/65 text-xs mt-1">Impact : {issue.impact}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -856,28 +884,50 @@ export default function Rapport() {
           </div>
         </section>
 
-        {/* ── RECOMMENDATIONS ─────────────────────────────────────────────────── */}
+        {/* ── RECOMMENDATIONS ────────────────────────────────────────────── */}
         <section id="recommendations" className="mb-12">
           <h2 className="text-xl font-bold text-white mb-2">📋 Plan d'Action Recommandé</h2>
-          <p className="text-white text-sm mb-6">
+          <p className="text-white/60 text-sm mb-6">
             {scan.recommendations?.length ?? 0} corrections classées par priorité
           </p>
-
           <div className="space-y-4">
             {(scan.recommendations ?? []).map((recommendation, index) => (
-              <RecommendationCard key={index} recommendation={recommendation} index={index} isLocked={false} />
+              <RecommendationCard
+                key={index}
+                recommendation={recommendation}
+                index={index}
+                isLocked={false}
+              />
             ))}
           </div>
         </section>
 
+        {/* ── Rescan info ─────────────────────────────────────────────────── */}
         <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 text-center mb-8">
-          <Clock size={24} className="text-primary mx-auto mb-3" />
-          <p className="text-white font-semibold mb-1">1 rescan gratuit disponible dans 30 jours</p>
+          <RefreshCw size={24} className="text-primary mx-auto mb-3" />
+          <p className="text-white font-semibold mb-1">Données à jour ?</p>
+          <p className="text-white/50 text-sm mb-4">
+            Relancez une analyse pour obtenir des métriques fraîches après vos corrections.
+          </p>
+          <button
+            onClick={handleRescan}
+            disabled={isRescanning}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl font-medium text-sm transition-all disabled:opacity-50"
+          >
+            {isRescanning
+              ? <Loader2 size={16} className="animate-spin" />
+              : <RefreshCw size={16} />
+            }
+            {isRescanning ? 'Analyse en cours...' : 'Relancer le scan'}
+          </button>
         </div>
 
+        {/* ── CTA Contact ─────────────────────────────────────────────────── */}
         <div className="bg-card-bg border border-border-color rounded-2xl p-6 text-center">
-          <h3 className="text-lg font-bold text-white mb-2">Besoin d'aide pour corriger ces problèmes ?</h3>
-          <p className="text-white text-sm mb-4">
+          <h3 className="text-lg font-bold text-white mb-2">
+            Besoin d'aide pour corriger ces problèmes ?
+          </h3>
+          <p className="text-white/60 text-sm mb-4">
             Notre équipe peut vous accompagner dans la mise en œuvre des corrections.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -900,6 +950,7 @@ export default function Rapport() {
             </Link>
           </div>
         </div>
+
       </div>
     </div>
   );

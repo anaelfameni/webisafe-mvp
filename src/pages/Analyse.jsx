@@ -680,7 +680,7 @@ export default function Analyse() {
                 Débloquer le rapport complet — 35 000 FCFA
               </p>
               <p className="text-white text-xs">
-                PDF 6 pages · Plan d'action · 1 rescan offert dans 30 jours
+                PDF · Plan d'action · 1 rescan offert dans 30 jours
               </p>
             </div>
             <button

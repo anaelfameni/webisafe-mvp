@@ -42,7 +42,7 @@ export default function CGU() {
             <h2 className="text-lg font-semibold text-white mb-3">3. Accès au service</h2>
             <p>
               Une analyse de base est accessible gratuitement. L'accès au rapport complet
-              (PDF 6 pages, plan d'action détaillé, rescan à 30 jours) est conditionné au
+              (PDF, plan d'action détaillé, rescan à 30 jours) est conditionné au
               paiement de 35 000 FCFA via Wave Money ou tout autre moyen accepté par la plateforme.
             </p>
           </section>

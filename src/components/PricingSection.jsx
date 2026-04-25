@@ -37,7 +37,7 @@ export default function PricingSection({ onScan }) {
       period: 'paiement unique',
       description: 'Rapport professionnel complet pour comprendre et corriger ce qui freine votre site.',
       features: [
-        'Rapport PDF 6 pages professionnel',
+        'Rapport PDF professionnel',
         '25+ metriques analysees',
         'Explications detaillees des failles et impacts business',
         "Plan d'action priorise en 3 etapes",
@@ -109,9 +109,8 @@ export default function PricingSection({ onScan }) {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className={`relative bg-card-bg border rounded-2xl p-6 lg:p-8 flex flex-col ${
-                plan.popular ? 'border-primary shadow-lg shadow-primary/10 scale-[1.02]' : 'border-border-color'
-              }`}
+              className={`relative bg-card-bg border rounded-2xl p-6 lg:p-8 flex flex-col ${plan.popular ? 'border-primary shadow-lg shadow-primary/10 scale-[1.02]' : 'border-border-color'
+                }`}
             >
               <span className={`inline-block self-start text-xs font-semibold px-3 py-1 rounded-full mb-4 ${plan.badgeColor}`}>
                 {plan.badge}

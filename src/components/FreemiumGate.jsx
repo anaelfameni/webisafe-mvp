@@ -6,7 +6,7 @@ export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, sca
   const recommendationCount = scanData?.recommendations?.length ?? 7;
 
   const features = [
-    'PDF professionnel de 6 pages',
+    'PDF professionnel',
     '25+ métriques détaillées avec explications',
     "Plan d'action priorisé en 3 étapes",
     '1 rescan gratuit dans 30 jours',

@@ -38,7 +38,7 @@ export default function WaveCheckoutModal({
   };
 
   const features = [
-    'PDF 6 pages professionnel',
+    'PDF professionnel',
     '25+ métriques détaillées',
     "Plan d'action priorisé",
     '1 rescan gratuit dans 30 jours',

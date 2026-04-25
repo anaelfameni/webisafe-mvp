@@ -66,12 +66,19 @@ async function readCache(normalizedUrl) {
     return null;
 }
 
-async function saveToDb(scanId, url, score, results) {
+async function saveToDb(scanId, url, score, results, userId = null) {
     if (!supabase) return;
     try {
         const { error } = await supabase
             .from('scans')
-            .insert({ id: scanId, url, score, results_json: results, paid: false });
+            .insert({
+                id: scanId,
+                url,
+                score,
+                results_json: results,
+                paid: false,
+                user_id: userId, // ← nouveau
+            });
         if (error) console.warn('[DB] Erreur sauvegarde:', error.message);
     } catch (e) {
         console.warn('[DB] Exception:', e.message);
@@ -617,6 +624,7 @@ export default async function handler(req, res) {
             success: true,
             scan_id: scanId,
             url: normalizedUrl,
+            scanned_at: new Date().toISOString(), // ← NOUVEAU
             global_score: globalScore,
             grade: getGrade(globalScore),
             scores,
@@ -636,15 +644,16 @@ export default async function handler(req, res) {
             scan_duration_ms: scanDurationMs,
         };
 
-        await saveToDb(scanId, normalizedUrl, globalScore, results);
+        await saveToDb(scanId, normalizedUrl, globalScore, results, userId); // ← passe userId
         return res.json(results);
+    }
 
     } catch (error) {
-        console.error('[SCAN] Erreur fatale:', error);
-        return res.status(500).json({
-            success: false,
-            error: "Une erreur est survenue lors de l'analyse. Réessayez dans quelques instants.",
-            type: 'SCAN_ERROR',
-        });
-    }
+    console.error('[SCAN] Erreur fatale:', error);
+    return res.status(500).json({
+        success: false,
+        error: "Une erreur est survenue lors de l'analyse. Réessayez dans quelques instants.",
+        type: 'SCAN_ERROR',
+    });
+}
 }

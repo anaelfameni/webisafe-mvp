@@ -514,7 +514,17 @@ export async function runFullAnalysis(url, onProgress) {
   try {
     const response = await fetch('/api/scan', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // Envoie l'id utilisateur au backend pour associer le scan au compte
+        'x-user-id': (() => {
+          try {
+            return JSON.parse(localStorage.getItem('webisafe_auth') || '{}')?.id || '';
+          } catch {
+            return '';
+          }
+        })(),
+      },
       body: JSON.stringify({ url }),
     });
 
