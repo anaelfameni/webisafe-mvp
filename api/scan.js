@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 
+// ── Supabase ──────────────────────────────────────────────────────────────────
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
@@ -37,11 +38,7 @@ function clamp(n, min, max) {
  * Score de 100 = IMPOSSIBLE sauf 0 failedCheck (et on plafonne à 97 même là).
  */
 function applyScoreCap(score, failedChecks = []) {
-    // Aucun critère échoué → on plafonne quand même à 97 (jamais 100)
     if (failedChecks.length === 0) return Math.min(score, 97);
-    // 1 critère échoué → max 89
-    // 2 critères échoués → max 81
-    // 3 → max 73, etc.
     const cap = Math.max(15, 89 - (failedChecks.length - 1) * 8);
     return Math.min(score, cap);
 }
@@ -77,7 +74,7 @@ async function saveToDb(scanId, url, score, results, userId = null) {
                 score,
                 results_json: results,
                 paid: false,
-                user_id: userId, // ← nouveau
+                user_id: userId,
             });
         if (error) console.warn('[DB] Erreur sauvegarde:', error.message);
     } catch (e) {
@@ -270,7 +267,6 @@ async function scanSecurity(url, vtApiKey) {
         } catch (e) { console.warn('[SEC] VirusTotal:', e.message); }
     }
 
-    // Score brut
     let rawScore = 0;
     rawScore += isHttps ? 25 : 0;
     rawScore += malwareDetected === false ? 25 : malwareDetected === null ? 10 : 0;
@@ -279,12 +275,10 @@ async function scanSecurity(url, vtApiKey) {
     rawScore += Math.round((headerPoints / maxHeaderPoints) * 50);
     rawScore = clamp(rawScore, 0, 100);
 
-    // Critères échoués
     const failedChecks = [];
     if (!isHttps) failedChecks.push('no_https');
     if (malwareDetected === true) failedChecks.push('malware_detected');
     if (malwareDetected === null) failedChecks.push('malware_unknown');
-    // Chaque header manquant compte comme un critère échoué distinct
     headersMissing.forEach(h => failedChecks.push(`missing_header_${h.header}`));
 
     return {
@@ -328,7 +322,6 @@ async function scanSEO(url) {
     const ogImage = $('meta[property="og:image"]').attr('content');
     const hasOpenGraph = Boolean(ogTitle && ogDesc && ogImage);
 
-    // Vérification sitemap réelle — chaque candidat testé individuellement
     let hasSitemap = false;
     try {
         const origin = new URL(url).origin;
@@ -349,7 +342,6 @@ async function scanSEO(url) {
         }
     } catch { hasSitemap = false; }
 
-    // Score brut — total max = 100 uniquement si TOUT est présent
     let rawScore = 0;
     if (title.length > 0) rawScore += 22;
     if (description.length > 0) rawScore += 18;
@@ -360,9 +352,7 @@ async function scanSEO(url) {
     if (h1Count === 1) rawScore += 8;
     else if (h1Count > 1) rawScore += 3;
     if (hasOpenGraph) rawScore += 6;
-    // Max possible = 22+18+15+10+13+8+8+6 = 100
 
-    // CHAQUE critère manquant = 1 failedCheck → plafonnement immédiat
     const failedChecks = [];
     if (!title) failedChecks.push('no_title');
     if (!description) failedChecks.push('no_description');
@@ -374,7 +364,6 @@ async function scanSEO(url) {
     else if (h1Count > 1) failedChecks.push('multiple_h1');
 
     const cappedScore = applyScoreCap(Math.min(100, rawScore), failedChecks);
-
     console.log(`[SEO] raw=${rawScore} failed=[${failedChecks.join(',')}] capped=${cappedScore}`);
 
     return {
@@ -485,7 +474,6 @@ function calculateGlobalScore(perf, sec, seo, ux) {
     if (seo != null) { score += seo * weights.seo; totalW += weights.seo; }
     if (ux != null) { score += ux * weights.ux; totalW += weights.ux; }
     if (totalW === 0) return 0;
-    // Score global plafonné à 97 — jamais 100
     return Math.min(Math.round(score / totalW), 97);
 }
 
@@ -560,6 +548,7 @@ export default async function handler(req, res) {
 
     const normalizedUrl = validation.url;
 
+    // ── Vérification accessibilité du site cible ──────────────────────────────
     try {
         const check = await fetch(normalizedUrl, {
             method: 'HEAD',
@@ -573,12 +562,13 @@ export default async function handler(req, res) {
         return res.status(422).json({ success: false, error: "Impossible de joindre le site. Vérifiez l'URL.", type: 'SITE_UNREACHABLE' });
     }
 
-    // Cache désactivé — on relit toujours les données fraîches
+    // ── Cache (désactivé) ─────────────────────────────────────────────────────
     const cached = await readCache(normalizedUrl);
     if (cached?.results_json) {
         return res.json({ ...cached.results_json, success: true, cached: true, scan_id: cached.id });
     }
 
+    // ── Clés API ──────────────────────────────────────────────────────────────
     const psKey = process.env.GOOGLE_PAGESPEED_KEY;
     const vtKey = process.env.VIRUSTOTAL_API_KEY ?? null;
 
@@ -591,6 +581,7 @@ export default async function handler(req, res) {
 
     console.log(`[SCAN] Démarrage id=${scanId} url=${normalizedUrl}`);
 
+    // ── Scan principal ────────────────────────────────────────────────────────
     try {
         const [perfResult, secResult, seoResult, uxResult, geoResult] = await Promise.allSettled([
             scanPerformance(normalizedUrl, psKey),
@@ -624,7 +615,7 @@ export default async function handler(req, res) {
             success: true,
             scan_id: scanId,
             url: normalizedUrl,
-            scanned_at: new Date().toISOString(), // ← NOUVEAU
+            scanned_at: new Date().toISOString(),
             global_score: globalScore,
             grade: getGrade(globalScore),
             scores,
@@ -644,16 +635,18 @@ export default async function handler(req, res) {
             scan_duration_ms: scanDurationMs,
         };
 
-        await saveToDb(scanId, normalizedUrl, globalScore, results, userId); // ← passe userId
-        return res.json(results);
-    }
+        // ✅ FIX : userId passé en null (non déclaré dans ce handler)
+        await saveToDb(scanId, normalizedUrl, globalScore, results, null);
 
+        return res.json(results);
+
+        // ✅ FIX : accolade parasite supprimée — le catch est directement lié au try
     } catch (error) {
-    console.error('[SCAN] Erreur fatale:', error);
-    return res.status(500).json({
-        success: false,
-        error: "Une erreur est survenue lors de l'analyse. Réessayez dans quelques instants.",
-        type: 'SCAN_ERROR',
-    });
-}
+        console.error('[SCAN] Erreur fatale:', error);
+        return res.status(500).json({
+            success: false,
+            error: "Une erreur est survenue lors de l'analyse. Réessayez dans quelques instants.",
+            type: 'SCAN_ERROR',
+        });
+    }
 }
