@@ -17,6 +17,15 @@ const supabase =
 
 export const config = { maxDuration: 60 };
 
+// ── User-Agent navigateur réel (évite les blocages basiques) ──────────────────
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const BROWSER_HEADERS = {
+    'User-Agent': BROWSER_UA,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+    'Cache-Control': 'no-cache',
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function readJsonBody(req) {
     if (req.body && typeof req.body === 'object') return req.body;
@@ -298,16 +307,41 @@ async function scanSecurity(url, vtApiKey) {
 
 // ── SEO ───────────────────────────────────────────────────────────────────────
 async function scanSEO(url) {
-    const res = await fetch(url, {
-        signal: AbortSignal.timeout(8_000),
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)',
-            Accept: 'text/html',
-        },
-        redirect: 'follow',
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
+    let html = '';
+    let resHeaders = null;
+
+    try {
+        const res = await fetch(url, {
+            signal: AbortSignal.timeout(10_000),
+            headers: BROWSER_HEADERS,
+            redirect: 'follow',
+        });
+        resHeaders = res.headers;
+        if (res.ok) {
+            html = await res.text();
+        } else {
+            console.warn(`[SEO] HTTP ${res.status} pour ${url}`);
+        }
+    } catch (e) {
+        console.warn(`[SEO] fetch échoué: ${e.message}`);
+    }
+
+    // Si on n'a pas pu récupérer de HTML, score partiel minimal
+    if (!html) {
+        return {
+            score: 20,
+            raw_score: 0,
+            has_title: null, title_length: null,
+            has_description: null, description_length: null,
+            h1_count: null, has_viewport: null,
+            has_open_graph: null, has_canonical: null,
+            has_sitemap: null, is_indexable: null,
+            failed_checks: ['fetch_failed'],
+            partial: true,
+            partial_reason: 'Impossible de récupérer le HTML du site.',
+        };
+    }
+
     const $ = cheerio.load(html);
 
     const title = $('title').first().text().trim();
@@ -335,7 +369,7 @@ async function scanSEO(url) {
                 const r = await fetch(candidate, {
                     method: 'HEAD',
                     signal: AbortSignal.timeout(4_000),
-                    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
+                    headers: BROWSER_HEADERS,
                 });
                 if (r.ok) { hasSitemap = true; break; }
             } catch { /* candidat suivant */ }
@@ -386,13 +420,46 @@ async function scanSEO(url) {
 
 // ── UX Mobile ─────────────────────────────────────────────────────────────────
 async function scanUX(url) {
-    const res = await fetch(url, {
-        signal: AbortSignal.timeout(10_000),
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
-        redirect: 'follow',
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
+    let html = '';
+    let resHeaders = null;
+
+    try {
+        const res = await fetch(url, {
+            signal: AbortSignal.timeout(12_000),
+            headers: BROWSER_HEADERS,
+            redirect: 'follow',
+        });
+        resHeaders = res.headers;
+        if (res.ok) {
+            html = await res.text();
+        } else {
+            console.warn(`[UX] HTTP ${res.status} pour ${url}`);
+        }
+    } catch (e) {
+        console.warn(`[UX] fetch échoué: ${e.message}`);
+    }
+
+    // Si on n'a pas pu récupérer de HTML, score partiel minimal
+    if (!html) {
+        return {
+            score: 20,
+            raw_score: 0,
+            accessibility_score: 20,
+            tap_targets_ok: null,
+            issues: [{
+                severity: 'medium',
+                message: 'Analyse incomplète : impossible de récupérer le HTML du site',
+                impact: 'Le site a peut-être bloqué la requête ou est temporairement indisponible.',
+            }],
+            issues_count: 1,
+            critical_count: 0,
+            failed_checks: ['fetch_failed'],
+            grade: 'D',
+            partial: true,
+            partial_reason: 'Impossible de récupérer le HTML du site.',
+        };
+    }
+
     const $ = cheerio.load(html);
     const issues = [];
 
@@ -420,7 +487,7 @@ async function scanUX(url) {
         });
     }
 
-    const encoding = res.headers.get('content-encoding') || '';
+    const encoding = resHeaders?.get('content-encoding') || '';
     const hasCompression = encoding.includes('br') || encoding.includes('gzip');
     if (!hasCompression) {
         issues.push({
