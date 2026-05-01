@@ -1,8 +1,8 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatDate, extractDomain } from './validators.js';
+import { buildPremiumExplanationParagraphs } from './premiumExplanation.js';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 export function sanitizePdfText(value) {
   const source = String(value ?? '');
   return source
@@ -18,22 +18,30 @@ export function sanitizePdfText(value) {
 }
 
 function t(value, fallback = 'N/A') {
-  const s = sanitizePdfText(value);
-  return s || fallback;
+  const text = sanitizePdfText(value);
+  return text || fallback;
+}
+
+function num(value, fallback = null) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function boolLabel(value, yes = 'Oui', no = 'Non') {
+  if (value === true) return yes;
+  if (value === false) return no;
+  return 'N/A';
+}
+
+function normalizeList(value) {
+  return Array.isArray(value) ? value.filter(Boolean) : [];
 }
 
 export function buildPdfFilename(reportData) {
   const rawDomain = reportData.domain || reportData.url || 'site';
-  const sanitizedDomain = t(rawDomain, 'site').replace(/[^a-zA-Z0-9.-]/g, '-');
+  const sanitizedDomain = t(extractDomain(rawDomain), 'site').replace(/[^a-zA-Z0-9.-]/g, '-');
   const datePart = new Date(reportData.scanDate || Date.now()).toISOString().split('T')[0];
   return `Webisafe_Rapport_${sanitizedDomain}_${datePart}.pdf`;
-}
-
-function hexToRgb(hex) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }
-    : { r: 0, g: 0, b: 0 };
 }
 
 function getScoreColor(score) {
@@ -44,24 +52,396 @@ function getScoreColor(score) {
   return '#ef4444';
 }
 
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }
+    : { r: 0, g: 0, b: 0 };
+}
+
+function scoreRgb(score) {
+  const rgb = hexToRgb(getScoreColor(num(score, 0)));
+  return [rgb.r, rgb.g, rgb.b];
+}
+
 function getScoreLabel(score) {
-  if (score >= 90) return 'Excellent';
-  if (score >= 70) return 'Bon';
-  if (score >= 50) return 'Acceptable';
-  if (score >= 30) return 'Mauvais';
+  const s = num(score, 0);
+  if (s >= 90) return 'Excellent';
+  if (s >= 70) return 'Bon';
+  if (s >= 50) return 'Acceptable';
+  if (s >= 30) return 'Mauvais';
   return 'Critique';
 }
 
-function getStatusIcon(status) {
-  if (status === 'pass') return 'OK';
-  if (status === 'warn') return '!!';
-  return 'KO';
+function statusFromScore(score) {
+  const s = num(score, 0);
+  if (s >= 75) return 'OK';
+  if (s >= 50) return 'A ameliorer';
+  return 'Critique';
 }
 
-function getStatusColor(status) {
-  if (status === 'pass') return [34, 197, 94];
-  if (status === 'warn') return [234, 179, 8];
+function statusColor(status) {
+  const s = String(status || '').toLowerCase();
+  if (s.includes('ok') || s.includes('bon') || s.includes('actif') || s.includes('present')) return [34, 197, 94];
+  if (s.includes('ameliorer') || s.includes('moyen') || s.includes('avertissement') || s.includes('partiel')) return [234, 179, 8];
+  if (s.includes('n/a')) return [148, 163, 184];
   return [239, 68, 68];
+}
+
+function normalizeHeaderLabel(header) {
+  if (typeof header === 'string') return { header, message: '' };
+  return {
+    header: header?.header || header?.label || 'Header',
+    message: header?.message || '',
+  };
+}
+
+function normalizeRecommendation(rec = {}) {
+  const title = rec.title || rec.label || rec.name || rec.action || 'Correction recommandee';
+  return {
+    priority: rec.priority || 'IMPORTANT',
+    category: rec.category || 'general',
+    title,
+    description: rec.description || '',
+    impact: rec.impact || '',
+    impactBusiness: rec.impactBusiness || rec.impact_business || '',
+    action: rec.action || title,
+    difficulty: rec.difficulty || rec.difficulte || 'Moyenne',
+    time: rec.time || rec.temps || '',
+  };
+}
+
+function normalizeScores(scan) {
+  const scores = scan.scores || {};
+  const metrics = scan.metrics || {};
+  const uxScore = num(scores.ux, num(scores.ux_mobile, num(metrics.ux?.accessibility_score, null)));
+  const global = num(scan.global_score, num(scores.global, 0));
+
+  return {
+    global,
+    performance: num(scores.performance, null),
+    security: num(scores.security, null),
+    seo: num(scores.seo, null),
+    ux: uxScore,
+    ux_mobile: uxScore,
+  };
+}
+
+function normalizePerformance(scan, scores) {
+  const metrics = scan.metrics?.performance || {};
+  const legacy = scan.performance || {};
+  const cwv = legacy.core_web_vitals || {};
+
+  const lcp = num(metrics.lcp, num(cwv.lcp?.value, null));
+  const fcp = num(metrics.fcp, num(cwv.fcp?.value, null));
+  const cls = num(metrics.cls, num(cwv.cls?.value, null));
+  const tbt = num(metrics.tbt, null);
+  const tti = num(metrics.tti, null);
+  const pageWeight = num(metrics.page_weight_mb, num(legacy.poids_page_mb, null));
+  const partial = Boolean(metrics.partial ?? legacy.partial);
+
+  return {
+    raw: metrics,
+    serverLocation: metrics.server_location || legacy.server_location || null,
+    opportunities: normalizeList(metrics.opportunities || legacy.opportunities),
+    metrics: [
+      { label: 'Score Performance', value: scores.performance != null ? `${scores.performance}/100` : 'N/A', status: statusFromScore(scores.performance), explanation: 'Score de vitesse et stabilite mesure par Webisafe et PageSpeed quand disponible.' },
+      { label: 'LCP', value: lcp != null ? `${Math.round(lcp)} ms` : 'N/A', status: lcp == null ? 'N/A' : lcp <= 2500 ? 'OK' : lcp <= 4000 ? 'A ameliorer' : 'Critique', explanation: 'Largest Contentful Paint : moment ou le contenu principal devient visible. Objectif : moins de 2500 ms.' },
+      { label: 'FCP', value: fcp != null ? `${Math.round(fcp)} ms` : 'N/A', status: fcp == null ? 'N/A' : fcp <= 1800 ? 'OK' : fcp <= 3000 ? 'A ameliorer' : 'Critique', explanation: 'First Contentful Paint : premier affichage visible. Plus il est bas, plus le site semble rapide.' },
+      { label: 'CLS', value: cls != null ? cls.toFixed(3) : 'N/A', status: cls == null ? 'N/A' : cls <= 0.1 ? 'OK' : cls <= 0.25 ? 'A ameliorer' : 'Critique', explanation: 'Cumulative Layout Shift : stabilite visuelle de la page. Objectif : moins de 0.1.' },
+      { label: 'TBT', value: tbt != null ? `${Math.round(tbt)} ms` : 'N/A', status: tbt == null ? 'N/A' : tbt <= 200 ? 'OK' : tbt <= 600 ? 'A ameliorer' : 'Critique', explanation: 'Total Blocking Time : temps pendant lequel la page repond mal aux interactions.' },
+      { label: 'TTI', value: tti != null ? `${Math.round(tti)} ms` : 'N/A', status: tti == null ? 'N/A' : tti <= 3800 ? 'OK' : tti <= 7300 ? 'A ameliorer' : 'Critique', explanation: 'Time To Interactive : moment ou la page devient vraiment utilisable.' },
+      { label: 'Poids page', value: pageWeight != null ? `${pageWeight} MB` : 'N/A', status: pageWeight == null ? 'N/A' : pageWeight <= 2 ? 'OK' : pageWeight <= 4 ? 'A ameliorer' : 'Critique', explanation: 'Poids total charge. Sur mobile, chaque Mo supplementaire augmente les abandons.' },
+      { label: 'Mode du scan', value: partial ? 'Partiel / fallback TTFB' : 'Complet', status: partial ? 'Partiel' : 'OK', explanation: partial ? `PageSpeed a echoue ou expire. Raison : ${metrics.partial_reason || 'fallback active'}.` : 'Les mesures principales ont ete collectees normalement.' },
+    ],
+  };
+}
+
+function normalizeSecurity(scan, scores) {
+  const metrics = scan.metrics?.security || {};
+  const legacy = scan.security || {};
+  const malware = metrics.malware_detected ?? legacy.malware;
+  const sslGrade = metrics.ssl_grade ?? legacy.ssl_grade ?? 'N/A';
+  const securityGrade = metrics.security_grade ?? legacy.security_grade ?? 'N/A';
+  const observatory = metrics.observatory_score ?? legacy.observatory_score;
+  const missingHeaders = normalizeList(metrics.headers_manquants ?? legacy.headers_manquants).map(normalizeHeaderLabel);
+  const cookieIssues = normalizeList(metrics.cookie_issues ?? legacy.cookie_issues);
+  const sensitiveFiles = metrics.sensitive_files ?? legacy.sensitive_files ?? null;
+
+  return {
+    raw: metrics,
+    missingHeaders,
+    cookieIssues,
+    sensitiveFiles,
+    sslDetails: metrics.ssl_details || legacy.ssl_details || null,
+    metrics: [
+      { label: 'Score Securite', value: scores.security != null ? `${scores.security}/100` : 'N/A', status: statusFromScore(scores.security), explanation: 'Score global des protections detectees : HTTPS, headers, reputation et signaux de risque.' },
+      { label: 'SSL Grade', value: sslGrade, status: ['A+', 'A'].includes(sslGrade) ? 'OK' : sslGrade === 'B' ? 'A ameliorer' : sslGrade === 'N/A' ? 'N/A' : 'Critique', explanation: 'Qualite du chiffrement HTTPS et de la configuration TLS.' },
+      { label: 'Grade Headers', value: securityGrade, status: ['A+', 'A', 'B'].includes(securityGrade) ? 'OK' : securityGrade === 'N/A' ? 'N/A' : 'A ameliorer', explanation: 'Evaluation des headers de securite qui reduisent les risques XSS, clickjacking et fuite de donnees.' },
+      { label: 'Malware (VirusTotal)', value: malware === true ? 'Detecte' : malware === false ? 'Aucun' : 'N/A', status: malware === true ? 'Critique' : malware === false ? 'OK' : 'N/A', explanation: 'Verification de reputation. Un signal malware peut bloquer la confiance et le trafic.' },
+      { label: 'Observatory (Mozilla)', value: observatory != null ? `${observatory}/100` : 'N/A', status: observatory == null ? 'N/A' : statusFromScore(observatory), explanation: 'Signal externe utile pour juger la robustesse des protections HTTP.' },
+    ],
+  };
+}
+
+function normalizeSeo(scan, scores) {
+  const metrics = scan.metrics?.seo || {};
+  const legacy = scan.seo || {};
+  const hasTitle = metrics.has_title ?? legacy.meta_tags_ok;
+  const hasDescription = metrics.has_description ?? legacy.meta_tags_ok;
+  const h1Count = metrics.h1_count;
+  const hasViewport = metrics.has_viewport ?? legacy.indexed;
+  const hasOpenGraph = metrics.has_open_graph ?? legacy.open_graph;
+
+  return {
+    raw: metrics,
+    metrics: [
+      { label: 'Score SEO', value: scores.seo != null ? `${scores.seo}/100` : 'N/A', status: statusFromScore(scores.seo), explanation: 'Score technique de visibilite : balises, structure, indexabilite et partage.' },
+      { label: 'Title', value: boolLabel(hasTitle, 'Present', 'Absent'), status: hasTitle ? 'OK' : 'Critique', explanation: 'Le title aide Google et les visiteurs a comprendre la page.' },
+      { label: 'Meta Description', value: boolLabel(hasDescription, 'Presente', 'Absente'), status: hasDescription ? 'OK' : 'Critique', explanation: 'La meta description influence le taux de clic dans les resultats Google.' },
+      { label: 'H1', value: h1Count != null ? `${h1Count}` : 'N/A', status: h1Count == null ? 'N/A' : h1Count === 1 ? 'OK' : h1Count === 0 ? 'Critique' : 'A ameliorer', explanation: 'Une page doit generalement avoir un H1 unique et descriptif.' },
+      { label: 'Viewport', value: boolLabel(hasViewport, 'OK', 'Absent'), status: hasViewport ? 'OK' : 'Critique', explanation: 'Indispensable pour un affichage mobile correct.' },
+      { label: 'Open Graph', value: boolLabel(hasOpenGraph, 'Present', 'Absent'), status: hasOpenGraph ? 'OK' : 'A ameliorer', explanation: 'Controle l apparence du lien lorsqu il est partage sur les reseaux sociaux.' },
+    ],
+  };
+}
+
+function normalizeUx(scan, scores) {
+  const metrics = scan.metrics?.ux || {};
+  const legacy = scan.ux || {};
+  const tapTargets = metrics.tap_targets_ok ?? legacy.elements_tactiles_ok;
+  const issues = normalizeList(metrics.issues ?? legacy.issues);
+
+  return {
+    raw: metrics,
+    issues,
+    metrics: [
+      { label: 'Score UX', value: scores.ux != null ? `${scores.ux}/100` : 'N/A', status: statusFromScore(scores.ux), explanation: 'Evaluation de l experience mobile : confort, accessibilite et facilite d interaction.' },
+      { label: 'Grade UX', value: metrics.grade ?? legacy.grade ?? 'N/A', status: ['A+', 'A', 'B'].includes(metrics.grade ?? legacy.grade) ? 'OK' : 'A ameliorer', explanation: 'Synthese rapide de la qualite mobile.' },
+      { label: 'Tap targets', value: tapTargets === true ? 'OK' : tapTargets === false ? 'A ameliorer' : 'N/A', status: tapTargets === true ? 'OK' : tapTargets === false ? 'A ameliorer' : 'N/A', explanation: 'Les boutons doivent etre assez grands et espaces pour les doigts sur smartphone.' },
+    ],
+  };
+}
+
+function normalizeScanOrigin(scan) {
+  const origin = scan.scan_origin || scan.scanOrigin || {};
+  return {
+    region_code: origin.region_code || scan.scan_region || 'standard',
+    region_name: origin.region_name || '',
+    city: origin.city || '',
+    country: origin.country || '',
+    continent: origin.continent || '',
+    label: origin.label || (origin.region_code || scan.scan_region ? 'Mesure africaine' : 'Mesure standard Webisafe'),
+    note: origin.note || '',
+  };
+}
+
+function buildExecutiveSummary(model) {
+  const score = model.scores.global;
+  const domain = model.domain;
+  const perf = model.scores.performance;
+  const sec = model.scores.security;
+  const seo = model.scores.seo;
+  const ux = model.scores.ux;
+  const alerts = model.criticalAlerts.length;
+
+  const opener =
+    score >= 80
+      ? `Le site ${domain} presente une base solide avec un score global de ${score}/100.`
+      : score >= 60
+        ? `Le site ${domain} fonctionne, mais son score de ${score}/100 montre plusieurs freins importants.`
+        : `Le site ${domain} demande une correction prioritaire : le score de ${score}/100 indique des risques visibles pour la confiance, la vitesse et la conversion.`;
+
+  const details = [
+    `Performance : ${perf ?? 'N/A'}/100. Les mesures de chargement, notamment LCP, FCP, CLS, TBT, TTI et poids de page, indiquent le ressenti concret d'un visiteur mobile.`,
+    `Securite : ${sec ?? 'N/A'}/100. Le rapport verifie HTTPS, SSL, headers, malware, fichiers sensibles et signaux externes disponibles.`,
+    `SEO : ${seo ?? 'N/A'}/100. Les balises title, meta description, H1, viewport et Open Graph influencent la visibilite et le taux de clic.`,
+    `UX Mobile : ${ux ?? 'N/A'}/100. Les problemes de boutons tactiles, accessibilite ou lisibilite peuvent bloquer les visiteurs sur smartphone.`,
+  ];
+
+  if (alerts > 0) {
+    details.push(`${alerts} alerte(s) critique(s) ou avertissement(s) doivent etre traitees avant les optimisations secondaires.`);
+  }
+
+  return [opener, ...details].join(' ');
+}
+
+export function buildPdfAuditModel(scan = {}) {
+  const domain = t(extractDomain(scan.url || scan.domain || ''), 'site');
+  const scores = normalizeScores(scan);
+  const recommendations = normalizeList(scan.recommendations || scan.ai_analysis?.recommandations_prioritaires).map(normalizeRecommendation);
+  const scanOrigin = normalizeScanOrigin(scan);
+
+  const model = {
+    raw: scan,
+    domain,
+    url: scan.url || scan.domain || '',
+    scanDate: scan.scanDate || scan.created_at || null,
+    scanOrigin,
+    scores,
+    grade: scan.grade || getScoreLabel(scores.global),
+    criticalAlerts: normalizeList(scan.critical_alerts),
+    sections: {
+      performance: normalizePerformance(scan, scores),
+      security: normalizeSecurity(scan, scores),
+      seo: normalizeSeo(scan, scores),
+      ux: normalizeUx(scan, scores),
+    },
+    recommendations,
+    narrative: {
+      title: 'Ce que revele votre audit premium',
+      paragraphs: buildPremiumExplanationParagraphs(recommendations).map((paragraph) => t(paragraph, '')),
+    },
+  };
+
+  model.executiveSummary = scan.summary?.resume_executif
+    ? t(scan.summary.resume_executif)
+    : buildExecutiveSummary(model);
+
+  return model;
+}
+
+const BLUE = [21, 102, 240];
+const DARK_BG = [13, 27, 42];
+const PANEL = [15, 30, 55];
+const PANEL_ALT = [20, 40, 70];
+const WHITE = [255, 255, 255];
+const GRAY = [148, 163, 184];
+const LIGHT = [226, 232, 240];
+const GREEN = [34, 197, 94];
+const YELLOW = [234, 179, 8];
+const RED = [239, 68, 68];
+
+function drawBackground(doc) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  doc.setFillColor(...DARK_BG);
+  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+}
+
+function drawLogo(doc, x, y) {
+  doc.setFillColor(...BLUE);
+  doc.roundedRect(x, y, 10, 10, 2, 2, 'F');
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('W', x + 5, y + 7, { align: 'center' });
+}
+
+function addHeader(doc, title, domain) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setFillColor(...BLUE);
+  doc.rect(0, 0, pageWidth, 8, 'F');
+  doc.setTextColor(219, 234, 254);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(`${t(title)} - ${t(domain)}`, pageWidth / 2, 5.5, { align: 'center' });
+}
+
+function addFooter(doc, pageNum, totalPages, domain) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  doc.setFillColor(...DARK_BG);
+  doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
+  doc.setFillColor(...BLUE);
+  doc.rect(0, pageHeight - 12, pageWidth, 1, 'F');
+  doc.setTextColor(...GRAY);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.text(`Webisafe - Audit de ${t(domain)}`, 18, pageHeight - 5);
+  doc.text(`Page ${pageNum} / ${totalPages}`, pageWidth - 18, pageHeight - 5, { align: 'right' });
+  doc.text('webisafe.tech', pageWidth / 2, pageHeight - 5, { align: 'center' });
+}
+
+function sectionTitle(doc, title, y, margin = 18) {
+  doc.setFillColor(...BLUE);
+  doc.rect(margin, y, 3, 8, 'F');
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(t(title), margin + 7, y + 6);
+  return y + 13;
+}
+
+function paragraphBlock(doc, title, text, x, y, w, options = {}) {
+  const lines = doc.splitTextToSize(t(text), w - 12);
+  const maxLines = options.maxLines || lines.length;
+  const used = lines.slice(0, maxLines);
+  const h = 14 + used.length * 4.5;
+  doc.setFillColor(...(options.fill || PANEL));
+  doc.roundedRect(x, y, w, h, 3, 3, 'F');
+  doc.setFillColor(...(options.accent || BLUE));
+  doc.roundedRect(x, y, 2, h, 1, 1, 'F');
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(options.titleSize || 9);
+  doc.text(t(title), x + 6, y + 8);
+  doc.setTextColor(...(options.textColor || LIGHT));
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(options.fontSize || 7.5);
+  used.forEach((line, index) => {
+    doc.text(line, x + 6, y + 15 + index * 4.5);
+  });
+  return y + h + 5;
+}
+
+function scoreCard(doc, x, y, w, label, score) {
+  const color = scoreRgb(score);
+  doc.setFillColor(...PANEL);
+  doc.roundedRect(x, y, w, 26, 3, 3, 'F');
+  doc.setFillColor(...color);
+  doc.roundedRect(x, y, w, 2, 1, 1, 'F');
+  doc.setTextColor(...color);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text(score != null ? `${score}` : 'N/A', x + w / 2, y + 12, { align: 'center' });
+  doc.setTextColor(...GRAY);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.text(t(label), x + w / 2, y + 20, { align: 'center' });
+}
+
+function drawMetricCards(doc, items, x, y, w) {
+  const cardW = (w - 6) / 4;
+  items.slice(0, 4).forEach((item, index) => {
+    const cardX = x + index * (cardW + 2);
+    const color = statusColor(item.status);
+    doc.setFillColor(...PANEL);
+    doc.roundedRect(cardX, y, cardW, 20, 2, 2, 'F');
+    doc.setFillColor(...color);
+    doc.roundedRect(cardX, y, cardW, 2, 1, 1, 'F');
+    doc.setTextColor(...color);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text(t(item.value), cardX + cardW / 2, y + 9, { align: 'center' });
+    doc.setTextColor(...GRAY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.2);
+    doc.text(t(item.label), cardX + cardW / 2, y + 15.5, { align: 'center' });
+  });
+  return y + 25;
+}
+
+function drawTable(doc, y, head, body, margin = 18) {
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [head.map((item) => t(item))],
+    body: body.map((row) => row.map((cell) => t(cell))),
+    headStyles: { fillColor: BLUE, textColor: WHITE, fontSize: 8, fontStyle: 'bold' },
+    bodyStyles: { fontSize: 7.2, textColor: LIGHT, fillColor: PANEL, cellPadding: 2.5 },
+    alternateRowStyles: { fillColor: PANEL_ALT },
+    styles: { overflow: 'linebreak', lineColor: [30, 58, 95], lineWidth: 0.1 },
+  });
+  return doc.lastAutoTable.finalY + 9;
+}
+
+function addNewPage(doc, model, pageNum, totalPages, title) {
+  doc.addPage();
+  drawBackground(doc);
+  addHeader(doc, title, model.domain);
+  addFooter(doc, pageNum, totalPages, model.domain);
+  return 18;
 }
 
 function downloadPdfBlob(doc, filename) {
@@ -77,717 +457,297 @@ function downloadPdfBlob(doc, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-// ── Génération de la synthèse exécutive ───────────────────────────────────────
-function buildResumeExecutif(reportData) {
-  // Si une synthèse externe est fournie et non vide, on la retourne directement
-  if (reportData.summary?.resume_executif) {
-    return reportData.summary.resume_executif;
-  }
-
-  const scores = reportData.scores || {};
-  const global = scores.global ?? 0;
-  const perf = scores.performance ?? 0;
-  const sec = scores.security ?? 0;
-  const seo = scores.seo ?? 0;
-  const ux = scores.ux_mobile ?? scores.ux ?? 0;
-
-  const cwv = reportData.performance?.core_web_vitals || {};
-  const lcpMs = cwv.lcp?.value;
-  const secData = reportData.security || {};
-  const missingHeaders = secData.headers_manquants || [];
-
-  // Évaluation globale
-  let globalEval = '';
-  if (global >= 85) {
-    globalEval = `Avec un score global de ${global}/100, votre site affiche d'excellentes performances et constitue un atout solide pour votre activite en ligne.`;
-  } else if (global >= 70) {
-    globalEval = `Avec un score global de ${global}/100, votre site est dans une situation satisfaisante, mais plusieurs points d'amelioration peuvent encore renforcer significativement votre position en ligne.`;
-  } else if (global >= 50) {
-    globalEval = `Avec un score global de ${global}/100, votre site presente des lacunes importantes qui freinent son efficacite commerciale et sa credibilite aupres des visiteurs.`;
-  } else {
-    globalEval = `Avec un score global de ${global}/100, votre site necessite une intervention urgente : les failles identifiees impactent directement votre visibilite, votre securite et vos conversions.`;
-  }
-
-  // Bloc performance
-  let perfBlock = '';
-  if (perf >= 80) {
-    perfBlock = `Performance (${perf}/100) : votre site se charge rapidement et offre une bonne experience utilisateur.`;
-  } else if (perf >= 60) {
-    const lcpInfo = lcpMs ? ` Le temps de chargement principal (LCP) est de ${lcpMs}ms, alors que l'objectif recommande est de 2500ms.` : '';
-    perfBlock = `Performance (${perf}/100) : le chargement du site est perfectible et peut decourager certains visiteurs.${lcpInfo}`;
-  } else {
-    const lcpInfo = lcpMs ? ` Le LCP mesure a ${lcpMs}ms depasse largement le seuil acceptable de 2500ms.` : '';
-    perfBlock = `Performance (${perf}/100) : les temps de chargement sont trop eleves et degradent l'experience utilisateur de maniere significative.${lcpInfo}`;
-  }
-
-  // Bloc securite
-  let secBlock = '';
-  if (sec >= 80) {
-    secBlock = `Securite (${sec}/100) : les protections en place sont satisfaisantes.`;
-  } else if (sec >= 60) {
-    const hInfo = missingHeaders.length > 0
-      ? ` Les headers HTTP suivants sont absents : ${missingHeaders.join(', ')}.`
-      : '';
-    secBlock = `Securite (${sec}/100) : le niveau de protection est insuffisant et expose le site a des vulnerabilites evitables.${hInfo}`;
-  } else {
-    secBlock = `Securite (${sec}/100) : des failles de securite critiques sont detectees et necessitent une correction prioritaire.`;
-  }
-
-  // Bloc SEO
-  let seoBlock = '';
-  if (seo >= 85) {
-    seoBlock = `Referencement SEO (${seo}/100) : votre site est bien optimise pour les moteurs de recherche.`;
-  } else if (seo >= 65) {
-    seoBlock = `Referencement SEO (${seo}/100) : le positionnement sur les moteurs de recherche peut encore etre ameliore.`;
-  } else {
-    seoBlock = `Referencement SEO (${seo}/100) : votre visibilite sur Google est fortement limitee par des elements techniques manquants.`;
-  }
-
-  // Bloc UX mobile
-  let uxBlock = '';
-  if (ux >= 80) {
-    uxBlock = `Experience mobile (${ux}/100) : votre site offre une navigation fluide et agréable sur smartphone.`;
-  } else if (ux >= 60) {
-    uxBlock = `Experience mobile (${ux}/100) : la navigation sur mobile reste perfectible et peut engendrer des abandons de visite.`;
-  } else {
-    uxBlock = `Experience mobile (${ux}/100) : l'experience sur smartphone est insuffisante, ce qui penalise un segment majeur de votre audience.`;
-  }
-
-  return [globalEval, perfBlock, secBlock, seoBlock, uxBlock].join(' ');
-}
-
-// ── Couleurs & constantes ─────────────────────────────────────────────────────
-const BLUE = [21, 102, 240];
-const DARK_BLUE = [10, 25, 60];
-const DARK_BG = [13, 27, 42];
-const WHITE = [255, 255, 255];
-const GRAY_TEXT = [148, 163, 184];
-const LIGHT_BG = [241, 245, 249];
-const BORDER = [30, 58, 95];
-
-// ── Fonctions utilitaires dessin ──────────────────────────────────────────────
-function drawRoundedRect(doc, x, y, w, h, r, fillColor, strokeColor) {
-  doc.setFillColor(...fillColor);
-  if (strokeColor) doc.setDrawColor(...strokeColor);
-  doc.roundedRect(x, y, w, h, r, r, strokeColor ? 'FD' : 'F');
-}
-
-function drawScoreCircle(doc, cx, cy, radius, score) {
-  const color = hexToRgb(getScoreColor(score));
-  doc.setFillColor(color.r * 0.2, color.g * 0.2, color.b * 0.2);
-  doc.circle(cx, cy, radius + 3, 'F');
-  doc.setFillColor(color.r, color.g, color.b);
-  doc.circle(cx, cy, radius, 'F');
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(radius > 15 ? 22 : 14);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${score}`, cx, cy + (radius > 15 ? 4 : 2), { align: 'center' });
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('/100', cx, cy + (radius > 15 ? 12 : 9), { align: 'center' });
-}
-
-function drawLogo(doc, x, y) {
-  doc.setFillColor(...BLUE);
-  doc.roundedRect(x, y, 10, 10, 2, 2, 'F');
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text('W', x + 5, y + 7, { align: 'center' });
-}
-
-function addPageHeader(doc, pageWidth, title = '') {
-  doc.setFillColor(...BLUE);
-  doc.rect(0, 0, pageWidth, 8, 'F');
-  if (title) {
-    doc.setTextColor(...GRAY_TEXT);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(t(title), pageWidth / 2, 5.5, { align: 'center' });
+function formatScanDate(model) {
+  try {
+    return model.scanDate ? formatDate(model.scanDate) : formatDate(new Date().toISOString());
+  } catch {
+    return new Date().toLocaleDateString('fr-FR');
   }
 }
 
-function addPageFooter(doc, pageWidth, pageNum, totalPages, domain) {
-  const pageHeight = doc.internal.pageSize.getHeight();
-  doc.setFillColor(...DARK_BG);
-  doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
-  doc.setTextColor(...GRAY_TEXT);
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Webisafe - Audit de ${t(domain)}`, 20, pageHeight - 5);
-  doc.text(`Page ${pageNum} / ${totalPages}`, pageWidth - 20, pageHeight - 5, { align: 'right' });
-  doc.text('webisafe.tech', pageWidth / 2, pageHeight - 5, { align: 'center' });
-}
-
-function sectionTitle(doc, text, y, margin) {
-  doc.setFillColor(...BLUE);
-  doc.rect(margin, y, 3, 8, 'F');
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
-  doc.text(t(text), margin + 7, y + 6);
-  return y + 14;
-}
-
-// ── Fonction principale ───────────────────────────────────────────────────────
-export function generatePDF(reportData) {
-  const doc = new jsPDF('p', 'mm', 'a4');
+function drawCover(doc, model, totalPages) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 18;
   const contentWidth = pageWidth - margin * 2;
-
-  const domain = t(extractDomain(reportData.url || reportData.domain || ''), 'site');
-  const scanDate = t(formatDate(reportData.scanDate || reportData.scan_duration_ms ? new Date().toISOString() : ''));
-  const scores = reportData.scores || {};
-  const globalScore = scores.global ?? 0;
-
-  // Génération de la synthèse exécutive (externe ou construite dynamiquement)
-  const resumeExecutif = buildResumeExecutif(reportData);
-
-  // ════════════════════════════════════════════════════════════════════════
-  // PAGE 1 — COUVERTURE
-  // ════════════════════════════════════════════════════════════════════════
-
-  doc.setFillColor(...DARK_BG);
-  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+  drawBackground(doc);
 
   doc.setFillColor(...BLUE);
-  doc.rect(0, 0, pageWidth, 70, 'F');
-
+  doc.rect(0, 0, pageWidth, 68, 'F');
   doc.setFillColor(10, 60, 160);
-  doc.rect(0, 0, pageWidth / 2, 70, 'F');
+  doc.rect(0, 0, pageWidth / 2, 68, 'F');
 
   drawLogo(doc, margin, 15);
   doc.setTextColor(...WHITE);
-  doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
   doc.text('Webi', margin + 14, 23);
   doc.setTextColor(147, 197, 253);
   doc.text('safe', margin + 14 + doc.getTextWidth('Webi'), 23);
-
-  doc.setTextColor(186, 230, 253);
-  doc.setFontSize(9);
+  doc.setTextColor(219, 234, 254);
   doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
   doc.text('Audit Web Professionnel', margin + 14, 30);
 
   doc.setTextColor(...WHITE);
-  doc.setFontSize(26);
   doc.setFont('helvetica', 'bold');
-  doc.text("Rapport d'Audit", pageWidth / 2, 50, { align: 'center' });
-  doc.setFontSize(14);
+  doc.setFontSize(25);
+  doc.text("Rapport d'Audit Premium", pageWidth / 2, 49, { align: 'center' });
   doc.setFont('helvetica', 'normal');
+  doc.setFontSize(13);
   doc.setTextColor(186, 230, 253);
-  doc.text(domain, pageWidth / 2, 61, { align: 'center' });
+  doc.text(model.domain, pageWidth / 2, 60, { align: 'center' });
 
-  const centerY = 115;
+  const centerY = 110;
   const bigR = 28;
-
-  const scoreRgb = hexToRgb(getScoreColor(globalScore));
-  doc.setFillColor(scoreRgb.r, scoreRgb.g, scoreRgb.b);
-  doc.setGState && doc.setGState(doc.GState({ opacity: 0.15 }));
-  doc.circle(pageWidth / 2, centerY, bigR + 10, 'F');
-  doc.setGState && doc.setGState(doc.GState({ opacity: 1 }));
-
-  doc.setFillColor(20, 40, 80);
-  doc.circle(pageWidth / 2, centerY, bigR + 3, 'F');
-
-  doc.setFillColor(scoreRgb.r, scoreRgb.g, scoreRgb.b);
+  const rgb = scoreRgb(model.scores.global);
+  doc.setFillColor(rgb[0] * 0.18, rgb[1] * 0.18, rgb[2] * 0.18);
+  doc.circle(pageWidth / 2, centerY, bigR + 8, 'F');
+  doc.setFillColor(...rgb);
   doc.circle(pageWidth / 2, centerY, bigR, 'F');
-
   doc.setTextColor(...WHITE);
-  doc.setFontSize(30);
   doc.setFont('helvetica', 'bold');
-  doc.text(`${globalScore}`, pageWidth / 2, centerY + 5, { align: 'center' });
+  doc.setFontSize(30);
+  doc.text(`${model.scores.global}`, pageWidth / 2, centerY + 5, { align: 'center' });
   doc.setFontSize(10);
   doc.text('/100', pageWidth / 2, centerY + 14, { align: 'center' });
-
+  doc.setTextColor(...rgb);
   doc.setFontSize(12);
-  doc.setTextColor(scoreRgb.r, scoreRgb.g, scoreRgb.b);
-  doc.text(getScoreLabel(globalScore).toUpperCase(), pageWidth / 2, centerY + bigR + 12, { align: 'center' });
+  doc.text(getScoreLabel(model.scores.global).toUpperCase(), pageWidth / 2, centerY + 41, { align: 'center' });
 
-  doc.setTextColor(...GRAY_TEXT);
-  doc.setFontSize(9);
-  doc.text('Score Global Webisafe', pageWidth / 2, centerY + bigR + 19, { align: 'center' });
-
-  const cats = [
-    { label: 'Performance', score: scores.performance ?? 0 },
-    { label: 'Securite', score: scores.security ?? 0 },
-    { label: 'SEO', score: scores.seo ?? 0 },
-    { label: 'UX Mobile', score: scores.ux_mobile ?? scores.ux ?? 0 },
+  const cards = [
+    ['Performance', model.scores.performance],
+    ['Securite', model.scores.security],
+    ['SEO', model.scores.seo],
+    ['UX Mobile', model.scores.ux],
   ];
-
-  const catY = 170;
-  const catW = (contentWidth - 9) / 4;
-  cats.forEach((cat, i) => {
-    const x = margin + i * (catW + 3);
-    const rgb = hexToRgb(getScoreColor(cat.score));
-    doc.setFillColor(20, 35, 65);
-    doc.roundedRect(x, catY, catW, 28, 3, 3, 'F');
-    doc.setFillColor(rgb.r, rgb.g, rgb.b);
-    doc.roundedRect(x, catY, catW, 2, 1, 1, 'F');
-    doc.setTextColor(rgb.r, rgb.g, rgb.b);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${cat.score}`, x + catW / 2, catY + 13, { align: 'center' });
-    doc.setTextColor(...GRAY_TEXT);
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'normal');
-    doc.text(t(cat.label), x + catW / 2, catY + 22, { align: 'center' });
+  const cardY = 165;
+  const cardW = (contentWidth - 9) / 4;
+  cards.forEach(([label, score], index) => {
+    scoreCard(doc, margin + index * (cardW + 3), cardY, cardW, label, score);
   });
 
-  const infoY = 215;
-  doc.setFillColor(20, 35, 65);
-  doc.roundedRect(margin, infoY, contentWidth, 20, 3, 3, 'F');
-  doc.setTextColor(...GRAY_TEXT);
-  doc.setFontSize(8);
-  doc.text(`Site analyse : ${t(reportData.url || domain)}`, margin + 5, infoY + 7);
-  doc.text(`Date : ${scanDate || new Date().toLocaleDateString('fr-FR')}`, margin + 5, infoY + 14);
-  doc.text('Genere par Webisafe - webisafe.tech', pageWidth - margin - 5, infoY + 10, { align: 'right' });
+  let y = 207;
+  y = paragraphBlock(
+    doc,
+    'Contexte de mesure',
+    `${model.scanOrigin.label} : ${model.scanOrigin.city || 'region'} ${model.scanOrigin.country || ''} (${model.scanOrigin.region_code}). ${model.scanOrigin.note || 'Les mesures locales de disponibilite et de latence utilisent le point de scan Webisafe disponible.'}`,
+    margin,
+    y,
+    contentWidth,
+    { maxLines: 4, accent: GREEN }
+  );
+  y = paragraphBlock(doc, 'Synthese executive', model.executiveSummary, margin, y, contentWidth, { maxLines: 8 });
 
-  // Synthèse sur la page de couverture
-  const resumeY = infoY + 28;
-  doc.setFillColor(15, 30, 60);
-  doc.roundedRect(margin, resumeY, contentWidth, 8, 2, 2, 'F');
-  doc.setFillColor(...BLUE);
-  doc.roundedRect(margin, resumeY, 3, 8, 1, 1, 'F');
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Synthese', margin + 7, resumeY + 5.5);
-
-  const lines = doc.splitTextToSize(
-    sanitizePdfText(resumeExecutif).split('\n\n')[0],
-    contentWidth - 10
-  ).slice(0, 6);
+  doc.setFillColor(...PANEL);
+  doc.roundedRect(margin, pageHeight - 38, contentWidth, 18, 3, 3, 'F');
+  doc.setTextColor(...GRAY);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...GRAY_TEXT);
-  doc.setFontSize(7.5);
-  lines.forEach((line, i) => {
-    doc.text(line, margin + 5, resumeY + 16 + i * 5);
+  doc.setFontSize(8);
+  doc.text(`Site analyse : ${t(model.url || model.domain)}`, margin + 5, pageHeight - 31);
+  doc.text(`Date : ${t(formatScanDate(model))}`, margin + 5, pageHeight - 24);
+  doc.text('Genere par Webisafe - webisafe.tech', pageWidth - margin - 5, pageHeight - 28, { align: 'right' });
+  addFooter(doc, 1, totalPages, model.domain);
+}
+
+function drawAlertsAndNarrative(doc, model, pageNum, totalPages) {
+  const margin = 18;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  let y = addNewPage(doc, model, pageNum, totalPages, 'Lecture experte');
+  y = sectionTitle(doc, 'Alertes et lecture experte', y, margin);
+
+  if (model.criticalAlerts.length > 0) {
+    model.criticalAlerts.forEach((alert) => {
+      const text = [alert.message, alert.impact ? `Impact : ${alert.impact}` : '', alert.recommendation ? `Conseil : ${alert.recommendation}` : ''].filter(Boolean).join(' ');
+      y = paragraphBlock(doc, alert.title || 'Alerte', text, margin, y, contentWidth, {
+        accent: String(alert.severity).toLowerCase() === 'critical' ? RED : YELLOW,
+        maxLines: 4,
+      });
+    });
+  } else {
+    y = paragraphBlock(doc, 'Aucune alerte critique', 'Aucune alerte critique prioritaire n a ete remontee par le scan.', margin, y, contentWidth, { accent: GREEN });
+  }
+
+  y += 2;
+  y = sectionTitle(doc, model.narrative.title, y, margin);
+  model.narrative.paragraphs.forEach((paragraph, index) => {
+    if (y > pageHeight - 58) {
+      y = addNewPage(doc, model, pageNum, totalPages, 'Lecture experte - suite');
+    }
+    y = paragraphBlock(doc, index === 0 ? 'Vue globale' : `Point ${index}`, paragraph, margin, y, contentWidth, { maxLines: index === 0 ? 8 : 10 });
   });
+}
 
-  doc.setFillColor(...DARK_BG);
-  doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
-  doc.setFillColor(...BLUE);
-  doc.rect(0, pageHeight - 12, pageWidth, 1, 'F');
-  doc.setTextColor(...GRAY_TEXT);
-  doc.setFontSize(7);
-  doc.text('Webisafe - webisafe.tech', pageWidth / 2, pageHeight - 5, { align: 'center' });
-
-  // ════════════════════════════════════════════════════════════════════════
-  // PAGE 2 — PERFORMANCE & SÉCURITÉ
-  // ════════════════════════════════════════════════════════════════════════
-  doc.addPage();
-  doc.setFillColor(...DARK_BG);
-  doc.rect(0, 0, pageWidth, pageHeight, 'F');
-  addPageHeader(doc, pageWidth, `Rapport Webisafe - ${domain}`);
-
-  let y = 18;
+function drawPerformanceSecurity(doc, model, pageNum, totalPages) {
+  const margin = 18;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  let y = addNewPage(doc, model, pageNum, totalPages, 'Performance et securite');
 
   y = sectionTitle(doc, 'Performance', y, margin);
+  y = drawMetricCards(doc, model.sections.performance.metrics, margin, y, contentWidth);
+  y = drawTable(
+    doc,
+    y,
+    ['Metrique', 'Valeur', 'Statut', 'Explication'],
+    model.sections.performance.metrics.map((item) => [item.label, item.value, item.status, item.explanation]),
+    margin
+  );
 
-  const perf = reportData.performance || {};
-  const cwv = perf.core_web_vitals || {};
-  const perfScore = scores.performance ?? 0;
-  const perfRgb = hexToRgb(getScoreColor(perfScore));
+  const server = model.sections.performance.serverLocation;
+  if (server) {
+    const serverText = [
+      `Serveur : ${server.city || 'N/A'}, ${server.country || 'N/A'}`,
+      server.isp ? `ISP : ${server.isp}` : '',
+      server.ip ? `IP : ${server.ip}` : '',
+      server.latency_warning?.message || '',
+      server.latency_warning?.impact ? `Impact : ${server.latency_warning.impact}` : '',
+      server.latency_warning?.recommendation ? `Conseil : ${server.latency_warning.recommendation}` : '',
+    ].filter(Boolean).join(' ');
+    y = paragraphBlock(doc, 'Localisation serveur', serverText, margin, y, contentWidth, {
+      accent: server.latency_warning?.warning ? YELLOW : GREEN,
+      maxLines: 6,
+    });
+  }
 
-  doc.setFillColor(15, 30, 55);
-  doc.roundedRect(margin, y, 38, 22, 3, 3, 'F');
-  doc.setFillColor(perfRgb.r, perfRgb.g, perfRgb.b);
-  doc.roundedRect(margin, y, 38, 2, 1, 1, 'F');
-  doc.setTextColor(perfRgb.r, perfRgb.g, perfRgb.b);
-  doc.setFontSize(20);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${perfScore}`, margin + 19, y + 13, { align: 'center' });
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY_TEXT);
-  doc.text('/100 - ' + getScoreLabel(perfScore), margin + 19, y + 19, { align: 'center' });
+  if (model.sections.performance.opportunities.length > 0) {
+    y = drawTable(
+      doc,
+      y,
+      ['Optimisation PageSpeed', 'Description', 'Gain estime'],
+      model.sections.performance.opportunities.slice(0, 5).map((op) => [
+        op.title,
+        op.description || '',
+        op.savings_ms != null ? `~${Math.round(op.savings_ms)} ms` : 'N/A',
+      ]),
+      margin
+    );
+  }
 
-  const cvwMetrics = [
-    { label: 'LCP', value: cwv.lcp?.value ? `${cwv.lcp.value}ms` : 'N/A', status: cwv.lcp?.rating === 'good' ? 'pass' : cwv.lcp?.rating === 'needs_improvement' ? 'warn' : 'fail', desc: 'Largest Contentful Paint - Objectif < 2500ms' },
-    { label: 'CLS', value: cwv.cls?.value !== null && cwv.cls?.value !== undefined ? cwv.cls.value.toFixed(3) : 'N/A', status: cwv.cls?.rating === 'good' ? 'pass' : cwv.cls?.rating === 'needs_improvement' ? 'warn' : 'fail', desc: 'Cumulative Layout Shift - Objectif < 0.1' },
-    { label: 'FCP', value: cwv.fcp?.value ? `${cwv.fcp.value}ms` : 'N/A', status: cwv.fcp?.rating === 'good' ? 'pass' : cwv.fcp?.rating === 'needs_improvement' ? 'warn' : 'fail', desc: 'First Contentful Paint - Objectif < 1800ms' },
-  ];
-
-  const cvwX = margin + 42;
-  cvwMetrics.forEach((m, i) => {
-    const mx = cvwX + i * ((contentWidth - 42) / 3 + 1);
-    const mw = (contentWidth - 42) / 3 - 1;
-    const sc = getStatusColor(m.status);
-    doc.setFillColor(15, 30, 55);
-    doc.roundedRect(mx, y, mw, 22, 3, 3, 'F');
-    doc.setFillColor(...sc);
-    doc.roundedRect(mx, y, mw, 2, 1, 1, 'F');
-    doc.setTextColor(...sc);
-    doc.setFontSize(13);
-    doc.setFont('helvetica', 'bold');
-    doc.text(t(m.value), mx + mw / 2, y + 11, { align: 'center' });
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text(t(m.label), mx + mw / 2, y + 17, { align: 'center' });
-    doc.setFontSize(6);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...GRAY_TEXT);
-    doc.text(getStatusIcon(m.status), mx + mw - 4, y + 6, { align: 'center' });
-  });
-
-  y += 28;
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    head: [['Metrique', 'Valeur', 'Statut', 'Interpretation']],
-    body: [
-      ['Poids de la page', perf.poids_page_mb ? `${perf.poids_page_mb} MB` : 'N/A', perf.poids_page_mb <= 2 ? 'OK' : perf.poids_page_mb <= 4 ? 'Moyen' : 'Lourd', perf.poids_page_mb > 4 ? 'Page trop lourde, ralentit le chargement' : perf.poids_page_mb > 2 ? 'Acceptable, optimisable' : 'Bon poids de page'],
-      ['Nb requetes', perf.nb_requetes ?? 'N/A', perf.nb_requetes <= 50 ? 'OK' : 'Eleve', perf.nb_requetes > 80 ? 'Trop de requetes, fusionner les fichiers' : 'Nombre de requetes acceptable'],
-      ['LCP (chargement)', cwv.lcp?.value ? `${cwv.lcp.value}ms` : 'N/A', cwv.lcp?.rating === 'good' ? 'Bon' : cwv.lcp?.rating === 'needs_improvement' ? 'A ameliorer' : 'Mauvais', cwv.lcp?.rating === 'good' ? 'Element principal visible rapidement' : 'Element principal trop lent a charger'],
-      ['CLS (stabilite)', cwv.cls?.value !== null ? cwv.cls?.value?.toFixed(3) : 'N/A', cwv.cls?.rating === 'good' ? 'Stable' : 'Instable', cwv.cls?.rating === 'good' ? 'Page stable, pas de sauts visuels' : 'Elements qui bougent pendant le chargement'],
-      ['FCP (premier affichage)', cwv.fcp?.value ? `${cwv.fcp.value}ms` : 'N/A', cwv.fcp?.rating === 'good' ? 'Rapide' : 'Lent', cwv.fcp?.rating === 'good' ? 'Premier contenu affiche rapidement' : 'Trop long avant le premier affichage'],
-    ],
-    headStyles: { fillColor: BLUE, textColor: WHITE, fontSize: 8, fontStyle: 'bold' },
-    bodyStyles: { fontSize: 7.5, textColor: [226, 232, 240], fillColor: [15, 30, 55] },
-    alternateRowStyles: { fillColor: [20, 40, 70] },
-    columnStyles: {
-      0: { cellWidth: 45, fontStyle: 'bold' },
-      1: { cellWidth: 25, halign: 'center' },
-      2: { cellWidth: 25, halign: 'center' },
-      3: { cellWidth: 'auto' },
-    },
-    didDrawCell: (data) => {
-      if (data.column.index === 2 && data.section === 'body') {
-        const val = data.cell.text[0];
-        let color = [34, 197, 94];
-        if (['A ameliorer', 'Moyen', 'Eleve', 'Instable', 'Lent'].includes(val)) color = [234, 179, 8];
-        if (['Mauvais', 'Lourd'].includes(val)) color = [239, 68, 68];
-        doc.setTextColor(...color);
-        doc.setFontSize(7.5);
-        doc.setFont('helvetica', 'bold');
-        doc.text(val, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center' });
-      }
-    },
-  });
-
-  y = doc.lastAutoTable.finalY + 12;
+  if (y > pageHeight - 95) {
+    y = addNewPage(doc, model, pageNum, totalPages, 'Securite - suite');
+  }
 
   y = sectionTitle(doc, 'Securite', y, margin);
+  y = drawMetricCards(doc, model.sections.security.metrics, margin, y, contentWidth);
+  y = drawTable(
+    doc,
+    y,
+    ['Controle', 'Resultat', 'Statut', 'Explication'],
+    model.sections.security.metrics.map((item) => [item.label, item.value, item.status, item.explanation]),
+    margin
+  );
 
-  const sec = reportData.security || {};
-  const secScore = scores.security ?? 0;
-  const secRgb = hexToRgb(getScoreColor(secScore));
-
-  doc.setFillColor(15, 30, 55);
-  doc.roundedRect(margin, y, 38, 18, 3, 3, 'F');
-  doc.setFillColor(secRgb.r, secRgb.g, secRgb.b);
-  doc.roundedRect(margin, y, 38, 2, 1, 1, 'F');
-  doc.setTextColor(secRgb.r, secRgb.g, secRgb.b);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${secScore}`, margin + 19, y + 10, { align: 'center' });
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY_TEXT);
-  doc.text(getScoreLabel(secScore), margin + 19, y + 15, { align: 'center' });
-
-  const secIndicators = [
-    { label: 'HTTPS', value: (reportData.summary?.https_enabled || sec.ssl_grade === 'OK') ? 'Actif' : 'Inactif', pass: reportData.summary?.https_enabled },
-    { label: 'Headers', value: sec.headers_manquants?.length === 0 ? 'Complets' : `${sec.headers_manquants?.length ?? '?'} manquants`, pass: sec.headers_manquants?.length === 0 },
-    { label: 'Malware', value: sec.malware ? 'Detecte!' : 'Aucun', pass: !sec.malware },
-    { label: 'OWASP', value: sec.failles_owasp_count === 0 ? 'OK' : `${sec.failles_owasp_count} faille(s)`, pass: sec.failles_owasp_count === 0 },
-  ];
-
-  const indW = (contentWidth - 42) / 4 - 1;
-  secIndicators.forEach((ind, i) => {
-    const ix = margin + 42 + i * (indW + 1.5);
-    const ic = ind.pass ? [34, 197, 94] : [239, 68, 68];
-    doc.setFillColor(15, 30, 55);
-    doc.roundedRect(ix, y, indW, 18, 2, 2, 'F');
-    doc.setFillColor(...ic);
-    doc.roundedRect(ix, y, indW, 2, 1, 1, 'F');
-    doc.setTextColor(...ic);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text(t(ind.value), ix + indW / 2, y + 9, { align: 'center' });
-    doc.setFontSize(6.5);
-    doc.setTextColor(...GRAY_TEXT);
-    doc.text(t(ind.label), ix + indW / 2, y + 15, { align: 'center' });
-  });
-
-  y += 24;
-
-  if (sec.headers_manquants?.length > 0) {
-    doc.setFillColor(60, 20, 20);
-    doc.roundedRect(margin, y, contentWidth, 10, 2, 2, 'F');
-    doc.setTextColor(252, 165, 165);
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Headers de securite manquants : ', margin + 4, y + 6.5);
-    doc.setFont('helvetica', 'normal');
-    doc.text(t(sec.headers_manquants.join(', ')), margin + 58, y + 6.5);
-    y += 14;
+  if (model.sections.security.missingHeaders.length > 0) {
+    y = drawTable(
+      doc,
+      y,
+      ['Header manquant', 'Message'],
+      model.sections.security.missingHeaders.map((item) => [item.header, item.message || 'Protection absente ou incomplete']),
+      margin
+    );
   }
 
-  addPageFooter(doc, pageWidth, 2, 4, domain);
+  if (model.sections.security.sensitiveFiles?.critical) {
+    const files = normalizeList(model.sections.security.sensitiveFiles.exposed_files).join(', ');
+    y = paragraphBlock(doc, 'Fichiers sensibles exposes', `${model.sections.security.sensitiveFiles.alert_message || 'Fichiers sensibles detectes.'} Fichiers : ${files || 'N/A'}`, margin, y, contentWidth, { accent: RED, maxLines: 5 });
+  }
 
-  // ════════════════════════════════════════════════════════════════════════
-  // PAGE 3 — SEO & UX
-  // ════════════════════════════════════════════════════════════════════════
-  doc.addPage();
-  doc.setFillColor(...DARK_BG);
-  doc.rect(0, 0, pageWidth, pageHeight, 'F');
-  addPageHeader(doc, pageWidth, `Rapport Webisafe - ${domain}`);
+  if (model.sections.security.cookieIssues.length > 0) {
+    y = drawTable(doc, y, ['Probleme cookie'], model.sections.security.cookieIssues.map((item) => [item]), margin);
+  }
+}
 
-  y = 18;
+function drawSeoUx(doc, model, pageNum, totalPages) {
+  const margin = 18;
+  const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  let y = addNewPage(doc, model, pageNum, totalPages, 'SEO et UX mobile');
 
   y = sectionTitle(doc, 'SEO - Referencement', y, margin);
-
-  const seo = reportData.seo || {};
-  const seoScore = scores.seo ?? 0;
-  const seoRgb = hexToRgb(getScoreColor(seoScore));
-
-  const seoMetrics = [
-    { label: 'Indexation Google', value: seo.indexed ? 'Indexe' : 'Non indexe', pass: seo.indexed, desc: seo.indexed ? 'Votre site est visible par Google' : 'Votre site est invisible sur Google' },
-    { label: 'Sitemap XML', value: seo.sitemap_present ? 'Present' : 'Absent', pass: seo.sitemap_present, desc: seo.sitemap_present ? 'Aide Google a explorer votre site' : 'Sans sitemap, Google explore moins bien votre site' },
-    { label: 'Balises Meta', value: seo.meta_tags_ok ? 'Completes' : 'Incompletes', pass: seo.meta_tags_ok, desc: seo.meta_tags_ok ? 'Titre et description presents' : 'Description ou titre manquants, impact SEO negatif' },
-    { label: 'Open Graph', value: seo.open_graph ? 'Present' : 'Absent', pass: seo.open_graph, desc: seo.open_graph ? 'Partage sur reseaux sociaux optimise' : 'Mauvais affichage lors du partage sur les reseaux' },
-  ];
-
-  doc.setFillColor(15, 30, 55);
-  doc.roundedRect(margin, y, 38, 18, 3, 3, 'F');
-  doc.setFillColor(seoRgb.r, seoRgb.g, seoRgb.b);
-  doc.roundedRect(margin, y, 38, 2, 1, 1, 'F');
-  doc.setTextColor(seoRgb.r, seoRgb.g, seoRgb.b);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${seoScore}`, margin + 19, y + 10, { align: 'center' });
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY_TEXT);
-  doc.text(getScoreLabel(seoScore), margin + 19, y + 15, { align: 'center' });
-
-  const seoIndW = (contentWidth - 42) / 4 - 1;
-  seoMetrics.forEach((m, i) => {
-    const sx = margin + 42 + i * (seoIndW + 1.5);
-    const sc2 = m.pass ? [34, 197, 94] : [239, 68, 68];
-    doc.setFillColor(15, 30, 55);
-    doc.roundedRect(sx, y, seoIndW, 18, 2, 2, 'F');
-    doc.setFillColor(...sc2);
-    doc.roundedRect(sx, y, seoIndW, 2, 1, 1, 'F');
-    doc.setTextColor(...sc2);
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'bold');
-    doc.text(t(m.value), sx + seoIndW / 2, y + 9, { align: 'center' });
-    doc.setFontSize(6);
-    doc.setTextColor(...GRAY_TEXT);
-    doc.text(t(m.label), sx + seoIndW / 2, y + 15, { align: 'center' });
-  });
-
-  y += 24;
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    head: [['Critere SEO', 'Resultat', 'Impact Business']],
-    body: seoMetrics.map(m => [t(m.label), t(m.value), t(m.desc)]),
-    headStyles: { fillColor: BLUE, textColor: WHITE, fontSize: 8, fontStyle: 'bold' },
-    bodyStyles: { fontSize: 7.5, textColor: [226, 232, 240], fillColor: [15, 30, 55] },
-    alternateRowStyles: { fillColor: [20, 40, 70] },
-    columnStyles: {
-      0: { cellWidth: 45, fontStyle: 'bold' },
-      1: { cellWidth: 30, halign: 'center' },
-      2: { cellWidth: 'auto' },
-    },
-  });
-
-  y = doc.lastAutoTable.finalY + 12;
+  y = drawMetricCards(doc, model.sections.seo.metrics, margin, y, contentWidth);
+  y = drawTable(
+    doc,
+    y,
+    ['Critere SEO', 'Resultat', 'Statut', 'Explication business'],
+    model.sections.seo.metrics.map((item) => [item.label, item.value, item.status, item.explanation]),
+    margin
+  );
 
   y = sectionTitle(doc, 'UX Mobile', y, margin);
+  y = drawMetricCards(doc, model.sections.ux.metrics, margin, y, contentWidth);
+  y = drawTable(
+    doc,
+    y,
+    ['Critere UX', 'Resultat', 'Statut', 'Explication business'],
+    model.sections.ux.metrics.map((item) => [item.label, item.value, item.status, item.explanation]),
+    margin
+  );
 
-  const ux = reportData.ux || {};
-  const uxScore = scores.ux_mobile ?? scores.ux ?? 0;
-  const uxRgb = hexToRgb(getScoreColor(uxScore));
+  if (model.sections.ux.issues.length > 0) {
+    y = drawTable(
+      doc,
+      y,
+      ['Probleme detecte', 'Severite', 'Impact', 'Code'],
+      model.sections.ux.issues.map((issue) => [issue.message, issue.severity || 'info', issue.impact || '', issue.type || '']),
+      margin
+    );
+  }
+}
 
-  const uxMetrics = [
-    { label: 'Responsive', value: ux.responsive ? 'Oui' : 'Non', pass: ux.responsive, desc: ux.responsive ? 'Site adapte aux mobiles - essentiel pour 80% du trafic africain' : 'Site non adapte au mobile, perte massive de visiteurs' },
-    { label: 'Taille texte', value: ux.taille_texte_px ? `${ux.taille_texte_px}px` : 'N/A', pass: ux.taille_texte_px >= 12, desc: ux.taille_texte_px >= 14 ? 'Texte lisible sans zoom sur mobile' : 'Texte trop petit, difficile a lire sur smartphone' },
-    { label: 'Boutons tactiles', value: ux.elements_tactiles_ok ? 'Optimises' : 'Trop proches', pass: ux.elements_tactiles_ok, desc: ux.elements_tactiles_ok ? 'Boutons bien espaces, navigation facile' : 'Boutons trop proches, clics difficiles sur mobile' },
-    { label: 'Score Vitesse Mobile', value: ux.vitesse_mobile ? `${ux.vitesse_mobile}/100` : 'N/A', pass: ux.vitesse_mobile >= 70, desc: ux.vitesse_mobile >= 70 ? 'Bonne experience mobile' : 'Experience mobile degradee, taux de rebond eleve' },
-  ];
+function drawRecommendations(doc, model, pageNum, totalPages) {
+  const margin = 18;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  let y = addNewPage(doc, model, pageNum, totalPages, "Plan d'action");
+  y = sectionTitle(doc, "Plan d'action recommande", y, margin);
 
-  doc.setFillColor(15, 30, 55);
-  doc.roundedRect(margin, y, 38, 18, 3, 3, 'F');
-  doc.setFillColor(uxRgb.r, uxRgb.g, uxRgb.b);
-  doc.roundedRect(margin, y, 38, 2, 1, 1, 'F');
-  doc.setTextColor(uxRgb.r, uxRgb.g, uxRgb.b);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${uxScore}`, margin + 19, y + 10, { align: 'center' });
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY_TEXT);
-  doc.text(getScoreLabel(uxScore), margin + 19, y + 15, { align: 'center' });
-
-  const uxIndW = (contentWidth - 42) / 4 - 1;
-  uxMetrics.forEach((m, i) => {
-    const ux2 = margin + 42 + i * (uxIndW + 1.5);
-    const sc3 = m.pass ? [34, 197, 94] : [239, 68, 68];
-    doc.setFillColor(15, 30, 55);
-    doc.roundedRect(ux2, y, uxIndW, 18, 2, 2, 'F');
-    doc.setFillColor(...sc3);
-    doc.roundedRect(ux2, y, uxIndW, 2, 1, 1, 'F');
-    doc.setTextColor(...sc3);
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'bold');
-    doc.text(t(m.value), ux2 + uxIndW / 2, y + 9, { align: 'center' });
-    doc.setFontSize(6);
-    doc.setTextColor(...GRAY_TEXT);
-    doc.text(t(m.label), ux2 + uxIndW / 2, y + 15, { align: 'center' });
-  });
-
-  y += 24;
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    head: [['Critere UX', 'Resultat', 'Impact Business']],
-    body: uxMetrics.map(m => [t(m.label), t(m.value), t(m.desc)]),
-    headStyles: { fillColor: BLUE, textColor: WHITE, fontSize: 8, fontStyle: 'bold' },
-    bodyStyles: { fontSize: 7.5, textColor: [226, 232, 240], fillColor: [15, 30, 55] },
-    alternateRowStyles: { fillColor: [20, 40, 70] },
-    columnStyles: {
-      0: { cellWidth: 45, fontStyle: 'bold' },
-      1: { cellWidth: 30, halign: 'center' },
-      2: { cellWidth: 'auto' },
-    },
-  });
-
-  addPageFooter(doc, pageWidth, 3, 4, domain);
-
-  // ════════════════════════════════════════════════════════════════════════
-  // PAGE 4 — RECOMMANDATIONS & PLAN D'ACTION
-  // ════════════════════════════════════════════════════════════════════════
-  doc.addPage();
-  doc.setFillColor(...DARK_BG);
-  doc.rect(0, 0, pageWidth, pageHeight, 'F');
-  addPageHeader(doc, pageWidth, `Rapport Webisafe - ${domain}`);
-
-  y = 18;
-  y = sectionTitle(doc, "Plan d'Action - Recommandations Prioritaires", y, margin);
-
-  const recs = reportData.recommendations || reportData.ai_analysis?.recommandations_prioritaires || [];
-
-  if (recs.length === 0) {
-    doc.setTextColor(...GRAY_TEXT);
-    doc.setFontSize(9);
-    doc.text('Aucune recommandation disponible.', margin, y + 8);
-    y += 16;
-  } else {
-    recs.forEach((rec, index) => {
-      if (y > pageHeight - 40) {
-        doc.addPage();
-        doc.setFillColor(...DARK_BG);
-        doc.rect(0, 0, pageWidth, pageHeight, 'F');
-        addPageHeader(doc, pageWidth, `Rapport Webisafe - ${domain}`);
-        y = 18;
-      }
-
-      const recH = 22;
-      const diffColors = {
-        'Facile': [34, 197, 94],
-        'Moyenne': [234, 179, 8],
-        'Difficile': [239, 68, 68],
-      };
-      const diff = t(rec.difficulte || rec.difficulty, 'Moyenne');
-      const dc = diffColors[diff] || [148, 163, 184];
-
-      doc.setFillColor(15, 30, 55);
-      doc.roundedRect(margin, y, contentWidth, recH, 3, 3, 'F');
-      doc.setFillColor(...dc);
-      doc.roundedRect(margin, y, 2, recH, 1, 1, 'F');
-
-      doc.setFillColor(...dc);
-      doc.circle(margin + 10, y + recH / 2, 5, 'F');
-      doc.setTextColor(...WHITE);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${index + 1}`, margin + 10, y + recH / 2 + 1, { align: 'center' });
-
-      doc.setTextColor(...WHITE);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      const actionLines = doc.splitTextToSize(t(rec.action), contentWidth - 60);
-      doc.text(actionLines[0], margin + 18, y + 8);
-
-      doc.setTextColor(...GRAY_TEXT);
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'normal');
-      doc.text(t(rec.impact), margin + 18, y + 15);
-
-      const badgeX = pageWidth - margin - 42;
-      doc.setFillColor(dc[0] * 0.3, dc[1] * 0.3, dc[2] * 0.3);
-      doc.roundedRect(badgeX, y + 4, 18, 6, 1, 1, 'F');
-      doc.setTextColor(...dc);
-      doc.setFontSize(6);
-      doc.setFont('helvetica', 'bold');
-      doc.text(diff, badgeX + 9, y + 8, { align: 'center' });
-
-      const tempsVal = t(rec.temps || rec.time, '');
-      if (tempsVal) {
-        doc.setFillColor(20, 40, 70);
-        doc.roundedRect(badgeX + 20, y + 4, 18, 6, 1, 1, 'F');
-        doc.setTextColor(...GRAY_TEXT);
-        doc.setFontSize(6);
-        doc.text(tempsVal, badgeX + 29, y + 8, { align: 'center' });
-      }
-
-      y += recH + 3;
-    });
+  if (model.recommendations.length === 0) {
+    paragraphBlock(doc, 'Aucune recommandation', 'Aucune recommandation detaillee n est disponible pour ce scan.', margin, y, contentWidth);
+    return;
   }
 
-  // ── Synthèse finale — section dédiée page 4 ───────────────────────────────
-  if (y < pageHeight - 65) {
-    y += 8;
+  model.recommendations.forEach((rec, index) => {
+    if (y > pageHeight - 70) {
+      y = addNewPage(doc, model, pageNum, totalPages, "Plan d'action - suite");
+    }
+    const body = [
+      rec.description,
+      rec.impact ? `Impact : ${rec.impact}` : '',
+      rec.impactBusiness ? `Impact business : ${rec.impactBusiness}` : '',
+      `Action : ${rec.action}`,
+      `Difficulte : ${rec.difficulty}${rec.time ? ` - Temps estime : ${rec.time}` : ''}`,
+    ].filter(Boolean).join(' ');
+    const accent = rec.priority === 'CRITIQUE' ? RED : rec.priority === 'AMELIORATION' ? GREEN : YELLOW;
+    y = paragraphBlock(doc, `${index + 1}. ${rec.title}`, body, margin, y, contentWidth, { accent, maxLines: 9 });
+  });
 
-    // Hauteur dynamique selon le texte
-    const synthLines = doc.splitTextToSize(sanitizePdfText(resumeExecutif), contentWidth - 14);
-    const maxLines = Math.min(synthLines.length, 7);
-    const synthHeight = 16 + maxLines * 5;
-
-    doc.setFillColor(15, 30, 55);
-    doc.roundedRect(margin, y, contentWidth, synthHeight, 3, 3, 'F');
-    doc.setFillColor(...BLUE);
-    doc.roundedRect(margin, y, contentWidth, 2, 1, 1, 'F');
-
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text("Synthese de l'audit", margin + 6, y + 10);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(...GRAY_TEXT);
-    synthLines.slice(0, maxLines).forEach((line, i) => {
-      doc.text(line, margin + 6, y + 18 + i * 5);
-    });
-
-    y += synthHeight + 5;
-  }
-
-  const ctaY = pageHeight - 35;
+  y = Math.min(y + 4, pageHeight - 42);
   doc.setFillColor(...BLUE);
-  doc.roundedRect(margin, ctaY, contentWidth, 18, 3, 3, 'F');
+  doc.roundedRect(margin, y, contentWidth, 20, 3, 3, 'F');
   doc.setTextColor(...WHITE);
-  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text("Besoin d'aide pour corriger ces problemes ?", pageWidth / 2, ctaY + 7, { align: 'center' });
-  doc.setFontSize(8);
+  doc.setFontSize(9);
+  doc.text("Besoin d'aide pour corriger ces problemes ?", margin + contentWidth / 2, y + 8, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.text('Contactez-nous : webisafe@gmail.com  |  WhatsApp : +225 05 95 33 56 62', pageWidth / 2, ctaY + 13, { align: 'center' });
+  doc.setFontSize(8);
+  doc.text('Webisafe peut prioriser, corriger et recontroler votre site avec un rescan offert dans 30 jours.', margin + contentWidth / 2, y + 15, { align: 'center' });
+}
 
-  addPageFooter(doc, pageWidth, 4, 4, domain);
-
+export function generatePDF(reportData) {
+  const model = buildPdfAuditModel(reportData);
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const totalPages = 5;
   const filename = buildPdfFilename({
-    domain,
-    url: reportData.url,
-    scanDate: reportData.scanDate,
+    domain: model.domain,
+    scanDate: model.scanDate,
   });
+
+  drawCover(doc, model, totalPages);
+  drawAlertsAndNarrative(doc, model, 2, totalPages);
+  drawPerformanceSecurity(doc, model, 3, totalPages);
+  drawSeoUx(doc, model, 4, totalPages);
+  drawRecommendations(doc, model, 5, totalPages);
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     downloadPdfBlob(doc, filename);

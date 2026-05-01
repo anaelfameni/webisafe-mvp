@@ -26,6 +26,10 @@ const WEST_AFRICA_CODES = new Set([
 
 // ── 1) Google PageSpeed Insights (robuste : category + timeout + retry) ───────
 async function runPageSpeed(url, apiKey) {
+  if (!apiKey) {
+    throw new Error('Cle PageSpeed absente');
+  }
+
   const attempt = async (timeoutMs) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);

@@ -1,17 +1,14 @@
-﻿import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl    = process.env.SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
-if (!supabaseUrl) {
-  throw new Error('[DB] SUPABASE_URL manquante dans .env');
+export const supabase = supabaseUrl && supabaseKey
+  ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
+  : null;
+
+if (supabase) {
+  console.log('[DB] Supabase connecte');
+} else {
+  console.warn('[DB] Supabase non configure - sauvegarde des scans desactivee');
 }
-if (!serviceRoleKey) {
-  throw new Error('[DB] SUPABASE_SERVICE_ROLE_KEY manquante dans .env');
-}
-
-export const supabase = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { persistSession: false },
-});
-
-console.log('[DB] Supabase connecte — service_role OK (bypass RLS)');

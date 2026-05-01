@@ -4,6 +4,7 @@ import { CheckCircle2, Copy, Loader2, ShieldCheck, Smartphone } from 'lucide-rea
 import ToastMessage from '../components/ToastMessage';
 import { useScans } from '../hooks/useScans';
 import { createPaymentRequest, fetchLatestPaymentRequest, notifyAdmin, updatePaymentRequest } from '../utils/paymentApi';
+import { buildPaymentNotificationSuccessToast } from '../utils/paymentToast';
 import { isValidEmail, normalizeURL } from '../utils/validators';
 import { WAVE_PAYMENT_AMOUNT, WAVE_PHONE_DISPLAY, formatFcfa, generateWavePaymentCode } from '../utils/wavePayment';
 
@@ -37,7 +38,7 @@ export default function Payment({ user }) {
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timeout = window.setTimeout(() => setToast(null), 2600);
+    const timeout = window.setTimeout(() => setToast(null), toast.duration ?? 2600);
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
@@ -150,10 +151,7 @@ export default function Payment({ user }) {
           scan_id: scanId,
         });
       } catch {
-        setToast({
-          type: 'warning',
-          message: "Demande enregistree, mais la notification admin n'a pas pu partir.",
-        });
+        setToast(buildPaymentNotificationSuccessToast());
       }
 
       setSubmitted(true);

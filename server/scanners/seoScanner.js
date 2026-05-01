@@ -1,6 +1,41 @@
 import * as cheerio from 'cheerio';
 
 const TIMEOUT_MS = 8_000;
+const PAGESPEED_TIMEOUT_MS = 25_000;
+const PAGESPEED_BASE = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
+
+async function fetchPageSpeedSeoScore(url, apiKey) {
+  if (!apiKey) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PAGESPEED_TIMEOUT_MS);
+
+  try {
+    const apiUrl =
+      `${PAGESPEED_BASE}` +
+      `?url=${encodeURIComponent(url)}` +
+      `&strategy=mobile` +
+      `&category=seo` +
+      `&key=${apiKey}`;
+
+    const response = await fetch(apiUrl, { signal: controller.signal });
+    if (!response.ok) throw new Error(`PageSpeed HTTP ${response.status}`);
+
+    const data = await response.json();
+    const score = data?.lighthouseResult?.categories?.seo?.score;
+
+    if (typeof score !== 'number') {
+      throw new Error('PageSpeed SEO score absent');
+    }
+
+    return Math.round(score * 100);
+  } catch (err) {
+    console.warn('[SEO] PageSpeed SEO indisponible:', err.message);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * Analyse SEO on-page alignée sur les audits PageSpeed Insights.
@@ -20,7 +55,7 @@ const TIMEOUT_MS = 8_000;
  *   ─────────────────────
  *   Total max   100 pts
  */
-export async function scanSEO(url) {
+export async function scanSEO(url, apiKey) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -155,8 +190,13 @@ export async function scanSEO(url) {
   // Open Graph (2 pts bonus social)
   if (hasOpenGraph) score += 2;
 
+  const localScore = Math.min(100, score);
+  const pageSpeedScore = await fetchPageSpeedSeoScore(url, apiKey);
+
   return {
-    score: Math.min(100, score),
+    score: pageSpeedScore ?? localScore,
+    local_score: localScore,
+    pageSpeed_score: pageSpeedScore,
     has_title: hasTitle,
     title_length: title.length,
     has_description: hasDescription,
@@ -168,5 +208,6 @@ export async function scanSEO(url) {
     is_indexable: isIndexable,
     crawlable_ratio: Math.round(crawlableRatio * 100),
     descriptive_ratio: Math.round(descriptiveRatio * 100),
+    partial: pageSpeedScore === null && Boolean(apiKey),
   };
 }

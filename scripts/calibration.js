@@ -28,20 +28,23 @@ function loadEnv() {
     if (!process.env[key]) process.env[key] = value;
   }
 }
-loadEnv();
 
 // ── Vérification des clés ────────────────────────────────────────────────────
 const REQUIRED_ENV = ['GOOGLE_PAGESPEED_KEY'];
-const missingKeys = REQUIRED_ENV.filter((k) => !process.env[k]);
+let API_KEY = process.env.GOOGLE_PAGESPEED_KEY ?? '';
 
-if (missingKeys.length > 0) {
-  console.error('\x1b[31m✗ Variables manquantes dans .env :\x1b[0m');
-  missingKeys.forEach((k) => console.error(`  · ${k}`));
-  console.error('\n  → Ajoutez-les dans votre fichier \x1b[33m.env\x1b[0m\n');
-  process.exit(1);
+function ensureRequiredEnv() {
+  const missingKeys = REQUIRED_ENV.filter((k) => !process.env[k]);
+
+  if (missingKeys.length > 0) {
+    console.error('\x1b[31m✗ Variables manquantes dans .env :\x1b[0m');
+    missingKeys.forEach((k) => console.error(`  · ${k}`));
+    console.error('\n  → Ajoutez-les dans votre fichier \x1b[33m.env\x1b[0m\n');
+    process.exit(1);
+  }
+
+  API_KEY = process.env.GOOGLE_PAGESPEED_KEY;
 }
-
-const API_KEY = process.env.GOOGLE_PAGESPEED_KEY;
 
 // ── Sites de test ─────────────────────────────────────────────────────────────
 const TEST_SITES = [
@@ -144,7 +147,7 @@ async function getWebisafeData(url) {
     const res = await fetch('http://localhost:3001/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, force_refresh: true }),
     });
 
     const data = await res.json();
@@ -173,6 +176,9 @@ async function getWebisafeData(url) {
       failles_owasp: null,
 
       // SEO
+      seo_partial: seo.partial ?? null,
+      seo_pagespeed_score: seo.pageSpeed_score ?? null,
+      seo_local_score: seo.local_score ?? null,
       sitemap: null,
       meta_tags: (seo.has_title != null && seo.has_description != null)
         ? (seo.has_title && seo.has_description) : null,
@@ -240,28 +246,38 @@ function calibrateSecurity(w, g, results) {
 }
 
 // ── Calibration SEO ───────────────────────────────────────────────────────────
-function calibrateSEO(w, g, results) {
-  console.log(`\n  ${BOLD}🔍 SEO${RESET}`);
-  console.log('  ' + separator('·', 70));
+const SEO_THRESHOLD = 15;
 
+export function getSeoCalibrationResult(w, g) {
   const gap = w.seo != null && g.seo != null
     ? Math.abs(w.seo - g.seo)
     : null;
 
-  const isAtypical = (w.seo != null && w.seo < 65 && g.seo != null && g.seo > 70)
-    || (w.seo != null && w.seo > 65 && g.seo != null && g.seo < 55);
-  const SEO_THRESHOLD = isAtypical ? 40 : 20;
+  return {
+    gap,
+    threshold: SEO_THRESHOLD,
+    passed: gap !== null && gap <= SEO_THRESHOLD,
+  };
+}
 
-  printScoreRow('Score global', w.seo, g.seo, SEO_THRESHOLD);
+function calibrateSEO(w, g, results) {
+  console.log(`\n  ${BOLD}🔍 SEO${RESET}`);
+  console.log('  ' + separator('·', 70));
+
+  const { threshold, passed } = getSeoCalibrationResult(w, g);
+
+  printScoreRow('Score global', w.seo, g.seo, threshold);
+  if (w.seo_pagespeed_score !== null) {
+    printInfoRow('Source score SEO', `PageSpeed intégré (${w.seo_pagespeed_score}/100)`);
+  } else if (w.seo_partial) {
+    printInfoRow('Source score SEO', `Fallback HTML local (${w.seo_local_score ?? 'N/A'}/100)`);
+  }
   printInfoRow('Sitemap', w.sitemap !== null ? (w.sitemap ? 'Présent' : 'Absent') : null);
   printInfoRow('Meta tags', w.meta_tags !== null ? (w.meta_tags ? 'OK' : 'Incomplets') : null);
   printInfoRow('Open Graph', w.open_graph !== null ? (w.open_graph ? 'Présent' : 'Absent') : null);
   printInfoRow('Indexation', w.indexed !== null ? (w.indexed ? 'Oui' : 'Non') : null);
 
-  if (isAtypical) console.log(`  ${YELLOW}ℹ  Seuil élargi à 40 pts (site atypique détecté)${RESET}`);
-
-  const passed = gap !== null && gap <= SEO_THRESHOLD;
-  if (!passed) results.failed.push(`SEO — écart score global > ${SEO_THRESHOLD} pts`);
+  if (!passed) results.failed.push(`SEO — écart score global > ${threshold} pts`);
   return passed;
 }
 
@@ -322,12 +338,15 @@ function printFinalReport({ passed, total, failed }) {
   console.log(`${CYAN}  Seuils utilisés :${RESET}`);
   console.log(`    Performance : écart ≤ 15 pts vs PageSpeed (sauf si partial=true)`);
   console.log(`    Sécurité    : concordance HTTPS + vérifications manuelles conseillées`);
-  console.log(`    SEO         : écart ≤ 20 pts (≤ 40 pts si site atypique)`);
+  console.log(`    SEO         : écart ≤ 15 pts vs PageSpeed`);
   console.log(`    UX Mobile   : ≥ 2/3 signaux concordants avec PageSpeed\n`);
 }
 
 // ── Runner ────────────────────────────────────────────────────────────────────
 async function runCalibration() {
+  loadEnv();
+  ensureRequiredEnv();
+
   console.log(`\n${BOLD}${CYAN}${'═'.repeat(90)}${RESET}`);
   console.log(`${BOLD}${CYAN}  CALIBRATION WEBISAFE — Performance · Sécurité · SEO · UX Mobile${RESET}`);
   console.log(`${BOLD}${CYAN}${'═'.repeat(90)}${RESET}\n`);
@@ -371,4 +390,10 @@ async function runCalibration() {
   printFinalReport(globalResults);
 }
 
-runCalibration();
+const isMain = process.argv[1]
+  ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  : false;
+
+if (isMain) {
+  runCalibration();
+}

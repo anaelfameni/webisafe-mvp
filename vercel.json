@@ -5,7 +5,8 @@
   "functions": {
     "api/scan.js": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 60,
+      "regions": ["cpt1"]
     }
   },
   "rewrites": [

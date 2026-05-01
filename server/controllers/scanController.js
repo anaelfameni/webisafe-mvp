@@ -81,7 +81,7 @@ async function readCache(normalizedUrl) {
 
 // ── Controller principal ──────────────────────────────────────────────────────
 export async function handleScan(req, res) {
-  const { url, email } = req.body ?? {};
+  const { url, email, force_refresh: forceRefresh = false } = req.body ?? {};
 
   // ── 1) Validation URL ─────────────────────────────────────────────────────
   const validation = validateUrl(url);
@@ -115,28 +115,27 @@ export async function handleScan(req, res) {
   }
 
   // ── 3) Cache 1 heure (Supabase) ───────────────────────────────────────────
-  const cachedScan = await readCache(normalizedUrl);
-  if (cachedScan?.results_json) {
-    console.log(`[SCAN] ♻️  Cache hit pour ${normalizedUrl}`);
-    return res.json({
-      ...cachedScan.results_json,
-      success: true,
-      cached: true,
-      scan_id: cachedScan.id,
-    });
+  if (!forceRefresh) {
+    const cachedScan = await readCache(normalizedUrl);
+    if (cachedScan?.results_json) {
+      console.log(`[SCAN] ♻️  Cache hit pour ${normalizedUrl}`);
+      return res.json({
+        ...cachedScan.results_json,
+        success: true,
+        cached: true,
+        scan_id: cachedScan.id,
+      });
+    }
+  } else {
+    console.log(`[SCAN] Cache ignoré pour calibration fraîche: ${normalizedUrl}`);
   }
 
   // ── 4) Clé API Google PageSpeed ───────────────────────────────────────────
-  const psKey = process.env.GOOGLE_PAGESPEED_KEY;
+  const psKey = process.env.GOOGLE_PAGESPEED_KEY ?? null;
   const vtKey = process.env.VIRUSTOTAL_API_KEY ?? null;
 
   if (!psKey) {
-    console.error('[SCAN] ❌ GOOGLE_PAGESPEED_KEY manquante');
-    return res.status(500).json({
-      success: false,
-      error: 'Configuration serveur incomplète (clé API manquante)',
-      type: 'CONFIG_ERROR',
-    });
+    console.warn('[SCAN] GOOGLE_PAGESPEED_KEY manquante - fallback local active');
   }
 
   // ── 5) Exécution des 4 scanners en parallèle ─────────────────────────────
@@ -148,7 +147,7 @@ export async function handleScan(req, res) {
     const [perfResult, secResult, seoResult, uxResult] = await Promise.allSettled([
       safeRun('Performance', () => scanPerformance(normalizedUrl, psKey)),
       safeRun('Sécurité', () => scanSecurity(normalizedUrl, vtKey)),
-      safeRun('SEO', () => scanSEO(normalizedUrl)),
+      safeRun('SEO', () => scanSEO(normalizedUrl, psKey)),
       safeRun('UX/Mobile', () => scanUXMobile(normalizedUrl, psKey)),
     ]);
 
@@ -211,11 +210,15 @@ export async function handleScan(req, res) {
         } : null,
 
         seo: seo ? {
+          local_score: seo.local_score ?? null,
+          pageSpeed_score: seo.pageSpeed_score ?? null,
           has_title: seo.has_title,
           has_description: seo.has_description,
           h1_count: seo.h1_count,
           has_viewport: seo.has_viewport,
           has_open_graph: seo.has_open_graph,
+          has_canonical: seo.has_canonical ?? null,
+          is_indexable: seo.is_indexable ?? null,
           has_sitemap: seo.has_sitemap ?? false,
           partial: seo.partial ?? false,
         } : null,
