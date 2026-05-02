@@ -499,7 +499,7 @@ function generateResume(data) {
 }
 
 // ── Fonction principale ───────────────────────────────────────────────────────
-export async function runFullAnalysis(url, onProgress) {
+export async function runFullAnalysis(url, onProgress, email) {
   const TOTAL_STEPS = 6;
   onProgress?.({ step: 0 });
 
@@ -512,6 +512,19 @@ export async function runFullAnalysis(url, onProgress) {
   }, 3000);
 
   try {
+    const storedAuth = (() => {
+      try {
+        return JSON.parse(localStorage.getItem('webisafe_auth') || '{}');
+      } catch {
+        return {};
+      }
+    })();
+
+    const effectiveEmail = email || storedAuth?.email || '';
+
+    const payload = { url };
+    if (effectiveEmail) payload.email = effectiveEmail;
+
     const response = await fetch('/api/scan', {
       method: 'POST',
       headers: {
@@ -525,15 +538,26 @@ export async function runFullAnalysis(url, onProgress) {
           }
         })(),
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify(payload),
     });
 
     clearInterval(progressInterval);
     onProgress?.({ step: TOTAL_STEPS });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || "Échec de l'analyse");
+      // Try to extract helpful error information (JSON or plain text)
+      let bodyText = '';
+      try { bodyText = await response.text(); } catch (e) { bodyText = ''; }
+
+      // Attempt to parse JSON error
+      try {
+        const parsed = JSON.parse(bodyText || '{}');
+        if (parsed && parsed.error) throw new Error(parsed.error);
+      } catch (jsonErr) {
+        // If JSON parse failed or no error field, include HTTP status + truncated body
+        const truncated = (bodyText || '').toString().slice(0, 800).replace(/\n/g, ' ');
+        throw new Error(`HTTP ${response.status} ${response.statusText}${truncated ? ' - ' + truncated : ''}`);
+      }
     }
 
     const rawData = await response.json();

@@ -599,7 +599,8 @@ function buildCriticalAlerts(sec, ux, perf) {
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    // Autorise l'en-tête personnalisé X-User-Id utilisé par le frontend
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Id, x-user-id');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST')
@@ -608,6 +609,12 @@ export default async function handler(req, res) {
     let body;
     try { body = await readJsonBody(req); }
     catch { return res.status(400).json({ success: false, error: 'Corps de requête invalide' }); }
+
+
+    // Email obligatoire
+    if (!body?.email || typeof body.email !== 'string' || !body.email.includes('@') || !body.email.includes('.')) {
+        return res.status(400).json({ success: false, error: 'Email obligatoire pour recevoir les résultats', type: 'INVALID_EMAIL' });
+    }
 
     const validation = validateUrl(body?.url);
     if (!validation.valid)
@@ -703,7 +710,7 @@ export default async function handler(req, res) {
         };
 
         // ✅ FIX : userId passé en null (non déclaré dans ce handler)
-        await saveToDb(scanId, normalizedUrl, globalScore, results, null);
+        await saveToDb(scanId, normalizedUrl, globalScore, results, body.email || null);
 
         return res.json(results);
 

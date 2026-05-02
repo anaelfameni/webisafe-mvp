@@ -317,8 +317,15 @@ export default function Analyse() {
       return;
     }
 
+    // Email requis pour les scans gratuits
+    if (!email || typeof email !== 'string' || !email.includes('@') || !email.includes('.')) {
+      setScanError({ type: 'INVALID_EMAIL', error: "Email requis pour recevoir les résultats." });
+      setScanState('error');
+      return;
+    }
+
     try {
-      const data = await runFullAnalysis(url, ({ step }) => setCurrentStep(step));
+      const data = await runFullAnalysis(url, ({ step }) => setCurrentStep(step), email);
 
       if (!data?.success) {
         setScanError(data);

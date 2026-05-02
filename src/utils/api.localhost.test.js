@@ -29,10 +29,11 @@ test('runFullAnalysis sends localhost scans to the backend with HTTP protocol', 
     });
   };
 
-  try {
-    const result = await runFullAnalysis('localhost:5173');
+    try {
+    const result = await runFullAnalysis('localhost:5173', undefined, 'client@test.com');
 
     assert.equal(requestBody.url, 'http://localhost:5173/');
+    assert.equal(requestBody.email, 'client@test.com');
     assert.equal(result.success, true);
   } finally {
     globalThis.fetch = originalFetch;

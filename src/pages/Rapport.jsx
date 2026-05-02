@@ -333,7 +333,7 @@ export default function Rapport() {
     if (!scan?.url || isRescanning) return;
     setIsRescanning(true);
     try {
-      const freshData = await runFullAnalysis(scan.url, () => { });
+      const freshData = await runFullAnalysis(scan.url, () => { }, scan?.email || scan?.user_email || '');
       if (freshData?.success) {
         const freshScan = {
           ...freshData,

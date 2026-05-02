@@ -23,10 +23,10 @@ export default function PremiumScoreCard({ score, ctaButton, onClose, compact = 
             <div className="flex flex-col gap-2.5 w-full md:w-1/2 z-10">
               {[
                 { range: '0-30', label: 'CRITIQUE', desc: 'Action urgente requise', color: '#ef4444', glowColor: 'rgba(239, 68, 68, 0.4)' },
-                { range: '30-50', label: 'MAUVAIS', desc: 'Corrections necessaires', color: '#f97316', glowColor: 'rgba(249, 115, 22, 0.4)' },
-                { range: '50-70', label: 'ACCEPTABLE', desc: 'Ameliorations recommandees', color: '#eab308', glowColor: 'rgba(234, 179, 8, 0.4)' },
+                { range: '30-50', label: 'MAUVAIS', desc: 'Corrections nécessaires', color: '#f97316', glowColor: 'rgba(249, 115, 22, 0.4)' },
+                { range: '50-70', label: 'ACCEPTABLE', desc: 'Améliorations recommandées', color: '#eab308', glowColor: 'rgba(234, 179, 8, 0.4)' },
                 { range: '70-90', label: 'BON', desc: 'Optimisations mineures', color: '#22c55e', glowColor: 'rgba(34, 197, 94, 0.4)' },
-                { range: '90-100', label: 'EXCELLENT', desc: 'Site tres bien protege', color: '#3b82f6', glowColor: 'rgba(59, 130, 246, 0.4)' },
+                { range: '90-100', label: 'EXCELLENT', desc: 'Site très bien protégé', color: '#3b82f6', glowColor: 'rgba(59, 130, 246, 0.4)' },
               ].map((seg) => {
                 const isActive =
                   (score >= 0 && score < 30 && seg.label === 'CRITIQUE') ||

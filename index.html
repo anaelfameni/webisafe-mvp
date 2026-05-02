@@ -76,76 +76,7 @@
 </head>
 
 <body>
-  <div id="root">
-    <style>
-      .initial-loader {
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background-color: #060e1a;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        padding: 24px;
-        text-align: center;
-      }
-
-      .initial-logo {
-        width: 52px;
-        height: 52px;
-        border-radius: 14px;
-        background: linear-gradient(135deg, #2563eb, #3b82f6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: 800;
-        font-size: 24px;
-        margin-bottom: 20px;
-        box-shadow: 0 0 32px rgba(59, 130, 246, 0.35);
-      }
-
-      .spinner {
-        width: 40px;
-        height: 40px;
-        border: 3px solid rgba(59, 130, 246, 0.25);
-        border-top-color: #3b82f6;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-bottom: 16px;
-      }
-
-      .initial-title {
-        color: #ffffff;
-        font-size: 20px;
-        font-weight: 700;
-        margin: 0 0 8px;
-      }
-
-      .initial-text {
-        color: rgba(255, 255, 255, 0.65);
-        font-size: 14px;
-        line-height: 1.6;
-        margin: 0;
-        max-width: 360px;
-      }
-
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-    </style>
-
-    <div class="initial-loader">
-      <div class="initial-logo">W</div>
-      <div class="spinner"></div>
-      <h1 class="initial-title">Webisafe</h1>
-      <p class="initial-text">
-        Chargement de votre outil d'audit web pour PME africaines...
-      </p>
-    </div>
-  </div>
+  <div id="root"></div>
 
   <!-- Fallback si JavaScript est désactivé -->
   <noscript>

@@ -44,6 +44,16 @@ export default function URLInput({ onScan, loading }) {
       return;
     }
 
+    if (!email.trim()) {
+      setError('Veuillez entrer votre email pour recevoir les résultats.');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      setError('Email invalide — vérifiez le format (ex: votremail@exemple.com)');
+      return;
+    }
+
     const normalizedUrl = normalizeURL(url);
     onScan(normalizedUrl, email);
   };
@@ -91,7 +101,8 @@ export default function URLInput({ onScan, loading }) {
           type="email"
           value={email}
           onChange={handleEmailChange}
-          placeholder="votre@email.com — Recevoir les résultats"
+          placeholder="votre@email.com pour recevoir les résultats (obligatoire)"
+          required
           className={`w-full px-4 py-3 bg-card-bg border-2 rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none transition-all text-sm ${emailValid === true
               ? 'border-success/50 focus:border-success'
               : emailValid === false
