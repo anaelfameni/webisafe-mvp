@@ -117,7 +117,9 @@ async function checkSecurityHeaders(url) {
       signal: controller.signal,
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
     });
-    return analyzeSecurityHeaders(response.headers, url);
+    // Utiliser l'URL finale après redirections pour déterminer si HTTPS est actif
+    const finalUrl = response.url || url;
+    return { ...analyzeSecurityHeaders(response.headers, finalUrl), finalUrl };
   } catch (err) {
     console.warn('[SECURITY] Headers check failed:', err.message);
     const isHttps = url.startsWith('https://');
@@ -337,7 +339,7 @@ function computeSecurityScore({ malwareDetected, observatoryScore, isHttps, head
 
 // ── Scanner principal ─────────────────────────────────────────────────────────
 export async function scanSecurity(url, vtApiKey) {
-  const isHttps = url.startsWith('https://');
+  let isHttps = url.startsWith('https://');
   const domain = new URL(url).hostname;
 
   // SSL Labs : uniquement en production (trop lent en dev)
@@ -365,8 +367,16 @@ export async function scanSecurity(url, vtApiKey) {
       cookie_issues: [],
       header_score: null,
       ssl_grade: isHttps ? 'Unknown' : 'Absent',
+      finalUrl: url,
       grade: 'F',
     };
+
+  // Si le check headers a retourné une URL finale, s'en servir pour déterminer HTTPS
+  try {
+    if (headersData && headersData.finalUrl && typeof headersData.finalUrl === 'string' && headersData.finalUrl.startsWith('https://')) {
+      isHttps = true;
+    }
+  } catch (e) { /* ignore */ }
 
   const sensitiveData = sensitiveResult.status === 'fulfilled'
     ? sensitiveResult.value

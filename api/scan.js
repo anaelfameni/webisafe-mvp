@@ -235,7 +235,8 @@ const SECURITY_HEADERS = {
 };
 
 async function scanSecurity(url, vtApiKey) {
-    const isHttps = url.startsWith('https://');
+    // Détecte si le site final est en HTTPS (tient compte des redirections)
+    let isHttps = url.startsWith('https://');
     const headersPresent = [];
     const headersMissing = [];
 
@@ -246,6 +247,14 @@ async function scanSecurity(url, vtApiKey) {
             headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
             redirect: 'follow',
         });
+
+        // Si la requête a suivi des redirections, res.url contient l'URL finale
+        try {
+            if (res && typeof res.url === 'string' && res.url.startsWith('https://')) {
+                isHttps = true;
+            }
+        } catch (e) { /* ignore */ }
+
         for (const [header, cfg] of Object.entries(SECURITY_HEADERS)) {
             if (res.headers.get(header)) {
                 headersPresent.push(header);
