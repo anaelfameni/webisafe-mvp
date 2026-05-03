@@ -6,7 +6,6 @@ import { Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
 export default function Header({ user, onLogout, onAuthClick }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -91,52 +90,31 @@ export default function Header({ user, onLogout, onAuthClick }) {
           </nav>
 
           {/* Desktop Actions */}
-          <div className="hidden lg:flex flex-1 items-center justify-end gap-4">
+          <div className="hidden lg:flex flex-1 items-center justify-end gap-3">
             {user ? (
-              <div className="relative">
+              <>
                 <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card-bg border border-border-color hover:border-primary/50 transition-all"
+                  onClick={() => navigate(user?.role === 'admin' ? '/admin' : '/dashboard')}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card-bg border border-border-color hover:border-primary/50 text-sm text-text-primary font-medium transition-all"
                 >
-                  <div className="w-7 h-7 bg-primary/20 rounded-full flex items-center justify-center">
-                    <User size={14} className="text-primary" />
-                  </div>
-                  <span className="text-sm text-text-primary">{user.name?.split(' ')[0]}</span>
+                  <LayoutDashboard size={15} className="text-primary" />
+                  {user?.role === 'admin' ? 'Panel Admin' : 'Tableau de bord'}
                 </button>
-
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 8 }}
-                      className="absolute right-0 mt-2 w-48 bg-card-bg border border-border-color rounded-xl shadow-xl overflow-hidden"
-                    >
-                      <button
-                        onClick={() => { navigate('/dashboard'); setUserMenuOpen(false); }}
-                        className="flex items-center gap-2 w-full px-4 py-3 text-sm text-text-primary hover:bg-primary/10 transition-colors"
-                      >
-                        <LayoutDashboard size={16} />
-                        Tableau de bord
-                      </button>
-                      <button
-                        onClick={() => { onLogout(); setUserMenuOpen(false); }}
-                        className="flex items-center gap-2 w-full px-4 py-3 text-sm text-danger hover:bg-danger/10 transition-colors border-t border-border-color"
-                      >
-                        <LogOut size={16} />
-                        Déconnexion
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                <button
+                  onClick={onLogout}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border-color hover:border-danger/40 text-sm text-white/50 hover:text-danger font-medium transition-all"
+                >
+                  <LogOut size={15} />
+                  Se déconnecter
+                </button>
+              </>
             ) : (
               <>
                 <button
                   onClick={() => onAuthClick('login')}
-                  className="text-sm font-medium text-text-secondary hover:text-primary transition-colors"
+                  className="text-sm font-medium px-4 py-2 rounded-xl border border-border-color hover:border-primary/50 text-text-secondary hover:text-white transition-all"
                 >
-                  Connexion
+                  Se connecter
                 </button>
                 <button
                   onClick={() => onAuthClick('signup')}
@@ -162,50 +140,71 @@ export default function Header({ user, onLogout, onAuthClick }) {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden bg-dark-navy/95 backdrop-blur-xl border-t border-border-color"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="lg:hidden bg-[#060C1A]/98 backdrop-blur-2xl border-t border-white/8"
           >
-            <div className="px-4 py-4 space-y-2">
-              {navItems.map((item) => (
-                <button
-                  key={item.path}
-                  onClick={() => handleNavClick(item.path)}
-                  className="block w-full text-left px-4 py-3 rounded-lg text-text-secondary hover:text-white hover:bg-card-bg transition-all"
-                >
-                  {item.label}
-                </button>
-              ))}
-              <hr className="border-border-color" />
-              {user ? (
-                <>
+            <div className="px-4 pt-3 pb-5">
+              {/* Nav links */}
+              <div className="space-y-0.5 mb-4">
+                {navItems.map((item) => (
                   <button
-                    onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}
-                    className="block w-full text-left px-4 py-3 rounded-lg text-text-secondary hover:text-white hover:bg-card-bg transition-all"
+                    key={item.path}
+                    onClick={() => handleNavClick(item.path)}
+                    className={`w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                      location.pathname === item.path
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-white/60 hover:text-white hover:bg-white/5'
+                    }`}
                   >
-                    📊 Tableau de bord
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="h-px bg-white/8 mb-4" />
+
+              {user ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-xl mb-1">
+                    <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0">
+                      <User size={14} className="text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-white text-sm font-semibold truncate">{user.name}</p>
+                      <p className="text-white/40 text-xs truncate">{user.email}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { navigate(user?.role === 'admin' ? '/admin' : '/dashboard'); setMobileMenuOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 border border-primary/20 text-primary text-sm font-semibold hover:bg-primary/20 transition-all"
+                  >
+                    <LayoutDashboard size={16} />
+                    {user?.role === 'admin' ? 'Panel Admin' : 'Tableau de bord'}
                   </button>
                   <button
                     onClick={() => { onLogout(); setMobileMenuOpen(false); }}
-                    className="block w-full text-left px-4 py-3 rounded-lg text-danger hover:bg-danger/10 transition-all"
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 text-white/50 text-sm font-medium hover:text-danger hover:border-danger/30 hover:bg-danger/5 transition-all"
                   >
-                    Déconnexion
+                    <LogOut size={16} />
+                    Se déconnecter
                   </button>
-                </>
+                </div>
               ) : (
-                <div className="pt-2 flex flex-col gap-2">
+                <div className="flex flex-col gap-2">
                   <button
                     onClick={() => { onAuthClick('login'); setMobileMenuOpen(false); }}
-                    className="block w-full text-center px-4 py-3 rounded-xl border border-border-color text-text-primary font-medium hover:bg-card-bg transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-white/15 text-white text-sm font-semibold hover:bg-white/5 transition-all"
                   >
-                    Connexion
+                    Se connecter
                   </button>
                   <button
                     onClick={() => { onAuthClick('signup'); setMobileMenuOpen(false); }}
-                    className="block w-full text-center px-4 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary-hover transition-all"
+                    className="w-full px-4 py-3 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-semibold transition-all"
                   >
-                    S'inscrire
+                    S'inscrire gratuitement
                   </button>
                 </div>
               )}

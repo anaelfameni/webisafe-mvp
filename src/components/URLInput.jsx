@@ -3,12 +3,13 @@ import { motion } from 'framer-motion';
 import { Search, ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
 import { isValidURL, isValidEmail, normalizeURL } from '../utils/validators';
 
-export default function URLInput({ onScan, loading }) {
+export default function URLInput({ onScan, loading, user }) {
   const [url, setUrl] = useState('');
   const [email, setEmail] = useState('');
   const [urlValid, setUrlValid] = useState(null);
   const [emailValid, setEmailValid] = useState(null);
   const [error, setError] = useState('');
+  const isLoggedIn = !!(user && user.email);
 
   const handleUrlChange = (e) => {
     const value = e.target.value;
@@ -44,18 +45,21 @@ export default function URLInput({ onScan, loading }) {
       return;
     }
 
-    if (!email.trim()) {
-      setError('Veuillez entrer votre email pour recevoir les résultats.');
-      return;
-    }
+    const effectiveEmail = isLoggedIn ? user.email : email;
 
-    if (!isValidEmail(email)) {
-      setError('Email invalide — vérifiez le format (ex: votremail@exemple.com)');
-      return;
+    if (!isLoggedIn) {
+      if (!effectiveEmail.trim()) {
+        setError('Veuillez entrer votre email pour recevoir les résultats.');
+        return;
+      }
+      if (!isValidEmail(effectiveEmail)) {
+        setError('Email invalide — vérifiez le format (ex: votremail@exemple.com)');
+        return;
+      }
     }
 
     const normalizedUrl = normalizeURL(url);
-    onScan(normalizedUrl, email);
+    onScan(normalizedUrl, effectiveEmail);
   };
 
   return (
@@ -95,23 +99,30 @@ export default function URLInput({ onScan, loading }) {
         )}
       </div>
 
-      {/* Email Input */}
-      <div className="relative mb-4">
-        <input
-          type="email"
-          value={email}
-          onChange={handleEmailChange}
-          placeholder="votre@email.com pour recevoir les résultats (obligatoire)"
-          required
-          className={`w-full px-4 py-3 bg-card-bg border-2 rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none transition-all text-sm ${emailValid === true
-              ? 'border-success/50 focus:border-success'
-              : emailValid === false
-                ? 'border-danger/50 focus:border-danger'
-                : 'border-border-color focus:border-primary'
-            }`}
-          disabled={loading}
-        />
-      </div>
+      {/* Email Input — masqué si l'utilisateur est connecté */}
+      {!isLoggedIn && (
+        <div className="relative mb-4">
+          <input
+            type="email"
+            value={email}
+            onChange={handleEmailChange}
+            placeholder="votre@email.com pour recevoir les résultats (obligatoire)"
+            required
+            className={`w-full px-4 py-3 bg-card-bg border-2 rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none transition-all text-sm ${emailValid === true
+                ? 'border-success/50 focus:border-success'
+                : emailValid === false
+                  ? 'border-danger/50 focus:border-danger'
+                  : 'border-border-color focus:border-primary'
+              }`}
+            disabled={loading}
+          />
+        </div>
+      )}
+      {isLoggedIn && (
+        <div className="mb-4 px-4 py-3 bg-success/10 border border-success/30 rounded-xl text-sm text-success">
+          ✓ Résultats envoyés à <strong>{user.email}</strong>
+        </div>
+      )}
 
       {/* Error */}
       {error && (

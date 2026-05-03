@@ -239,6 +239,7 @@ async function scanSecurity(url, vtApiKey) {
     let isHttps = url.startsWith('https://');
     const headersPresent = [];
     const headersMissing = [];
+    let finalUrl = url;
 
     try {
         const res = await fetch(url, {
@@ -250,8 +251,11 @@ async function scanSecurity(url, vtApiKey) {
 
         // Si la requête a suivi des redirections, res.url contient l'URL finale
         try {
-            if (res && typeof res.url === 'string' && res.url.startsWith('https://')) {
-                isHttps = true;
+            if (res && typeof res.url === 'string') {
+                finalUrl = res.url;
+                if (finalUrl.startsWith('https://')) {
+                    isHttps = true;
+                }
             }
         } catch (e) { /* ignore */ }
 
@@ -304,6 +308,7 @@ async function scanSecurity(url, vtApiKey) {
         raw_score: rawScore,
         malware_detected: malwareDetected,
         https: isHttps,
+        final_url: finalUrl,
         ssl_grade: isHttps ? 'A' : 'Absent',
         headers_presents: headersPresent,
         headers_manquants: headersMissing,
@@ -716,7 +721,13 @@ export default async function handler(req, res) {
                 ux: uxResult.status === 'rejected' ? uxResult.reason?.message : null,
             },
             scan_duration_ms: scanDurationMs,
+            // Résumé UI rapide
+            summary: {
+                https_enabled: sec?.https ?? String(normalizedUrl || '').startsWith('https'),
+            },
         };
+
+        console.log(`[SCAN] security final_url=${sec?.final_url ?? 'N/A'} https=${sec?.https ?? 'N/A'}`);
 
         // ✅ FIX : userId passé en null (non déclaré dans ce handler)
         await saveToDb(scanId, normalizedUrl, globalScore, results, body.email || null);

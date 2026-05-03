@@ -13,7 +13,7 @@ test('buildAdminPaymentNotificationEmail builds the admin alert email with the e
     payment_code: 'WBS-1234-ABCD',
     user_email: 'client@test.com',
     url_to_audit: 'https://site-client.ci',
-    wave_phone: '+2250700000000',
+    wave_phone: '+2250595335662',
     timestamp: '21/04/2026 10:30:00',
   });
 

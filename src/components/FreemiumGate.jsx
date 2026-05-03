@@ -8,7 +8,7 @@ export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, sca
   const features = [
     'PDF professionnel',
     '25+ métriques détaillées avec explications',
-    "Plan d'action priorisé en 3 étapes",
+    "Plan d'action de corrections",
     '1 rescan gratuit dans 30 jours',
   ];
 
@@ -33,7 +33,7 @@ export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, sca
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <Lock size={18} className="text-blue-400" />
-                <span className="text-white font-semibold text-lg">Contenu Premium</span>
+                <span className="text-white font-semibold text-lg">Audit Premium</span>
               </div>
               <button
                 onClick={onClose}
@@ -94,15 +94,16 @@ export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, sca
                   onClose();
                   onUpgrade();
                 }}
-                className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 transition-colors text-white font-semibold text-base shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2"
+                className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 transition-colors text-white font-semibold text-base shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 relative overflow-hidden"
               >
-                Obtenir le rapport — 35 000 FCFA →
+                <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-[shimmer_2.7s_infinite]" />
+                Obtenir le rapport : 35 000 FCFA
               </button>
 
               {/* Lien secondaire */}
               <button
                 onClick={onClose}
-                className="w-full mt-4 text-white/50 hover:text-white/80 transition-colors text-sm text-center"
+                className="w-full mt-4 py-3 rounded-2xl border border-white/10 text-white font-semibold text-sm text-center transition-colors"
               >
                 Continuer avec la version gratuite
               </button>

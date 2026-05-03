@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Check, ArrowRight, MessageCircle } from 'lucide-react';
+import { Check, ArrowRight, MessageCircle, Shield, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function PricingSection({ onScan }) {
@@ -57,6 +57,29 @@ export default function PricingSection({ onScan }) {
       },
     },
     {
+      name: 'Webisafe Protect',
+      badge: 'Surveillance Continue',
+      badgeColor: 'bg-primary/15 text-primary',
+      price: '15 000',
+      currency: 'FCFA',
+      period: '/mois',
+      description: 'Votre site surveillé 24h/24, alertes automatiques et rapport mensuel sans rien faire.',
+      features: [
+        'Scan mensuel automatique complet',
+        'Monitoring uptime toutes les 5 minutes',
+        'Alertes email critiques uniquement',
+        'Historique 6 mois avec graphiques',
+        'Alerte SSL proactive J-14, J-7, J-1',
+        'Badge "Sécurisé par Webisafe"',
+      ],
+      cta: 'Souscrire à Protect',
+      ctaStyle: 'bg-primary text-white hover:bg-primary-hover',
+      ctaIcon: <Shield size={16} />,
+      popular: false,
+      prerequisite: true,
+      onClick: () => navigate('/protect'),
+    },
+    {
       name: 'White Label Lite',
       badge: 'Pour Agences',
       badgeColor: 'bg-success/10 text-success',
@@ -95,13 +118,13 @@ export default function PricingSection({ onScan }) {
           viewport={{ once: true }}
           className="text-center mb-12"
         >
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Des prix adaptes a l'Afrique</h2>
+          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Des prix adaptés à l'Afrique</h2>
           <p className="text-text-secondary max-w-2xl mx-auto">
-            Pas d'abonnement cache. Des tarifs penses pour les PME africaines.
+            Pas d'abonnement caché. Des tarifs pensés pour les PME.
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {plans.map((plan, index) => (
             <motion.div
               key={index}
@@ -109,7 +132,10 @@ export default function PricingSection({ onScan }) {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className={`relative bg-card-bg border rounded-2xl p-6 lg:p-8 flex flex-col ${plan.popular ? 'border-primary shadow-lg shadow-primary/10 scale-[1.02]' : 'border-border-color'
+              className={`relative bg-card-bg border rounded-2xl p-6 flex flex-col ${
+                  plan.popular ? 'border-primary shadow-lg shadow-primary/10 scale-[1.02]'
+                  : plan.prerequisite ? 'border-primary/30'
+                  : 'border-border-color'
                 }`}
             >
               <span className={`inline-block self-start text-xs font-semibold px-3 py-1 rounded-full mb-4 ${plan.badgeColor}`}>
@@ -138,6 +164,12 @@ export default function PricingSection({ onScan }) {
                 ))}
               </ul>
 
+              {plan.prerequisite && (
+                <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-warning/8 border border-warning/20 rounded-xl">
+                  <Lock size={11} className="text-warning flex-shrink-0" />
+                  <p className="text-warning/80 text-[11px] leading-tight">Disponible uniquement après un scan premium à 35 000 FCFA</p>
+                </div>
+              )}
               <button
                 onClick={plan.onClick}
                 className={`relative overflow-hidden w-full py-3 px-6 rounded-full font-semibold text-sm transition-all flex items-center justify-center gap-2 ${plan.ctaStyle}`}

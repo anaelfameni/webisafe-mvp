@@ -199,6 +199,8 @@ export async function handleScan(req, res) {
           malware_detected: sec.malware_detected,
           observatory_score: sec.observatory_score,
           ssl_grade: sec.ssl_grade,
+          https: sec.https ?? String(normalizedUrl || '').startsWith('https'),
+          final_url: sec.finalUrl ?? null,
           security_grade: sec.security_grade ?? null,
           headers_presents: sec.headers_presents ?? [],
           headers_manquants: sec.headers_manquants ?? [],
@@ -244,6 +246,10 @@ export async function handleScan(req, res) {
       },
 
       scan_duration_ms: scanDurationMs,
+      // Résumé rapide pour l'UI
+      summary: {
+        https_enabled: sec?.https ?? String(normalizedUrl || '').startsWith('https'),
+      },
     };
 
     // ── 7) Sauvegarde DB (ne bloque pas la réponse si ça échoue) ──────────

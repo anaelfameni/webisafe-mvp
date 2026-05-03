@@ -17,7 +17,7 @@ export default function Footer() {
             <Link to="/cgu" className="text-white/40 hover:text-white/70 transition-colors">CGU</Link>
             <Link to="/confidentialite" className="text-white/40 hover:text-white/70 transition-colors">Confidentialité</Link>
             <Link to="/a-propos" className="text-white/40 hover:text-white/70 transition-colors">À propos</Link>
-            <a href="mailto:contact@webisafe.tech" className="text-white/40 hover:text-white/70 transition-colors">Contact</a>
+            <a href="mailto:webisafe@gmail.com" className="text-white/40 hover:text-white/70 transition-colors">Contact</a>
           </nav>
 
           <div className="flex items-center gap-3 text-white/30 text-xs">

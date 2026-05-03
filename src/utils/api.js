@@ -150,6 +150,92 @@ function normalizeAllScores(rawData) {
   };
 }
 
+// ── Table temps estimé par type de faille (T5) ───────────────────────────────
+const FAULT_TIME_MAP = {
+  ssl_expired: '10 minutes',
+  ssl_misconfigured: '20 minutes',
+  hsts_missing: '15 minutes',
+  csp_missing: '30 minutes',
+  xframe_missing: '10 minutes',
+  xcontent_missing: '10 minutes',
+  mixed_content: '45 minutes',
+  images_unoptimized: '20 minutes',
+  cache_missing: '15 minutes',
+  gzip_disabled: '10 minutes',
+  js_render_blocking: '1 heure',
+  css_render_blocking: '45 minutes',
+  meta_title_missing: '5 minutes',
+  meta_description_missing: '5 minutes',
+  h1_missing: '5 minutes',
+  alt_missing: '15 minutes',
+  sitemap_missing: '20 minutes',
+  robots_missing: '10 minutes',
+  xss_vulnerability: '2 à 4 heures',
+  sql_injection: '3 à 6 heures',
+  wordpress_outdated: '15 minutes',
+  plugin_outdated: '10 minutes',
+  no_https_redirect: '15 minutes',
+  mobile_not_responsive: '2 à 8 heures',
+  malware: '4 à 8 heures',
+  https_missing: '30 minutes',
+  headers_missing: '30 à 60 minutes',
+  sensitive_files: '1 à 2 heures',
+  lcp_slow: '2 à 4 heures',
+  cls_unstable: '1 à 2 heures',
+  page_weight_heavy: '2 à 3 heures',
+  open_graph_missing: '20 minutes',
+  canonical_missing: '15 minutes',
+  h1_multiple: '15 minutes',
+  default: '30 minutes',
+};
+
+// ── Table difficulté par type de faille (T6) ─────────────────────────────────
+const FAULT_DIFFICULTY_MAP = {
+  ssl_expired: '⭐ Facile — Faisable sans développeur',
+  ssl_misconfigured: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  hsts_missing: '⭐⭐⭐ Technique — Modification fichier serveur',
+  csp_missing: '⭐⭐⭐ Technique — Connaissance HTTP requise',
+  xframe_missing: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  xcontent_missing: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  mixed_content: '⭐⭐ Intermédiaire — Inspection du code requise',
+  images_unoptimized: '⭐ Facile — Faisable sans développeur',
+  cache_missing: '⭐⭐ Intermédiaire — Plugin ou config serveur',
+  gzip_disabled: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  js_render_blocking: '⭐⭐⭐ Technique — Connaissance JavaScript',
+  css_render_blocking: '⭐⭐⭐ Technique — Connaissance CSS',
+  meta_title_missing: '⭐ Facile — Faisable sans développeur',
+  meta_description_missing: '⭐ Facile — Faisable sans développeur',
+  h1_missing: '⭐ Facile — Faisable sans développeur',
+  alt_missing: '⭐ Facile — Faisable sans développeur',
+  sitemap_missing: '⭐ Facile — Plugin WordPress ou outil en ligne',
+  robots_missing: '⭐⭐ Intermédiaire — Accès FTP requis',
+  xss_vulnerability: '⭐⭐⭐⭐ Expert — Développeur senior requis',
+  sql_injection: '⭐⭐⭐⭐ Expert — Développeur senior requis',
+  wordpress_outdated: '⭐ Facile — Faisable sans développeur',
+  plugin_outdated: '⭐ Facile — Faisable sans développeur',
+  no_https_redirect: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  mobile_not_responsive: '⭐⭐⭐⭐ Expert — Développeur requis',
+  malware: '⭐⭐⭐⭐ Expert — Professionnel requis',
+  https_missing: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  headers_missing: '⭐⭐ Intermédiaire — Modification config serveur',
+  sensitive_files: '⭐⭐ Intermédiaire — Modification config serveur',
+  lcp_slow: '⭐⭐⭐ Technique — Optimisation images et code',
+  cls_unstable: '⭐⭐ Intermédiaire — Définir dimensions fixes',
+  page_weight_heavy: '⭐⭐ Intermédiaire — Compression images et code',
+  open_graph_missing: '⭐ Facile — Plugin SEO ou ajout manuel',
+  canonical_missing: '⭐ Facile — Activable via plugin SEO',
+  h1_multiple: '⭐ Facile — Faisable sans développeur',
+  default: '⭐⭐ Intermédiaire',
+};
+
+function getFaultTime(faultType) {
+  return FAULT_TIME_MAP[faultType] ?? FAULT_TIME_MAP.default;
+}
+
+function getFaultDifficulty(faultType) {
+  return FAULT_DIFFICULTY_MAP[faultType] ?? FAULT_DIFFICULTY_MAP.default;
+}
+
 // ── Génération recommandations professionnelles ───────────────────────────────
 function generateRecommendations(data) {
   const recs = [];
@@ -162,121 +248,144 @@ function generateRecommendations(data) {
   // SECURITE
   if (sec.malware_detected === true) {
     recs.push({
-      priorite: 1,
+      priorite: 1, faultType: 'malware',
       categorie: 'Sécurité',
       action: 'Nettoyer le malware détecté sur votre site en urgence',
       explication: "Un logiciel malveillant a été détecté sur votre site. Des pirates ont potentiellement accès à vos données ou à celles de vos visiteurs. Google peut bloquer l'accès à votre site à tout moment.",
       impact: 'Critique : risque de blacklistage Google et perte totale de trafic',
-      difficulte: 'Difficile : faites appel à un professionnel',
-      temps: '4 à 8 heures',
+      impactBusiness: 'Vos visiteurs peuvent être infectés, Google peut vous blacklister et afficher une alerte rouge sur votre site.',
+      comment_implémenter: "1. Identifiez le malware via Sucuri ou VirusTotal. 2. Nettoyez les fichiers infectés. 3. Changez tous les mots de passe. 4. Activez un pare-feu applicatif.",
+      difficulte: getFaultDifficulty('malware'),
+      temps: getFaultTime('malware'),
     });
   }
 
   if (!sec.https) {
     recs.push({
-      priorite: 2,
+      priorite: 2, faultType: 'https_missing',
       categorie: 'Sécurité',
       action: 'Passer votre site en HTTPS (certificat SSL)',
       explication: "Votre site fonctionne encore en HTTP, ce qui signifie que toutes les données échangées entre vos visiteurs et votre site sont visibles par des tiers. Les navigateurs modernes affichent \"Site non sécurisé\" en rouge, ce qui fait fuir les visiteurs.",
       impact: 'Sécurité +20 points, meilleure confiance des visiteurs',
-      difficulte: 'Facile : activable chez votre hébergeur en 30 minutes',
-      temps: '30 minutes',
+      impactBusiness: "Sans HTTPS, Chrome affiche 'Site non sécurisé' et 85% des visiteurs quittent immédiatement la page.",
+      comment_implémenter: "1. Commandez un certificat SSL gratuit (Let's Encrypt) via votre hébergeur (cPanel → SSL/TLS). 2. Activez la redirection HTTP → HTTPS. 3. Vérifiez les URLs internes.",
+      difficulte: getFaultDifficulty('https_missing'),
+      temps: getFaultTime('https_missing'),
     });
   }
 
   if (missingHeaders.length > 0) {
+    const hasCsp = missingHeaders.some(h => h.toLowerCase().includes('content-security'));
+    const hasHsts = missingHeaders.some(h => h.toLowerCase().includes('strict-transport'));
+    const primaryFault = hasCsp ? 'csp_missing' : hasHsts ? 'hsts_missing' : 'headers_missing';
     recs.push({
-      priorite: 3,
+      priorite: 3, faultType: primaryFault,
       categorie: 'Sécurité',
       action: `Activer les protections de sécurité manquantes : ${missingHeaders.join(', ')}`,
       explication: `Ces protections (appelées "headers HTTP") sont des instructions envoyées aux navigateurs pour défendre votre site contre les attaques courantes : vol de session, injection de code malveillant, détournement de clics. Il en manque ${missingHeaders.length} sur votre site.`,
       impact: 'Sécurité +10 à +25 points selon le nombre activé',
-      difficulte: 'Facile à moyenne : modification dans la configuration serveur',
-      temps: '30 à 60 minutes',
+      impactBusiness: "Ces headers protègent vos visiteurs contre le clickjacking, les injections XSS et le vol de cookies de session.",
+      comment_implémenter: "Ajoutez ces headers dans la config nginx (.conf) ou Apache (.htaccess). Exemple nginx : add_header X-Frame-Options \"SAMEORIGIN\"; add_header Content-Security-Policy \"default-src 'self';\";",
+      difficulte: getFaultDifficulty(primaryFault),
+      temps: getFaultTime(primaryFault),
     });
   }
 
   if (sec.sensitive_files?.critical) {
     const files = sec.sensitive_files.exposed_files ?? [];
     recs.push({
-      priorite: 1,
+      priorite: 1, faultType: 'sensitive_files',
       categorie: 'Sécurité',
       action: "Bloquer l'accès public aux fichiers sensibles exposés",
       explication: `Des fichiers contenant potentiellement des mots de passe, clés API ou données confidentielles sont accessibles publiquement${files.length ? ` : ${files.slice(0, 3).join(', ')}` : ''}. N'importe qui peut les télécharger.`,
       impact: 'Critique : risque immédiat de fuite de données et de piratage',
-      difficulte: 'Moyenne : modification de la configuration serveur (.htaccess ou nginx)',
-      temps: '1 à 2 heures',
+      impactBusiness: "Un pirate peut accéder à vos credentials, base de données ou code source et compromettre l'ensemble de votre infrastructure.",
+      comment_implémenter: "Dans .htaccess Apache : <FilesMatch \"\\.(env|log|sql|bak)$\"> deny from all </FilesMatch>. Ou dans nginx : location ~* \\.(env|log|sql) { deny all; }",
+      difficulte: getFaultDifficulty('sensitive_files'),
+      temps: getFaultTime('sensitive_files'),
     });
   }
 
   // SEO
   if (seo.has_description === false) {
     recs.push({
-      priorite: 4,
+      priorite: 4, faultType: 'meta_description_missing',
       categorie: 'SEO',
-      action: 'Rédiger une méta description pour chaque page (150 à 160 caractères)',
+      action: 'Rédiger une méta description optimisée pour chaque page (150 à 160 caractères)',
       explication: "La méta description est le petit texte affiché sous le titre de votre site dans Google. Sans elle, Google choisit lui-même un extrait souvent peu attractif. Un bon texte ici augmente le nombre de personnes qui cliquent sur votre lien.",
       impact: 'SEO +10 à +15 points, meilleur taux de clic dans Google',
-      difficulte: 'Facile : à rédiger directement dans votre CMS',
-      temps: '15 minutes',
+      impactBusiness: "Une méta description bien rédigée augmente le CTR (taux de clic) de 5 à 30%, soit plus de visiteurs sans changer votre classement.",
+      comment_implémenter: "Dans WordPress : Yoast SEO → modifier chaque page → remplir 'Meta description' (150-160 caractères). Commencez par votre verbe d'action et votre proposition de valeur unique.",
+      difficulte: getFaultDifficulty('meta_description_missing'),
+      temps: getFaultTime('meta_description_missing'),
     });
   }
 
   if (!seo.has_sitemap) {
     recs.push({
-      priorite: 5,
+      priorite: 5, faultType: 'sitemap_missing',
       categorie: 'SEO',
-      action: 'Créer et soumettre un sitemap XML à Google',
+      action: 'Créer et soumettre un sitemap XML à Google Search Console',
       explication: "Le sitemap est une liste de toutes vos pages, fournie à Google pour qu'il les trouve et les indexe plus rapidement. Sans sitemap, certaines de vos pages peuvent ne jamais apparaître dans les résultats de recherche.",
       impact: 'SEO +10 points, indexation plus rapide et complète de vos pages',
-      difficulte: 'Facile : générable automatiquement avec un plugin (ex: Yoast pour WordPress)',
-      temps: '20 minutes',
+      impactBusiness: "Avec un sitemap, Google indexe vos nouvelles pages en 24-48h au lieu de plusieurs semaines. Impact direct sur la visibilité de vos produits et services.",
+      comment_implémenter: "WordPress : Yoast SEO génère automatiquement votre sitemap à votresite.com/sitemap_index.xml. Soumettez ensuite dans Google Search Console → Sitemaps.",
+      difficulte: getFaultDifficulty('sitemap_missing'),
+      temps: getFaultTime('sitemap_missing'),
     });
   }
 
   if (seo.h1_count === 0) {
     recs.push({
-      priorite: 5,
+      priorite: 5, faultType: 'h1_missing',
       categorie: 'SEO',
       action: 'Ajouter un titre principal (balise H1) sur chaque page',
       explication: "Le H1 est le titre principal de votre page, celui que Google lit en premier pour comprendre le sujet. Son absence est un signal négatif pour le référencement et désoriente vos visiteurs.",
       impact: 'SEO +8 points, meilleure compréhension par Google',
-      difficulte: 'Facile : modifiable dans votre éditeur de contenu',
-      temps: '10 minutes',
+      impactBusiness: "Votre H1 est le premier signal textuel que Google utilise pour indexer votre page. Sans lui, votre page peut être classée sur des requêtes non ciblées.",
+      comment_implémenter: "Chaque page doit avoir exactement un <h1>Votre titre principal</h1>. Dans WordPress, il correspond au titre de la page ou de l'article. Assurez-vous qu'il contient votre mot-clé principal.",
+      difficulte: getFaultDifficulty('h1_missing'),
+      temps: getFaultTime('h1_missing'),
     });
   } else if (seo.h1_count > 1) {
     recs.push({
-      priorite: 6,
+      priorite: 6, faultType: 'h1_multiple',
       categorie: 'SEO',
       action: `Réduire à un seul titre H1 par page (${seo.h1_count} détectés actuellement)`,
       explication: "Google s'attend à trouver un seul titre principal H1 par page. En avoir plusieurs lui envoie un signal contradictoire sur le sujet de la page, ce qui peut nuire à votre positionnement.",
       impact: 'Meilleure structure SEO, évite la dilution du référencement',
-      difficulte: 'Facile',
-      temps: '15 minutes',
+      impactBusiness: "Plusieurs H1 créent une ambiguïté pour les moteurs de recherche qui ne savent plus quel sujet principal indexer.",
+      comment_implémenter: "Inspectez votre HTML : gardez un seul <h1>, transformez les autres en <h2> ou <h3>. Vérifiez aussi dans votre thème que le logo ou header n'utilise pas un <h1>.",
+      difficulte: getFaultDifficulty('h1_multiple'),
+      temps: getFaultTime('h1_multiple'),
     });
   }
 
   if (seo.has_open_graph === false) {
     recs.push({
-      priorite: 7,
+      priorite: 7, faultType: 'open_graph_missing',
       categorie: 'SEO',
       action: 'Ajouter les balises Open Graph (titre, description, image)',
       explication: "Ces balises contrôlent l'apparence de votre site quand quelqu'un partage un lien sur WhatsApp, Facebook ou LinkedIn. Sans elles, le partage affiche un aperçu vide ou peu attractif.",
       impact: 'Meilleur affichage sur les réseaux sociaux, plus de clics sur les partages',
-      difficulte: 'Facile : plugin SEO ou ajout manuel dans le head',
-      temps: '20 minutes',
+      impactBusiness: "Un lien partagé sans Open Graph affiche un aperçu vide. Avec des balises OG, vous contrôlez l'image et le texte affiché, augmentant les clics de 40% en moyenne.",
+      comment_implémenter: "Ajoutez dans le <head> : <meta property=\"og:title\" content=\"Votre titre\"> <meta property=\"og:description\" content=\"Description\"> <meta property=\"og:image\" content=\"URL image 1200x630\">",
+      difficulte: getFaultDifficulty('open_graph_missing'),
+      temps: getFaultTime('open_graph_missing'),
     });
   }
 
   if (!seo.has_canonical) {
     recs.push({
-      priorite: 7,
+      priorite: 7, faultType: 'canonical_missing',
       categorie: 'SEO',
       action: 'Ajouter des balises canoniques sur vos pages',
       explication: "La balise canonique indique à Google quelle est la version officielle d'une page, évitant que le même contenu accessible via plusieurs URLs ne se pénalise mutuellement dans les classements.",
       impact: 'Évite la pénalité de contenu dupliqué',
-      difficulte: 'Facile : activable via plugin SEO',
-      temps: '15 minutes',
+      impactBusiness: "Sans canonique, si votre page est accessible en HTTP et HTTPS, ou avec/sans www, Google peut les indexer comme 2 pages distinctes et vous pénaliser pour contenu dupliqué.",
+      comment_implémenter: "Ajoutez dans le <head> : <link rel=\"canonical\" href=\"https://votresite.com/votre-page/\">. Yoast SEO le fait automatiquement si bien configuré.",
+      difficulte: getFaultDifficulty('canonical_missing'),
+      temps: getFaultTime('canonical_missing'),
     });
   }
 
@@ -284,37 +393,43 @@ function generateRecommendations(data) {
   if (perf.lcp != null && perf.lcp > 2500) {
     const lcpSec = (perf.lcp / 1000).toFixed(1);
     recs.push({
-      priorite: 3,
+      priorite: 3, faultType: 'lcp_slow',
       categorie: 'Performance',
-      action: `Accélérer l'affichage du contenu principal (actuellement ${lcpSec}s, objectif sous 2,5s)`,
+      action: `Accélérer l'affichage du contenu principal (LCP actuel : ${lcpSec}s → objectif : sous 2,5s)`,
       explication: `Le LCP mesure le temps avant que le contenu principal de votre page s'affiche. À ${lcpSec} secondes, vos visiteurs attendent trop longtemps. Google le sait et vous pénalise dans ses résultats. Plus de 40% des visiteurs quittent un site qui met plus de 3 secondes à charger.`,
       impact: "Performance +10 à +20 points, moins d'abandons de visite",
-      difficulte: 'Moyenne : optimisation des images et du code',
-      temps: '2 à 4 heures',
+      impactBusiness: `Réduire votre LCP de ${lcpSec}s à 2s peut augmenter votre taux de conversion de 15 à 25% selon les études Google.`,
+      comment_implémenter: "1. Compressez votre image hero avec TinyPNG. 2. Activez le cache navigateur. 3. Ajoutez l'attribut fetchpriority=\"high\" sur votre image principale. 4. Activez la compression Gzip/Brotli sur le serveur.",
+      difficulte: getFaultDifficulty('lcp_slow'),
+      temps: getFaultTime('lcp_slow'),
     });
   }
 
   if (perf.cls != null && perf.cls > 0.1) {
     recs.push({
-      priorite: 4,
+      priorite: 4, faultType: 'cls_unstable',
       categorie: 'Performance',
-      action: `Stabiliser la mise en page (score CLS actuellement ${perf.cls.toFixed(3)}, objectif sous 0,1)`,
+      action: `Stabiliser la mise en page (CLS : ${perf.cls.toFixed(3)} → objectif : sous 0,1)`,
       explication: "Le CLS mesure les sauts visuels : quand des éléments de la page se déplacent soudainement pendant le chargement. C'est ce qui arrive quand vous allez cliquer sur un bouton et que la page bouge juste avant. Très frustrant pour les visiteurs, et pénalisé par Google.",
       impact: 'Meilleure stabilité visuelle, moins de clics accidentels',
-      difficulte: 'Moyenne : définir des dimensions fixes pour images et publicités',
-      temps: '1 à 2 heures',
+      impactBusiness: "Un CLS élevé génère des clics accidentels, augmente le taux de rebond et dégrade votre score Core Web Vitals qui influence directement votre classement Google.",
+      comment_implémenter: "1. Définissez width et height sur toutes vos balises <img>. 2. Réservez de l'espace pour les publicités avec min-height CSS. 3. Évitez d'injecter du contenu au-dessus du contenu visible.",
+      difficulte: getFaultDifficulty('cls_unstable'),
+      temps: getFaultTime('cls_unstable'),
     });
   }
 
   if (perf.page_weight_mb != null && perf.page_weight_mb > 3) {
     recs.push({
-      priorite: 4,
+      priorite: 4, faultType: 'page_weight_heavy',
       categorie: 'Performance',
-      action: `Réduire le poids de la page (actuellement ${perf.page_weight_mb} MB, objectif sous 2 MB)`,
+      action: `Réduire le poids de la page (${perf.page_weight_mb} MB actuel → objectif : sous 2 MB)`,
       explication: `Votre page pèse ${perf.page_weight_mb} MB. Sur une connexion mobile 3G courante en Afrique, cela représente ${Math.round(perf.page_weight_mb * 8)} secondes de téléchargement. Compresser vos images et votre code réduirait ce temps de moitié.`,
       impact: 'Temps de chargement réduit de 30 à 50%',
-      difficulte: "Moyenne : compression d'images et minification du code",
-      temps: '2 à 3 heures',
+      impactBusiness: "Chaque 500Ko économisé = ~1 seconde de moins sur 3G. En Afrique de l'Ouest, 70% du trafic se fait sur mobile avec des connexions limitées.",
+      comment_implémenter: "1. Compressez toutes les images avec TinyPNG (images) ou Squoosh (WebP). 2. Minifiez CSS/JS dans WordPress avec WP Rocket. 3. Activez le lazy loading sur les images : <img loading=\"lazy\">.",
+      difficulte: getFaultDifficulty('page_weight_heavy'),
+      temps: getFaultTime('page_weight_heavy'),
     });
   }
 
@@ -324,16 +439,73 @@ function generateRecommendations(data) {
       .filter(i => i.severity === 'high')
       .forEach(issue => {
         recs.push({
-          priorite: 3,
+          priorite: 3, faultType: 'mobile_not_responsive',
           categorie: 'UX Mobile',
-          action: `Corriger : ${issue.message}`,
-          explication: issue.impact,
+          action: `Corriger le problème UX : ${issue.message}`,
+          explication: issue.impact || issue.message,
           impact: 'UX Mobile +10 à +20 points',
-          difficulte: 'Variable',
-          temps: '1 à 3 heures',
+          impactBusiness: "Un site difficile à utiliser sur mobile perd en moyenne 50% de ses visiteurs dans les 3 premières secondes.",
+          comment_implémenter: "Testez votre site sur Google Mobile-Friendly Test. Corrigez chaque problème signalé : taille des boutons (min 48x48px), texte lisible (min 16px), pas de scroll horizontal.",
+          difficulte: getFaultDifficulty('mobile_not_responsive'),
+          temps: getFaultTime('mobile_not_responsive'),
         });
       });
   }
+
+  // ── Recommandations avancées (3 minimum par scan) ──────────────────────────
+  const advancedRecs = [];
+
+  advancedRecs.push({
+    priorite: 8, faultType: 'images_unoptimized',
+    categorie: 'Performance',
+    action: "Convertir toutes vos images en format WebP ou AVIF",
+    explication: "Le format WebP est 25 à 35% plus léger que le JPEG à qualité équivalente. L'AVIF est encore plus efficace. La majorité des navigateurs modernes supportent ces formats, y compris sur mobile Afrique.",
+    impact: "Réduction du poids de la page de 20 à 40%, amélioration du LCP",
+    impactBusiness: "Des images plus légères = pages qui chargent 30 à 50% plus vite = moins d'abandons, meilleur classement Google et meilleure expérience mobile.",
+    comment_implémenter: "WordPress : installez le plugin ShortPixel ou Imagify pour conversion automatique. En manuel : utilisez squoosh.app pour convertir image par image. Ajoutez l'attribut <img loading=\"lazy\"> sur toutes les images hors viewport.",
+    difficulte: getFaultDifficulty('images_unoptimized'),
+    temps: getFaultTime('images_unoptimized'),
+  });
+
+  advancedRecs.push({
+    priorite: 8, faultType: 'cache_missing',
+    categorie: 'Performance',
+    action: "Mettre en place une stratégie de cache navigateur et serveur",
+    explication: "Sans cache, chaque visiteur re-télécharge 100% des ressources de votre site à chaque visite. Un cache bien configuré permet aux visiteurs récurrents de charger votre site en moins d'une seconde.",
+    impact: "Vitesse x3 pour les visiteurs récurrents, réduction de la bande passante serveur",
+    impactBusiness: "60% de votre trafic vient de visiteurs récurrents. Un cache bien configuré leur offre une expérience instantanée et réduit votre coût d'hébergement.",
+    comment_implémenter: "Apache .htaccess : <IfModule mod_expires.c> ExpiresActive On ExpiresByType image/webp \"access 1 year\" ExpiresByType text/css \"access 1 month\" </IfModule>. WordPress : WP Rocket ou W3 Total Cache.",
+    difficulte: getFaultDifficulty('cache_missing'),
+    temps: getFaultTime('cache_missing'),
+  });
+
+  advancedRecs.push({
+    priorite: 9, faultType: 'default',
+    categorie: 'SEO',
+    action: "Implémenter le balisage Schema.org (données structurées) pour enrichir votre présence Google",
+    explication: "Les données structurées Schema.org permettent à Google d'afficher des Rich Snippets : étoiles d'avis, prix, horaires, FAQ directement dans les résultats de recherche. Résultat : votre lien occupe plus d'espace et attire davantage de clics.",
+    impact: "Augmentation du CTR de 20 à 40%, meilleure visibilité dans les SERP",
+    impactBusiness: "Vos concurrents avec des rich snippets reçoivent 2x plus de clics que des résultats classiques, même s'ils sont positionnés en dessous.",
+    comment_implémenter: "Choisissez le type Schema adapté (LocalBusiness, Product, Article, FAQPage). Générez le JSON-LD sur schema.org/generator. Injectez-le dans le <head> de vos pages. Validez avec l'outil de test Google.",
+    difficulte: '⭐⭐ Intermédiaire — Connaissance JSON/HTML recommandée',
+    temps: '1 à 3 heures',
+  });
+
+  if (perf.lcp == null || (perf.lcp != null && perf.lcp > 1500)) {
+    advancedRecs.push({
+      priorite: 9, faultType: 'js_render_blocking',
+      categorie: 'Performance',
+      action: "Éliminer les ressources JavaScript et CSS bloquant le rendu de la page",
+      explication: "Les fichiers JS et CSS chargés dans le <head> sans async/defer bloquent l'affichage de la page jusqu'à leur téléchargement complet. C'est l'une des causes les plus fréquentes de LCP élevé et de mauvais score PageSpeed.",
+      impact: "Performance +10 à +25 points, LCP amélioré de 0,5 à 2 secondes",
+      impactBusiness: "Éliminer les render-blocking resources peut réduire votre temps de chargement perçu de moitié, directement mesurable par Google Lighthouse.",
+      comment_implémenter: "1. Ajoutez defer sur vos balises script : <script src=\"app.js\" defer>. 2. Chargez les CSS critiques inline et les autres en asynchrone. 3. Utilisez la section 'Eliminate render-blocking resources' de PageSpeed pour identifier les fichiers à corriger.",
+      difficulte: getFaultDifficulty('js_render_blocking'),
+      temps: getFaultTime('js_render_blocking'),
+    });
+  }
+
+  advancedRecs.slice(0, 5).forEach(rec => recs.push(rec));
 
   return recs.sort((a, b) => (a.priorite ?? 9) - (b.priorite ?? 9));
 }
@@ -522,7 +694,7 @@ export async function runFullAnalysis(url, onProgress, email) {
 
     const effectiveEmail = email || storedAuth?.email || '';
 
-    const payload = { url };
+    const payload = { url, force_refresh: true };
     if (effectiveEmail) payload.email = effectiveEmail;
 
     const response = await fetch('/api/scan', {
@@ -550,14 +722,19 @@ export async function runFullAnalysis(url, onProgress, email) {
       try { bodyText = await response.text(); } catch (e) { bodyText = ''; }
 
       // Attempt to parse JSON error
+      let parsedError = null;
       try {
         const parsed = JSON.parse(bodyText || '{}');
-        if (parsed && parsed.error) throw new Error(parsed.error);
-      } catch (jsonErr) {
-        // If JSON parse failed or no error field, include HTTP status + truncated body
-        const truncated = (bodyText || '').toString().slice(0, 800).replace(/\n/g, ' ');
-        throw new Error(`HTTP ${response.status} ${response.statusText}${truncated ? ' - ' + truncated : ''}`);
+        if (parsed && parsed.error) parsedError = parsed.error;
+      } catch (_) {
+        // not JSON, fall through
       }
+
+      if (parsedError) {
+        throw new Error(parsedError);
+      }
+      const truncated = (bodyText || '').toString().slice(0, 800).replace(/\n/g, ' ');
+      throw new Error(`HTTP ${response.status} ${response.statusText}${truncated ? ' - ' + truncated : ''}`);
     }
 
     const rawData = await response.json();
@@ -626,6 +803,11 @@ export async function runFullAnalysis(url, onProgress, email) {
         seo: normalizedScores.seo ?? 0,
         ux_mobile: uxScore ?? 0,
         ux: uxScore ?? 0,
+      },
+
+      // Résumé UI : utiliser la valeur fournie par le backend si présente
+      summary: {
+        https_enabled: rawData?.summary?.https_enabled ?? String(data.url || '').startsWith('https'),
       },
 
       performance: {

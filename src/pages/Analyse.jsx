@@ -82,29 +82,31 @@ const CriticalAlertsBanner = ({ alerts }) => {
   );
 };
 
-// ── Badge serveur ─────────────────────────────────────────────────────────────
-const ServerLocationBadge = ({ serverLocation }) => {
-  if (!serverLocation) return null;
+// ── Badge latence / CDN ───────────────────────────────────────────────────────
+const LatencyWarningBadge = ({ serverLocation }) => {
+  if (!serverLocation?.latency_warning?.warning) return null;
 
-  const { country, city, isp, latency_warning } = serverLocation;
-  const isWarning = latency_warning?.warning;
+  const { city, country, latency_warning } = serverLocation;
 
   return (
-    <div
-      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border ${isWarning
-        ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-200'
-        : 'bg-green-500/10 border-green-500/30 text-green-200'
-        }`}
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-start gap-3 p-4 rounded-2xl border bg-yellow-500/10 border-yellow-500/30 mb-6"
     >
-      <MapPin size={12} className="flex-shrink-0" />
-      <span>
-        Serveur : <strong>{city}, {country}</strong>
-        {isp && <span className="text-white/50 ml-1">({isp})</span>}
-        {isWarning && latency_warning?.message && (
-          <span className="ml-2 text-yellow-200/70">{latency_warning.message}</span>
+      <MapPin size={16} className="flex-shrink-0 mt-0.5 text-yellow-300" />
+      <div className="flex-1 min-w-0">
+        <p className="text-yellow-200 font-semibold text-sm">
+          Serveur éloigné de vos visiteurs
+        </p>
+        {latency_warning.message && (
+          <p className="text-yellow-200/80 text-xs mt-1">{latency_warning.message}</p>
         )}
-      </span>
-    </div>
+        {latency_warning.recommendation && (
+          <p className="text-white/50 text-xs mt-1">💡 {latency_warning.recommendation}</p>
+        )}
+      </div>
+    </motion.div>
   );
 };
 
@@ -317,15 +319,16 @@ export default function Analyse() {
       return;
     }
 
-    // Email requis pour les scans gratuits
-    if (!email || typeof email !== 'string' || !email.includes('@') || !email.includes('.')) {
+    // Email requis uniquement si l'utilisateur n'est pas connecté
+    const effectiveScanEmail = (isAuthenticated && user?.email) ? user.email : email;
+    if (!effectiveScanEmail || typeof effectiveScanEmail !== 'string' || !effectiveScanEmail.includes('@') || !effectiveScanEmail.includes('.')) {
       setScanError({ type: 'INVALID_EMAIL', error: "Email requis pour recevoir les résultats." });
       setScanState('error');
       return;
     }
 
     try {
-      const data = await runFullAnalysis(url, ({ step }) => setCurrentStep(step), email);
+      const data = await runFullAnalysis(url, ({ step }) => setCurrentStep(step), effectiveScanEmail);
 
       if (!data?.success) {
         setScanError(data);
@@ -333,7 +336,7 @@ export default function Analyse() {
         return;
       }
 
-      const scanPayload = { ...data, email, paid: false };
+      const scanPayload = { ...data, email: effectiveScanEmail, paid: false };
       const id = saveScan(scanPayload);
       const storedScan = { ...scanPayload, id };
 
@@ -351,7 +354,7 @@ export default function Analyse() {
       });
       setScanState('error');
     }
-  }, [email, isPaid, saveScan, url]);
+  }, [email, isAuthenticated, user, isPaid, saveScan, url]);
 
   useEffect(() => { performScan(); }, [performScan]);
 
@@ -497,12 +500,6 @@ export default function Analyse() {
           <p className="text-lg text-white">{extractDomain(url)}</p>
         </motion.div>
 
-        {serverLocation && (
-          <div className="flex justify-center mb-6">
-            <ServerLocationBadge serverLocation={serverLocation} />
-          </div>
-        )}
-
         <CriticalAlertsBanner alerts={criticalAlerts} />
 
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
@@ -524,6 +521,8 @@ export default function Analyse() {
             }
           />
         </motion.div>
+
+        <LatencyWarningBadge serverLocation={serverLocation} />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
           <ScoreCard
@@ -607,73 +606,112 @@ export default function Analyse() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-12"
         >
-          <h2 className="text-xl font-bold text-white mb-2">Problèmes identifiés</h2>
-          <p className="text-white text-sm mb-6">
-            {(scanData.recommendations?.length ?? 0)} corrections recommandées pour votre site
-          </p>
 
-          <div className="space-y-4">
-            {hasPaid ? (
-              <>
-                {(scanData.ai_analysis?.recommandations_prioritaires ?? []).map((rec, index) => (
-                  <RecommendationCard
-                    key={`unlocked_${index}`}
-                    recommendation={rec}
-                    index={index}
-                    isLocked={false}
-                  />
-                ))}
-              </>
-            ) : (
-              <>
-                {(scanData.recommendations_preview ?? []).map((rec, index) => (
-                  <RecommendationCard
-                    key={`preview_${index}`}
-                    recommendation={rec}
-                    index={index}
-                    isLocked={false}
-                  />
-                ))}
+        <div className="space-y-4">
+          {hasPaid ? (
+            <>
+              {(
+                scanData.ai_analysis?.recommandations_prioritaires?.length > 0
+                  ? scanData.ai_analysis.recommandations_prioritaires
+                  : scanData.recommendations ?? []
+              ).map((rec, index) => (
+                <RecommendationCard
+                  key={`unlocked_${index}`}
+                  recommendation={rec}
+                  index={index}
+                  isLocked={false}
+                />
+              ))}
+            </>
+          ) : (() => {
+            const totalRecs = scanData.recommendations?.length ?? 0;
+            const allRecs = scanData.recommendations ?? [];
+            const isExactly3 = totalRecs === 3;
 
-                <div className="relative">
-                  <div className="filter blur-sm pointer-events-none select-none space-y-4">
-                    {[1, 2, 3].map((_, index) => (
+            if (isExactly3) {
+                return (
+                  <>
+                    {allRecs.slice(1).map((rec, index) => (
                       <RecommendationCard
-                        key={`blurred_${index}`}
-                        recommendation={{
-                          action: 'Optimisation critique cachée',
-                          impact: 'Significatif',
-                          difficulte: 'Moyenne',
-                          temps: '2h',
-                        }}
-                        index={index + (scanData.recommendations_preview?.length ?? 0)}
-                        isLocked={true}
+                        key={`preview_${index}`}
+                        recommendation={rec}
+                        index={index}
+                        isLocked={false}
                       />
                     ))}
+
+                    <div className="relative rounded-2xl overflow-hidden">
+                      <div className="filter blur-[3px] pointer-events-none select-none opacity-70">
+                        <RecommendationCard
+                          recommendation={allRecs[0]}
+                          index={0}
+                          isLocked={true}
+                        />
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-dark-navy/80 via-dark-navy/40 to-transparent flex flex-col items-center justify-center gap-3">
+                        <p className="text-white font-bold text-sm">🔒 Recommandation la plus critique</p>
+                        <button
+                          onClick={() => setShowFreemiumGate(true)}
+                          className="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-[0_0_24px_rgba(21,102,240,0.5)] transition-all text-sm"
+                        >
+                          Voir la correction complète <ArrowRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                );
+              }
+
+              return (
+                <>
+                  {(scanData.recommendations_preview ?? []).map((rec, index) => (
+                    <RecommendationCard
+                      key={`preview_${index}`}
+                      recommendation={rec}
+                      index={index}
+                      isLocked={false}
+                    />
+                  ))}
+
+                  <div className="relative">
+                    <div className="filter blur-sm pointer-events-none select-none space-y-4">
+                      {[1, 2, 3].map((_, index) => (
+                        <RecommendationCard
+                          key={`blurred_${index}`}
+                          recommendation={{
+                            action: 'Optimisation critique cachée',
+                            impact: 'Significatif',
+                            difficulte: 'Moyenne',
+                            temps: '2h',
+                          }}
+                          index={index + (scanData.recommendations_preview?.length ?? 0)}
+                          isLocked={true}
+                        />
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => setShowFreemiumGate(true)}
+                      className="absolute inset-0 flex items-center justify-center"
+                      aria-label="Obtenir le rapport complet"
+                    >
+                      <span className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-[0_0_24px_rgba(21,102,240,0.5)] transition-all">
+                        🔒 Obtenir le rapport complet
+                        <ArrowRight size={16} />
+                      </span>
+                    </button>
                   </div>
 
-                  <button
-                    onClick={() => setShowFreemiumGate(true)}
-                    className="absolute inset-0 flex items-center justify-center"
-                    aria-label="Obtenir le rapport complet"
-                  >
-                    <span className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-[0_0_24px_rgba(21,102,240,0.5)] transition-all">
-                      🔒 Obtenir le rapport complet
-                      <ArrowRight size={16} />
-                    </span>
-                  </button>
-                </div>
-
-                <div className="text-center py-4">
-                  <p className="text-white text-sm mb-4">
-                    <Lock size={14} className="inline mr-1" />
-                    {(scanData.recommendations?.length ?? 0) -
-                      (scanData.recommendations_preview?.length ?? 0)}{' '}
-                    corrections critiques supplémentaires disponibles
-                  </p>
-                </div>
-              </>
-            )}
+                  <div className="text-center py-4">
+                    <p className="text-white text-sm mb-4">
+                      <Lock size={14} className="inline mr-1" />
+                      {totalRecs - (scanData.recommendations_preview?.length ?? 0)}{' '}
+                      corrections critiques supplémentaires disponibles
+                    </p>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </motion.div>
       </div>

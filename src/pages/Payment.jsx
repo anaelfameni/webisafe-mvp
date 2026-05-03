@@ -213,6 +213,21 @@ export default function Payment({ user }) {
     <div className="min-h-screen px-4 pt-24 pb-16">
       <ToastMessage toast={toast} />
       <div className="mx-auto max-w-md rounded-[28px] border border-[#1566F0]/30 bg-card-bg p-8 shadow-2xl shadow-black/30">
+        {/* Bouton bypass ADMIN uniquement */}
+        {user?.role === 'admin' && scanId && (
+          <div className="mb-6 rounded-2xl border-2 border-orange-500/40 bg-orange-500/10 p-5 text-center">
+            <p className="text-xs uppercase tracking-widest text-orange-400 font-bold mb-2">⚙️ Mode Admin</p>
+            <p className="text-sm text-white/70 mb-4">Accédez directement à l'audit premium sans paiement.</p>
+            <button
+              onClick={() => navigate(`/rapport/${scanId}`)}
+              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600 px-6 py-3 text-sm font-bold text-white transition"
+            >
+              <ShieldCheck size={16} />
+              Voir l'audit premium (Admin)
+            </button>
+          </div>
+        )}
+
         <div className="text-center">
           <div className="mx-auto flex w-fit items-center gap-3 rounded-full bg-primary/10 px-4 py-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary font-bold text-white">W</div>
@@ -327,14 +342,14 @@ export default function Payment({ user }) {
             disabled={submitting || !wavePhone.trim() || !email.trim()}
             className="w-full rounded-xl bg-primary px-5 py-4 text-lg font-bold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? 'Soumission en cours...' : "J'ai paye - Soumettre"}
+            {submitting ? 'Soumission en cours...' : "J'ai payé - Soumettre"}
           </button>
         </form>
 
         <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/60 px-4 py-4 text-sm text-white/60">
           <div className="flex items-start gap-3">
             <Smartphone size={18} className="mt-0.5 text-primary" />
-            <p>Revenez ensuite ici, entrez simplement votre numero Wave, puis cliquez sur le bouton ci-dessus.</p>
+            <p>Revenez ensuite dans votre tableau de board pour apercevoir votre rapport complet.</p>
           </div>
         </div>
       </div>

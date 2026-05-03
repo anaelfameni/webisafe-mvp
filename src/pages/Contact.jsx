@@ -59,7 +59,7 @@ export default function Contact() {
           >
             {/* WhatsApp */}
             <a
-              href="https://wa.me/2250700000000?text=Bonjour, j'ai une question concernant Webisafe."
+              href="https://wa.me/22505953356620?text=Bonjour, j'ai une question concernant Webisafe."
               target="_blank"
               rel="noopener noreferrer"
               className="block bg-success/10 border border-success/30 rounded-2xl p-6 hover:bg-success/20 transition-all group"
@@ -78,8 +78,8 @@ export default function Contact() {
             <div className="bg-card-bg border border-border-color rounded-2xl p-6">
               <Mail size={24} className="text-primary mb-3" />
               <h3 className="text-white font-bold mb-1">Email</h3>
-              <a href="mailto:contact@webisafe.ci" className="text-primary text-sm hover:underline">
-                contact@webisafe.ci
+              <a href="mailto:webisafe@gmail.com" className="text-primary text-sm hover:underline">
+                webisafe@gmail.com
               </a>
               <p className="text-text-secondary text-xs mt-2">
                 Réponse sous 24h ouvrées

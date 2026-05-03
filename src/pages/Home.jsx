@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../hooks/useAuth';
 import { Zap, Shield, Search, Smartphone, Star, ArrowRight, TrendingDown, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import URLInput from '../components/URLInput';
@@ -12,6 +13,7 @@ import ScoreGaugeChart from '../components/ScoreGaugeChart';
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (location.state?.scrollToTop) {
@@ -189,7 +191,7 @@ export default function Home() {
             ))}
           </motion.div>
 
-          <URLInput onScan={handleScan} />
+          <URLInput onScan={handleScan} user={user} />
 
           <motion.p
             initial={{ opacity: 0 }}
@@ -206,10 +208,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto">
           <motion.div {...animationProps} className="text-center mb-12">
             <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-              Votre site vous fait peut-etre perdre des clients
+              Votre site vous fait peut-être perdre des clients
             </h2>
             <p className="text-text-secondary max-w-2xl mx-auto">
-              Sans le savoir, votre site web repousse peut etre vos visiteurs. Decouvrez pourquoi.
+              Sans le savoir, votre site web repousse peut être vos visiteurs. Découvrez pourquoi.
             </p>
           </motion.div>
 

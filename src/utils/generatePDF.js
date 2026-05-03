@@ -100,15 +100,65 @@ function normalizeRecommendation(rec = {}) {
   const title = rec.title || rec.label || rec.name || rec.action || 'Correction recommandee';
   return {
     priority: rec.priority || 'IMPORTANT',
-    category: rec.category || 'general',
+    category: rec.category || rec.categorie || 'general',
     title,
-    description: rec.description || '',
+    description: rec.description || rec.explication || '',
     impact: rec.impact || '',
     impactBusiness: rec.impactBusiness || rec.impact_business || '',
     action: rec.action || title,
-    difficulty: rec.difficulty || rec.difficulte || 'Moyenne',
-    time: rec.time || rec.temps || '',
+    howTo: rec.comment_implémenter || rec.comment_implementer || '',
+    difficulty: rec.difficulty || rec.difficulte || getFaultDifficultyPdf(rec.faultType),
+    time: rec.time || rec.temps || getFaultTimePdf(rec.faultType),
+    faultType: rec.faultType || 'default',
   };
+}
+
+const PDF_FAULT_TIME_MAP = {
+  ssl_expired: '10 minutes', ssl_misconfigured: '20 minutes', hsts_missing: '15 minutes',
+  csp_missing: '30 minutes', xframe_missing: '10 minutes', xcontent_missing: '10 minutes',
+  mixed_content: '45 minutes', images_unoptimized: '20 minutes', cache_missing: '15 minutes',
+  gzip_disabled: '10 minutes', js_render_blocking: '1 heure', css_render_blocking: '45 minutes',
+  meta_title_missing: '5 minutes', meta_description_missing: '5 minutes', h1_missing: '5 minutes',
+  alt_missing: '15 minutes', sitemap_missing: '20 minutes', robots_missing: '10 minutes',
+  xss_vulnerability: '2 a 4 heures', sql_injection: '3 a 6 heures',
+  wordpress_outdated: '15 minutes', plugin_outdated: '10 minutes',
+  no_https_redirect: '15 minutes', mobile_not_responsive: '2 a 8 heures',
+  malware: '4 a 8 heures', https_missing: '30 minutes', headers_missing: '30 a 60 minutes',
+  sensitive_files: '1 a 2 heures', lcp_slow: '2 a 4 heures', cls_unstable: '1 a 2 heures',
+  page_weight_heavy: '2 a 3 heures', open_graph_missing: '20 minutes',
+  canonical_missing: '15 minutes', h1_multiple: '15 minutes', default: '30 minutes',
+};
+
+const PDF_FAULT_DIFFICULTY_MAP = {
+  ssl_expired: 'Facile', ssl_misconfigured: 'Intermediaire', hsts_missing: 'Technique',
+  csp_missing: 'Technique', xframe_missing: 'Intermediaire', xcontent_missing: 'Intermediaire',
+  mixed_content: 'Intermediaire', images_unoptimized: 'Facile', cache_missing: 'Intermediaire',
+  gzip_disabled: 'Intermediaire', js_render_blocking: 'Technique', css_render_blocking: 'Technique',
+  meta_title_missing: 'Facile', meta_description_missing: 'Facile', h1_missing: 'Facile',
+  alt_missing: 'Facile', sitemap_missing: 'Facile', robots_missing: 'Intermediaire',
+  xss_vulnerability: 'Expert', sql_injection: 'Expert', wordpress_outdated: 'Facile',
+  plugin_outdated: 'Facile', no_https_redirect: 'Intermediaire', mobile_not_responsive: 'Expert',
+  malware: 'Expert', https_missing: 'Intermediaire', headers_missing: 'Intermediaire',
+  sensitive_files: 'Intermediaire', lcp_slow: 'Technique', cls_unstable: 'Intermediaire',
+  page_weight_heavy: 'Intermediaire', open_graph_missing: 'Facile', canonical_missing: 'Facile',
+  h1_multiple: 'Facile', default: 'Intermediaire',
+};
+
+function getFaultTimePdf(faultType) {
+  return PDF_FAULT_TIME_MAP[faultType] || PDF_FAULT_TIME_MAP.default;
+}
+
+function getFaultDifficultyPdf(faultType) {
+  return PDF_FAULT_DIFFICULTY_MAP[faultType] || PDF_FAULT_DIFFICULTY_MAP.default;
+}
+
+function getDifficultyColor(difficulty) {
+  const d = String(difficulty || '').toLowerCase();
+  if (d.includes('facile')) return [0, 196, 140];
+  if (d.includes('intermediaire') || d.includes('intermédiaire')) return [255, 184, 0];
+  if (d.includes('technique')) return [255, 107, 53];
+  if (d.includes('expert')) return [255, 59, 59];
+  return [0, 212, 255];
 }
 
 function normalizeScores(scan) {
@@ -708,18 +758,46 @@ function drawRecommendations(doc, model, pageNum, totalPages) {
   }
 
   model.recommendations.forEach((rec, index) => {
-    if (y > pageHeight - 70) {
+    if (y > pageHeight - 90) {
       y = addNewPage(doc, model, pageNum, totalPages, "Plan d'action - suite");
     }
+
+    const accent = rec.priority === 'CRITIQUE' ? RED : rec.priority === 'AMELIORATION' ? GREEN : YELLOW;
+    const diffColor = getDifficultyColor(rec.difficulty);
+    const timeStr = t(rec.time, '30 minutes');
+    const diffStr = t(rec.difficulty, 'Intermediaire');
+
+    const blockH = 14;
+    doc.setFillColor(0, 30, 60);
+    doc.roundedRect(margin, y, contentWidth, blockH, 2, 2, 'F');
+    doc.setFillColor(0, 212, 255);
+    doc.roundedRect(margin, y, 2, blockH, 1, 1, 'F');
+
+    doc.setTextColor(0, 212, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.text(`Temps estime : ${timeStr}`, margin + 6, y + 5.5);
+
+    doc.setFillColor(...diffColor);
+    const diffLabel = `Difficulte : ${diffStr}`;
+    const diffLabelW = doc.getTextWidth(diffLabel) + 6;
+    const diffX = margin + 6 + doc.getTextWidth(`Temps estime : ${timeStr}`) + 16;
+    doc.roundedRect(diffX, y + 2, diffLabelW, 9, 1, 1, 'F');
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.text(diffLabel, diffX + 3, y + 7.5);
+
+    y += blockH + 2;
+
     const body = [
       rec.description,
       rec.impact ? `Impact : ${rec.impact}` : '',
       rec.impactBusiness ? `Impact business : ${rec.impactBusiness}` : '',
       `Action : ${rec.action}`,
-      `Difficulte : ${rec.difficulty}${rec.time ? ` - Temps estime : ${rec.time}` : ''}`,
+      rec.howTo ? `Comment : ${rec.howTo}` : '',
     ].filter(Boolean).join(' ');
-    const accent = rec.priority === 'CRITIQUE' ? RED : rec.priority === 'AMELIORATION' ? GREEN : YELLOW;
-    y = paragraphBlock(doc, `${index + 1}. ${rec.title}`, body, margin, y, contentWidth, { accent, maxLines: 9 });
+    y = paragraphBlock(doc, `${index + 1}. ${rec.title}`, body, margin, y, contentWidth, { accent, maxLines: 10 });
   });
 
   y = Math.min(y + 4, pageHeight - 42);

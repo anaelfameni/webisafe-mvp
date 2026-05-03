@@ -108,7 +108,11 @@ function buildActionPlan(recommendations) {
   const categories = [...new Set(recommendations.map((item) => normalizeCategory(item.category)))];
   const categoryText = categories.length > 0 ? categories.join(', ') : 'les points techniques identifies';
 
-  return `Plan d'action global : respectez cet ordre de correction en commencant par securiser les failles critiques, puis corrigez les problemes importants qui penalisent la performance, la visibilite et l'experience utilisateur, avant de finaliser les ameliorations de fond sur ${categoryText}. Cette logique permet d'eviter de corriger un detail pendant qu'un risque plus grave continue de nuire a votre site. Faire ces corrections vous-meme sans methodologie claire peut creer des erreurs de configuration, casser certaines pages, degrader le referencement ou rouvrir une faille sans le vouloir. Webisafe peut prendre en charge l'ensemble de la correction, prioriser les interventions, securiser chaque mise a jour et vous livrer un resultat fiable sans exposition inutile pour votre activite.`;
+  const base = `Plan d'action global : respectez cet ordre de correction en commencant par securiser les failles critiques, puis corrigez les problemes importants qui penalisent la performance, la visibilite et l'experience utilisateur, avant de finaliser les ameliorations de fond sur ${categoryText}. Cette logique permet d'eviter de corriger un detail pendant qu'un risque plus grave continue de nuire a votre site. Faire ces corrections vous-meme sans methodologie claire peut creer des erreurs de configuration, casser certaines pages, degrader le referencement ou rouvrir une faille sans le vouloir.`;
+
+  const cta = `Avec le rapport complet vous accederez a la liste detaillee des failles et recevrez un plan de correction priorise et exploitable. Sans ces informations vous risquez de perdre clients,visibilite et revenus ; en agissant vous protegerez vos visiteurs, augmenterez la confiance et transformerez votre trafic en conversions mesurables.`;
+
+  return `${base} ${cta}`;
 }
 
 export function buildPremiumExplanationParagraphs(recommendations = []) {
@@ -134,5 +138,17 @@ export function buildPremiumExplanationParagraphs(recommendations = []) {
 
   paragraphs.push(buildActionPlan(normalizedRecommendations));
 
-  return paragraphs;
+  // Capitalize first alphabetical character of each paragraph for presentation
+  function capitalizeParagraph(text = '') {
+    const s = String(text || '');
+    for (let i = 0; i < s.length; i++) {
+      const ch = s.charAt(i);
+      if (/[a-zA-ZàâäéèêëïîôöùûüçœÀÂÄÉÈÊËÏÎÔÖÙÛÜÇŒ]/.test(ch)) {
+        return s.slice(0, i) + ch.toUpperCase() + s.slice(i + 1);
+      }
+    }
+    return s;
+  }
+
+  return paragraphs.map(capitalizeParagraph);
 }

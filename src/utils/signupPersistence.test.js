@@ -10,7 +10,7 @@ test('buildSignupRecord maps signup coordinates for Supabase storage', () => {
     id: 'user_123',
     name: 'Ada Lovelace',
     email: 'ada@example.com',
-    phone: '+2250700000000',
+    phone: '+2250595335662',
     phoneCountry: 'CI',
     createdAt,
   });
@@ -19,7 +19,7 @@ test('buildSignupRecord maps signup coordinates for Supabase storage', () => {
     id: 'user_123',
     name: 'Ada Lovelace',
     email: 'ada@example.com',
-    phone: '+2250700000000',
+    phone: '+2250595335662',
     phone_country: 'CI',
     created_at: createdAt,
   });

@@ -78,6 +78,35 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
     const prioriteLabel = getPrioriteLabel(recommendation.priorite);
     const difficulte = String(recommendation.difficulte || '').split(':')[0].trim();
     const temps = String(recommendation.temps || '');
+    const roiLabel = (Number(recommendation.priorite) <= 2) ? 'ROI élevé' : (Number(recommendation.priorite) <= 4 ? 'ROI moyen' : 'ROI faible');
+
+    // Mask sensitive content for critical recommendations (server-side criticals)
+    const maskSensitive = Boolean(recommendation._mask_sensitive || recommendation.maskSensitive || recommendation.priorite === 1 || recommendation.priority === 'CRITIQUE');
+
+    if (maskSensitive) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: Math.min(index * 0.08, 0.5) }}
+          className={`bg-card-bg border ${style.borderColor} rounded-2xl p-5 relative overflow-hidden`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${style.badgeBg} ${style.badgeText}`}>
+              {recommendation.categorie}
+            </span>
+            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-red-600/10 text-red-300">🔴 Urgent</span>
+          </div>
+          <h4 className="text-white font-semibold text-sm mb-2">Problème critique détecté</h4>
+          <p className="text-text-secondary text-sm mb-3 leading-relaxed">
+            La nature exacte de cette faille est masquée pour des raisons de sécurité. Elle peut impacter directement la confiance ou les revenus de votre site. Débloquez le rapport complet pour obtenir la liste détaillée et le plan de correction priorisé.
+          </p>
+          <div className="mt-3">
+            <button className="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold">Obtenir le rapport complet</button>
+          </div>
+        </motion.div>
+      );
+    }
 
     return (
       <motion.div
@@ -90,7 +119,7 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
           <div className="absolute inset-0 bg-card-bg/60 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
             <div className="text-center p-4">
               <Lock size={24} className="text-white mx-auto mb-2" />
-              <p className="text-white text-sm font-medium">Contenu premium</p>
+              <p className="text-white text-sm font-medium">Audit premium</p>
             </div>
           </div>
         )}
@@ -104,12 +133,7 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
             <span className="text-white/50 text-xs">{prioriteLabel}</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {difficulte && (
-              <span className="text-white/40 text-xs whitespace-nowrap">{difficulte}</span>
-            )}
-            {temps && (
-              <span className="text-white/40 text-xs whitespace-nowrap">· {temps}</span>
-            )}
+            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/5 text-white/80">{roiLabel}</span>
           </div>
         </div>
 
@@ -151,7 +175,7 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
         <div className="absolute inset-0 bg-card-bg/60 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
           <div className="text-center p-4">
             <Lock size={24} className="text-white mx-auto mb-2" />
-            <p className="text-white text-sm font-medium">Contenu premium</p>
+            <p className="text-white text-sm font-medium">Audit premium</p>
           </div>
         </div>
       )}
@@ -160,8 +184,8 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
         <span className={`text-xs font-semibold px-3 py-1 rounded-full ${config.badgeBg} ${config.badgeText}`}>
           {config.label}
         </span>
-        <span className="text-white/40 text-xs">
-          {recommendation.difficulty} · {recommendation.time}
+        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/5 text-white/80">
+          {recommendation.priority === 'CRITIQUE' ? 'ROI élevé' : (recommendation.priority === 'IMPORTANT' ? 'ROI moyen' : 'ROI faible')}
         </span>
       </div>
 

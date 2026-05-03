@@ -9,6 +9,42 @@
       "regions": [
         "cpt1"
       ]
+    },
+    "api/subscribe.js": {
+      "memory": 256,
+      "maxDuration": 15
+    },
+    "api/history/[user_id].js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
+    "api/uptime/[user_id].js": {
+      "memory": 256,
+      "maxDuration": 15
+    },
+    "api/badge/[site_url].js": {
+      "memory": 128,
+      "maxDuration": 5
+    },
+    "api/cron/monthly-scan.js": {
+      "memory": 512,
+      "maxDuration": 60
+    },
+    "api/cron/ssl-check.js": {
+      "memory": 256,
+      "maxDuration": 30
+    },
+    "api/subscriptions.js": {
+      "memory": 128,
+      "maxDuration": 10
+    },
+    "api/confirm-subscription.js": {
+      "memory": 128,
+      "maxDuration": 10
+    },
+    "api/reject-subscription.js": {
+      "memory": 128,
+      "maxDuration": 10
     }
   },
   "headers": [

@@ -34,6 +34,7 @@ test('runFullAnalysis sends localhost scans to the backend with HTTP protocol', 
 
     assert.equal(requestBody.url, 'http://localhost:5173/');
     assert.equal(requestBody.email, 'client@test.com');
+    assert.equal(requestBody.force_refresh, true);
     assert.equal(result.success, true);
   } finally {
     globalThis.fetch = originalFetch;

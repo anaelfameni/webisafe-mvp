@@ -34,7 +34,7 @@ export async function sendResendEmail({ to, subject, html }) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Webisafe <contact@webisafe.ci>',
+      from: 'Webisafe <webisafe@gmail.com>',
       to: Array.isArray(to) ? to : [to],
       subject,
       html,

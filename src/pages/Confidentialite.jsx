@@ -22,7 +22,7 @@ export default function Confidentialite() {
             <h2 className="text-lg font-semibold text-white mb-3">Responsable du traitement</h2>
             <p>
               Anael FAMENI — Abidjan, Côte d'Ivoire<br />
-              Contact : <a href="mailto:contact@webisafe.tech" className="text-primary hover:underline">contact@webisafe.tech</a>
+              Contact : <a href="mailto:webisafe@gmail.com" className="text-primary hover:underline">contact@webisafe.tech</a>
             </p>
           </section>
 

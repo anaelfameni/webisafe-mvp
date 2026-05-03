@@ -408,6 +408,7 @@ export async function scanSecurity(url, vtApiKey) {
     malware_detected: malwareDetected,
     observatory_score: observatoryScore,
     https: isHttps,
+    finalUrl: headersData.finalUrl ?? url,
     ssl_grade: sslData.grade !== 'N/A' ? sslData.grade : headersData.ssl_grade,
     headers_presents: headersData.headers_presents,
     headers_manquants: headersData.headers_manquants,

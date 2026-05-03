@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -18,10 +18,21 @@ import CGU from './pages/CGU';
 import Confidentialite from './pages/Confidentialite';
 import APropos from './pages/APropos';
 import NotFound from './pages/NotFound';
+import Protect from './pages/Protect';
 
 function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, handleAuth }) {
   const location = useLocation();
-  const isAdminRoute = location.pathname === '/admin';
+  const navigate = useNavigate();
+  const isFullscreenRoute = location.pathname === '/admin' || location.pathname === '/dashboard';
+
+  const handleAuthAndRedirect = (mode, data) => {
+    const result = handleAuth(mode, data);
+    if (result?.success && result?.redirectTo) {
+      setShowAuth(false);
+      navigate(result.redirectTo, { replace: true });
+    }
+    return result;
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -39,7 +50,7 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
 
   return (
     <div className="min-h-screen bg-dark-navy text-text-primary font-inter">
-      {!isAdminRoute && (
+      {!isFullscreenRoute && (
         <Header
           user={user}
           onLogout={logout}
@@ -76,18 +87,19 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
           <Route path="/cgu" element={<CGU />} />
           <Route path="/confidentialite" element={<Confidentialite />} />
           <Route path="/a-propos" element={<APropos />} />
+          <Route path="/protect" element={<Protect />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
 
-      {!isAdminRoute && <Footer />}
+      {!isFullscreenRoute && <Footer />}
 
-      {!isAdminRoute && (
+      {!isFullscreenRoute && (
         <AuthModal
           isOpen={showAuth}
           initialMode={authMode}
           onClose={() => setShowAuth(false)}
-          onAuth={handleAuth}
+          onAuth={handleAuthAndRedirect}
         />
       )}
     </div>
@@ -107,11 +119,21 @@ function App() {
     return login(data.email, data.password);
   };
 
+  const handleAuthWithRedirect = (mode, data) => {
+    const result = handleAuth(mode, data);
+    return result;
+  };
+
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/';
+  };
+
   return (
     <Router>
       <AppShell
         user={user}
-        logout={logout}
+        logout={handleLogout}
         showAuth={showAuth}
         setShowAuth={setShowAuth}
         authMode={authMode}

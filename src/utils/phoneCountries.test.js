@@ -32,7 +32,7 @@ test('exposes a comprehensive country list and a default selection', () => {
 
 test('normalizes local phone digits and builds an international number', () => {
   assert.equal(normalizePhoneDigits('07 00-00-00 00'), '0700000000');
-  assert.equal(buildInternationalPhone('CI', '07 00 00 00 00'), '+2250700000000');
+  assert.equal(buildInternationalPhone('CI', '07 00 00 00 00'), '+2250595335662');
   assert.equal(buildInternationalPhone('FR', '06 12 34 56 78'), '+330612345678');
 });
 
