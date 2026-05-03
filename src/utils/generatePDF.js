@@ -351,125 +351,161 @@ export function buildPdfAuditModel(scan = {}) {
   return model;
 }
 
-const BLUE = [21, 102, 240];
-const DARK_BG = [13, 27, 42];
-const PANEL = [15, 30, 55];
-const PANEL_ALT = [20, 40, 70];
-const WHITE = [255, 255, 255];
-const GRAY = [148, 163, 184];
-const LIGHT = [226, 232, 240];
-const GREEN = [34, 197, 94];
-const YELLOW = [234, 179, 8];
-const RED = [239, 68, 68];
+// ── Design System ── Couleurs identiques au site Webisafe ──
+const C_PRIMARY = [21, 102, 240];        // #1566F0
+const C_PRIMARY_LT = [56, 189, 248];     // #38BDF8
+const C_DARK = [15, 23, 42];             // #0F172A
+const C_CARD = [30, 41, 59];             // #1E293B
+const C_CARD_HOVER = [38, 53, 72];       // #263548
+const C_BORDER = [51, 65, 85];           // #334155
+const C_WHITE = [255, 255, 255];         // #F8FAFC
+const C_TEXT_SEC = [148, 163, 184];      // #94A3B8
+const C_LIGHT = [226, 232, 240];
+const C_SUCCESS = [34, 197, 94];         // #22C55E
+const C_WARNING = [249, 115, 22];        // #F97316
+const C_DANGER = [239, 68, 68];          // #EF4444
 
+// ── Helpers de dessin ──
 function drawBackground(doc) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  doc.setFillColor(...DARK_BG);
-  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  doc.setFillColor(...C_DARK);
+  doc.rect(0, 0, pw, ph, 'F');
 }
 
-function drawLogo(doc, x, y) {
-  doc.setFillColor(...BLUE);
-  doc.roundedRect(x, y, 10, 10, 2, 2, 'F');
-  doc.setTextColor(...WHITE);
+function drawLogo(doc, x, y, size = 10) {
+  doc.setFillColor(...C_PRIMARY);
+  doc.roundedRect(x, y, size, size, 2, 2, 'F');
+  doc.setTextColor(...C_WHITE);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text('W', x + 5, y + 7, { align: 'center' });
+  doc.setFontSize(size * 0.75);
+  doc.text('W', x + size / 2, y + size * 0.72, { align: 'center' });
 }
 
 function addHeader(doc, title, domain) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  doc.setFillColor(...BLUE);
-  doc.rect(0, 0, pageWidth, 8, 'F');
+  const pw = doc.internal.pageSize.getWidth();
+  doc.setFillColor(...C_PRIMARY);
+  doc.rect(0, 0, pw, 10, 'F');
   doc.setTextColor(219, 234, 254);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.text(`${t(title)} - ${t(domain)}`, pageWidth / 2, 5.5, { align: 'center' });
+  doc.setFontSize(8);
+  doc.text(`${t(title)}  |  ${t(domain)}`, pw / 2, 6.5, { align: 'center' });
 }
 
 function addFooter(doc, pageNum, totalPages, domain) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  doc.setFillColor(...DARK_BG);
-  doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
-  doc.setFillColor(...BLUE);
-  doc.rect(0, pageHeight - 12, pageWidth, 1, 'F');
-  doc.setTextColor(...GRAY);
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  doc.setFillColor(...C_DARK);
+  doc.rect(0, ph - 14, pw, 14, 'F');
+  doc.setDrawColor(...C_BORDER);
+  doc.setLineWidth(0.3);
+  doc.line(18, ph - 14, pw - 18, ph - 14);
+  doc.setTextColor(...C_TEXT_SEC);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.text(`Webisafe - Audit de ${t(domain)}`, 18, pageHeight - 5);
-  doc.text(`Page ${pageNum} / ${totalPages}`, pageWidth - 18, pageHeight - 5, { align: 'right' });
-  doc.text('webisafe.tech', pageWidth / 2, pageHeight - 5, { align: 'center' });
+  doc.setFontSize(7.5);
+  doc.text(`Webisafe - Audit de ${t(domain)}`, 18, ph - 5);
+  doc.text(`Page ${pageNum} / ${totalPages}`, pw - 18, ph - 5, { align: 'right' });
+  doc.text('webisafe.tech', pw / 2, ph - 5, { align: 'center' });
 }
 
 function sectionTitle(doc, title, y, margin = 18) {
-  doc.setFillColor(...BLUE);
-  doc.rect(margin, y, 3, 8, 'F');
-  doc.setTextColor(...WHITE);
+  doc.setFillColor(...C_PRIMARY);
+  doc.rect(margin, y, 3.5, 9, 'F');
+  doc.setTextColor(...C_WHITE);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.text(t(title), margin + 7, y + 6);
-  return y + 13;
+  doc.setFontSize(14);
+  doc.text(t(title), margin + 9, y + 6.8);
+  doc.setDrawColor(...C_BORDER);
+  doc.setLineWidth(0.3);
+  doc.line(margin, y + 13, doc.internal.pageSize.getWidth() - margin, y + 13);
+  return y + 19;
+}
+
+function subtitle(doc, text, x, y) {
+  doc.setTextColor(...C_PRIMARY_LT);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(t(text), x, y);
+  return y + 5;
 }
 
 function paragraphBlock(doc, title, text, x, y, w, options = {}) {
-  const lines = doc.splitTextToSize(t(text), w - 12);
+  const lines = doc.splitTextToSize(t(text), w - 14);
   const maxLines = options.maxLines || lines.length;
   const used = lines.slice(0, maxLines);
-  const h = 14 + used.length * 4.5;
-  doc.setFillColor(...(options.fill || PANEL));
+  const h = 16 + used.length * 4.8;
+  doc.setFillColor(...(options.fill || C_CARD));
   doc.roundedRect(x, y, w, h, 3, 3, 'F');
-  doc.setFillColor(...(options.accent || BLUE));
-  doc.roundedRect(x, y, 2, h, 1, 1, 'F');
-  doc.setTextColor(...WHITE);
+  doc.setDrawColor(...C_BORDER);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(x, y, w, h, 3, 3, 'S');
+  const accent = options.accent || C_PRIMARY;
+  doc.setFillColor(...accent);
+  doc.roundedRect(x, y, 2.5, h, 1, 1, 'F');
+  doc.setTextColor(...C_WHITE);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(options.titleSize || 9);
-  doc.text(t(title), x + 6, y + 8);
-  doc.setTextColor(...(options.textColor || LIGHT));
+  doc.setFontSize(options.titleSize || 9.5);
+  doc.text(t(title), x + 8, y + 9);
+  doc.setTextColor(...(options.textColor || C_LIGHT));
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(options.fontSize || 7.5);
+  doc.setFontSize(options.fontSize || 7.8);
   used.forEach((line, index) => {
-    doc.text(line, x + 6, y + 15 + index * 4.5);
+    doc.text(line, x + 8, y + 16.5 + index * 4.8);
   });
-  return y + h + 5;
+  return y + h + 6;
 }
 
-function scoreCard(doc, x, y, w, label, score) {
-  const color = scoreRgb(score);
-  doc.setFillColor(...PANEL);
-  doc.roundedRect(x, y, w, 26, 3, 3, 'F');
+function infoCard(doc, x, y, w, label, value, color, options = {}) {
+  const h = options.height || 26;
+  doc.setFillColor(...C_CARD);
+  doc.roundedRect(x, y, w, h, 3, 3, 'F');
+  doc.setDrawColor(...C_BORDER);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(x, y, w, h, 3, 3, 'S');
   doc.setFillColor(...color);
-  doc.roundedRect(x, y, w, 2, 1, 1, 'F');
+  doc.roundedRect(x, y, w, 2.5, 1.5, 1.5, 'F');
   doc.setTextColor(...color);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text(score != null ? `${score}` : 'N/A', x + w / 2, y + 12, { align: 'center' });
-  doc.setTextColor(...GRAY);
+  doc.setFontSize(options.valueSize || 15);
+  const displayValue = value != null ? `${value}` : 'N/A';
+  doc.text(displayValue, x + w / 2, y + 11, { align: 'center' });
+  doc.setTextColor(...C_TEXT_SEC);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.text(t(label), x + w / 2, y + 20, { align: 'center' });
+  doc.text(t(label), x + w / 2, y + 19, { align: 'center' });
+}
+
+function drawProgressBar(doc, x, y, w, h, value, max, color) {
+  doc.setFillColor(...C_BORDER);
+  doc.roundedRect(x, y, w, h, h / 2, h / 2, 'F');
+  const pct = Math.min(Math.max((value || 0) / (max || 100), 0), 1);
+  if (pct > 0) {
+    doc.setFillColor(...color);
+    doc.roundedRect(x, y, w * pct, h, h / 2, h / 2, 'F');
+  }
+}
+
+function drawBadge(doc, text, x, y, color, bgColor = null) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  const padding = 3.5;
+  const tw = doc.getTextWidth(text) + padding * 2;
+  const bg = bgColor || [color[0], color[1], color[2]];
+  doc.setFillColor(...bg);
+  doc.roundedRect(x, y, tw, 10, 2, 2, 'F');
+  doc.setTextColor(...color);
+  doc.text(text, x + padding, y + 6.5);
+  return tw;
 }
 
 function drawMetricCards(doc, items, x, y, w) {
-  const cardW = (w - 6) / 4;
+  const cardW = (w - 9) / 4;
   items.slice(0, 4).forEach((item, index) => {
-    const cardX = x + index * (cardW + 2);
+    const cardX = x + index * (cardW + 3);
     const color = statusColor(item.status);
-    doc.setFillColor(...PANEL);
-    doc.roundedRect(cardX, y, cardW, 20, 2, 2, 'F');
-    doc.setFillColor(...color);
-    doc.roundedRect(cardX, y, cardW, 2, 1, 1, 'F');
-    doc.setTextColor(...color);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text(t(item.value), cardX + cardW / 2, y + 9, { align: 'center' });
-    doc.setTextColor(...GRAY);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.2);
-    doc.text(t(item.label), cardX + cardW / 2, y + 15.5, { align: 'center' });
+    infoCard(doc, cardX, y, cardW, item.label, item.value, color);
   });
-  return y + 25;
+  return y + 32;
 }
 
 function drawTable(doc, y, head, body, margin = 18) {
@@ -478,12 +514,34 @@ function drawTable(doc, y, head, body, margin = 18) {
     margin: { left: margin, right: margin },
     head: [head.map((item) => t(item))],
     body: body.map((row) => row.map((cell) => t(cell))),
-    headStyles: { fillColor: BLUE, textColor: WHITE, fontSize: 8, fontStyle: 'bold' },
-    bodyStyles: { fontSize: 7.2, textColor: LIGHT, fillColor: PANEL, cellPadding: 2.5 },
-    alternateRowStyles: { fillColor: PANEL_ALT },
-    styles: { overflow: 'linebreak', lineColor: [30, 58, 95], lineWidth: 0.1 },
+    headStyles: {
+      fillColor: C_PRIMARY,
+      textColor: C_WHITE,
+      fontSize: 8.5,
+      fontStyle: 'bold',
+      cellPadding: 3,
+      lineColor: C_BORDER,
+      lineWidth: 0.2,
+    },
+    bodyStyles: {
+      fontSize: 7.5,
+      textColor: C_LIGHT,
+      fillColor: C_CARD,
+      cellPadding: 3,
+      lineColor: C_BORDER,
+      lineWidth: 0.15,
+    },
+    alternateRowStyles: { fillColor: C_CARD_HOVER },
+    styles: {
+      overflow: 'linebreak',
+      font: 'helvetica',
+      minCellHeight: 10,
+    },
+    columnStyles: {
+      0: { fontStyle: 'bold', textColor: C_WHITE },
+    },
   });
-  return doc.lastAutoTable.finalY + 9;
+  return doc.lastAutoTable.finalY + 10;
 }
 
 function addNewPage(doc, model, pageNum, totalPages, title) {
@@ -516,137 +574,219 @@ function formatScanDate(model) {
 }
 
 function drawCover(doc, model, totalPages) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
   const margin = 18;
-  const contentWidth = pageWidth - margin * 2;
+  const cw = pw - margin * 2;
   drawBackground(doc);
 
-  doc.setFillColor(...BLUE);
-  doc.rect(0, 0, pageWidth, 68, 'F');
-  doc.setFillColor(10, 60, 160);
-  doc.rect(0, 0, pageWidth / 2, 68, 'F');
+  // ── Bandeau haut dégradé ──
+  doc.setFillColor(...C_PRIMARY);
+  doc.rect(0, 0, pw, 72, 'F');
+  doc.setFillColor(18, 88, 200);
+  doc.rect(0, 0, pw * 0.55, 72, 'F');
 
-  drawLogo(doc, margin, 15);
-  doc.setTextColor(...WHITE);
+  // Logo + marque
+  drawLogo(doc, margin, 16, 11);
+  doc.setTextColor(...C_WHITE);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text('Webi', margin + 14, 23);
+  doc.setFontSize(19);
+  doc.text('Webi', margin + 15, 24);
   doc.setTextColor(147, 197, 253);
-  doc.text('safe', margin + 14 + doc.getTextWidth('Webi'), 23);
-  doc.setTextColor(219, 234, 254);
+  doc.text('safe', margin + 15 + doc.getTextWidth('Webi'), 24);
+  doc.setTextColor(186, 230, 253);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text('Audit Web Professionnel', margin + 14, 30);
+  doc.text('Audit Web Professionnel', margin + 15, 31);
 
-  doc.setTextColor(...WHITE);
+  // Titre principal
+  doc.setTextColor(...C_WHITE);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(25);
-  doc.text("Rapport d'Audit Premium", pageWidth / 2, 49, { align: 'center' });
+  doc.setFontSize(26);
+  doc.text("Rapport d'Audit Premium", pw / 2, 52, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(13);
+  doc.setFontSize(14);
   doc.setTextColor(186, 230, 253);
-  doc.text(model.domain, pageWidth / 2, 60, { align: 'center' });
+  doc.text(model.domain, pw / 2, 64, { align: 'center' });
 
-  const centerY = 110;
-  const bigR = 28;
+  // ── Score global ── jauge circulaire
+  const gaugeY = 106;
+  const outerR = 30;
+  const innerR = 24;
   const rgb = scoreRgb(model.scores.global);
-  doc.setFillColor(rgb[0] * 0.18, rgb[1] * 0.18, rgb[2] * 0.18);
-  doc.circle(pageWidth / 2, centerY, bigR + 8, 'F');
-  doc.setFillColor(...rgb);
-  doc.circle(pageWidth / 2, centerY, bigR, 'F');
-  doc.setTextColor(...WHITE);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(30);
-  doc.text(`${model.scores.global}`, pageWidth / 2, centerY + 5, { align: 'center' });
-  doc.setFontSize(10);
-  doc.text('/100', pageWidth / 2, centerY + 14, { align: 'center' });
-  doc.setTextColor(...rgb);
-  doc.setFontSize(12);
-  doc.text(getScoreLabel(model.scores.global).toUpperCase(), pageWidth / 2, centerY + 41, { align: 'center' });
 
+  // Cercle extérieur (track)
+  doc.setFillColor(...C_CARD);
+  doc.circle(pw / 2, gaugeY, outerR, 'F');
+  doc.setDrawColor(...C_BORDER);
+  doc.setLineWidth(0.5);
+  doc.circle(pw / 2, gaugeY, outerR, 'S');
+
+  // Cercle intérieur avec couleur score
+  doc.setFillColor(rgb[0] * 0.22, rgb[1] * 0.22, rgb[2] * 0.22);
+  doc.circle(pw / 2, gaugeY, outerR - 2, 'F');
+  doc.setFillColor(...rgb);
+  doc.circle(pw / 2, gaugeY, innerR, 'F');
+
+  // Score texte
+  doc.setTextColor(...C_WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(32);
+  doc.text(`${model.scores.global ?? 'N/A'}`, pw / 2, gaugeY + 6, { align: 'center' });
+  doc.setFontSize(11);
+  doc.text('/100', pw / 2, gaugeY + 16, { align: 'center' });
+  doc.setTextColor(...rgb);
+  doc.setFontSize(13);
+  doc.text(getScoreLabel(model.scores.global).toUpperCase(), pw / 2, gaugeY + 44, { align: 'center' });
+
+  // ── 4 cartes scores avec barres de progression ──
+  const cardY = 162;
+  const cardW = (cw - 12) / 4;
   const cards = [
-    ['Performance', model.scores.performance],
-    ['Securite', model.scores.security],
-    ['SEO', model.scores.seo],
-    ['UX Mobile', model.scores.ux],
+    ['Performance', model.scores.performance, 'performance'],
+    ['Securite', model.scores.security, 'securite'],
+    ['SEO', model.scores.seo, 'seo'],
+    ['UX Mobile', model.scores.ux, 'ux'],
   ];
-  const cardY = 165;
-  const cardW = (contentWidth - 9) / 4;
   cards.forEach(([label, score], index) => {
-    scoreCard(doc, margin + index * (cardW + 3), cardY, cardW, label, score);
+    const cx = margin + index * (cardW + 4);
+    const cRgb = scoreRgb(score);
+    infoCard(doc, cx, cardY, cardW, label, score != null ? `${score}` : 'N/A', cRgb);
+    // Mini barre de progression
+    if (score != null) {
+      drawProgressBar(doc, cx + 4, cardY + 22, cardW - 8, 2.5, score, 100, cRgb);
+    }
   });
 
-  let y = 207;
-  y = paragraphBlock(
-    doc,
-    'Contexte de mesure',
-    `${model.scanOrigin.label} : ${model.scanOrigin.city || 'region'} ${model.scanOrigin.country || ''} (${model.scanOrigin.region_code}). ${model.scanOrigin.note || 'Les mesures locales de disponibilite et de latence utilisent le point de scan Webisafe disponible.'}`,
-    margin,
-    y,
-    contentWidth,
-    { maxLines: 4, accent: GREEN }
-  );
-  y = paragraphBlock(doc, 'Synthese executive', model.executiveSummary, margin, y, contentWidth, { maxLines: 8 });
+  // ── Résumé exécutif ──
+  let y = cardY + 36;
+  y = paragraphBlock(doc, 'Synthese executive', model.executiveSummary, margin, y, cw, {
+    maxLines: 7,
+    accent: C_PRIMARY_LT,
+    titleSize: 10,
+  });
 
-  doc.setFillColor(...PANEL);
-  doc.roundedRect(margin, pageHeight - 38, contentWidth, 18, 3, 3, 'F');
-  doc.setTextColor(...GRAY);
+  // ── Métadonnées scan ──
+  y += 3;
+  const metaItems = [
+    `Site analyse : ${t(model.url || model.domain)}`,
+    `Date du scan : ${t(formatScanDate(model))}`,
+    `Contexte : ${model.scanOrigin.label}${model.scanOrigin.city ? ` — ${model.scanOrigin.city}` : ''}`,
+    `Recommandations : ${model.recommendations.length}`,
+    `Alertes critiques : ${model.criticalAlerts.length}`,
+  ];
+  const metaText = metaItems.join('  |  ');
+  y = paragraphBlock(doc, 'Informations scan', metaText, margin, y, cw, {
+    maxLines: 3,
+    accent: C_SUCCESS,
+    fontSize: 7.5,
+  });
+
+  // ── Pied de page ──
+  doc.setFillColor(...C_CARD);
+  doc.roundedRect(margin, ph - 36, cw, 22, 3, 3, 'F');
+  doc.setDrawColor(...C_BORDER);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(margin, ph - 36, cw, 22, 3, 3, 'S');
+  doc.setTextColor(...C_TEXT_SEC);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(`Site analyse : ${t(model.url || model.domain)}`, margin + 5, pageHeight - 31);
-  doc.text(`Date : ${t(formatScanDate(model))}`, margin + 5, pageHeight - 24);
-  doc.text('Genere par Webisafe - webisafe.tech', pageWidth - margin - 5, pageHeight - 28, { align: 'right' });
+  doc.text('Ce rapport a ete genere automatiquement par Webisafe (webisafe.tech).', margin + 5, ph - 28);
+  doc.text('Les scores et recommandations sont basees sur une analyse technique en date du scan.', margin + 5, ph - 22);
+  doc.setTextColor(...C_PRIMARY_LT);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Confidentiel - Usage interne uniquement', pw - margin - 5, ph - 22, { align: 'right' });
+
   addFooter(doc, 1, totalPages, model.domain);
 }
 
 function drawAlertsAndNarrative(doc, model, pageNum, totalPages) {
   const margin = 18;
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  const ph = doc.internal.pageSize.getHeight();
+  const cw = doc.internal.pageSize.getWidth() - margin * 2;
   let y = addNewPage(doc, model, pageNum, totalPages, 'Lecture experte');
   y = sectionTitle(doc, 'Alertes et lecture experte', y, margin);
 
-  if (model.criticalAlerts.length > 0) {
+  // ── Compteur d'alertes ──
+  const alertCount = model.criticalAlerts.length;
+  doc.setFillColor(...C_CARD);
+  doc.roundedRect(margin, y, cw, 18, 3, 3, 'F');
+  doc.setDrawColor(...C_BORDER);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(margin, y, cw, 18, 3, 3, 'S');
+  doc.setFillColor(...(alertCount > 0 ? C_DANGER : C_SUCCESS));
+  doc.roundedRect(margin, y, 2.5, 18, 1, 1, 'F');
+  doc.setTextColor(...C_WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(alertCount > 0 ? `${alertCount} alerte(s) critique(s) detectee(s)` : 'Aucune alerte critique detectee', margin + 8, y + 10);
+  doc.setTextColor(...C_TEXT_SEC);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(
+    alertCount > 0
+      ? 'Ces alertes doivent etre traitees en priorite avant toute optimisation secondaire.'
+      : 'Le scan n a remonte aucune alerte prioritaire critique necessitant une action immediate.',
+    margin + 8, y + 15
+  );
+  y += 24;
+
+  if (alertCount > 0) {
     model.criticalAlerts.forEach((alert) => {
+      const isCritical = String(alert.severity).toLowerCase() === 'critical';
+      const accent = isCritical ? C_DANGER : C_WARNING;
+      const badgeColor = isCritical ? C_DANGER : C_WARNING;
+      const badgeText = isCritical ? 'CRITIQUE' : 'AVERTISSEMENT';
+
       const text = [alert.message, alert.impact ? `Impact : ${alert.impact}` : '', alert.recommendation ? `Conseil : ${alert.recommendation}` : ''].filter(Boolean).join(' ');
-      y = paragraphBlock(doc, alert.title || 'Alerte', text, margin, y, contentWidth, {
-        accent: String(alert.severity).toLowerCase() === 'critical' ? RED : YELLOW,
-        maxLines: 4,
+
+      // Badge de sévérité
+      const badgeW = drawBadge(doc, badgeText, margin + 8, y + 2, badgeColor, [badgeColor[0], badgeColor[1], badgeColor[2]]);
+      y += 14;
+
+      y = paragraphBlock(doc, alert.title || 'Alerte', text, margin, y, cw, {
+        accent,
+        maxLines: 5,
       });
     });
-  } else {
-    y = paragraphBlock(doc, 'Aucune alerte critique', 'Aucune alerte critique prioritaire n a ete remontee par le scan.', margin, y, contentWidth, { accent: GREEN });
   }
 
-  y += 2;
+  y += 4;
   y = sectionTitle(doc, model.narrative.title, y, margin);
   model.narrative.paragraphs.forEach((paragraph, index) => {
-    if (y > pageHeight - 58) {
+    if (y > ph - 60) {
       y = addNewPage(doc, model, pageNum, totalPages, 'Lecture experte - suite');
+      y = sectionTitle(doc, model.narrative.title + ' (suite)', y, margin);
     }
-    y = paragraphBlock(doc, index === 0 ? 'Vue globale' : `Point ${index}`, paragraph, margin, y, contentWidth, { maxLines: index === 0 ? 8 : 10 });
+    y = paragraphBlock(doc, index === 0 ? 'Vue globale' : `Point ${index}`, paragraph, margin, y, cw, {
+      maxLines: index === 0 ? 8 : 10,
+      accent: index === 0 ? C_PRIMARY_LT : C_PRIMARY,
+    });
   });
 }
 
 function drawPerformanceSecurity(doc, model, pageNum, totalPages) {
   const margin = 18;
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  const ph = doc.internal.pageSize.getHeight();
+  const cw = doc.internal.pageSize.getWidth() - margin * 2;
   let y = addNewPage(doc, model, pageNum, totalPages, 'Performance et securite');
 
+  // ── Performance ──
   y = sectionTitle(doc, 'Performance', y, margin);
-  y = drawMetricCards(doc, model.sections.performance.metrics, margin, y, contentWidth);
-  y = drawTable(
-    doc,
-    y,
-    ['Metrique', 'Valeur', 'Statut', 'Explication'],
-    model.sections.performance.metrics.map((item) => [item.label, item.value, item.status, item.explanation]),
-    margin
-  );
+  y = drawMetricCards(doc, model.sections.performance.metrics, margin, y, cw);
+  y += 4;
 
+  // Tableau avec couleurs de statut enrichies
+  const perfBody = model.sections.performance.metrics.map((item) => {
+    const color = statusColor(item.status);
+    return [item.label, item.value, item.status, item.explanation];
+  });
+  y = drawTable(doc, y, ['Metrique', 'Valeur', 'Statut', 'Explication'], perfBody, margin);
+
+  // Serveur
   const server = model.sections.performance.serverLocation;
   if (server) {
+    if (y > ph - 70) { y = addNewPage(doc, model, pageNum, totalPages, 'Performance - suite'); y = sectionTitle(doc, 'Performance (suite)', y, margin); }
     const serverText = [
       `Serveur : ${server.city || 'N/A'}, ${server.country || 'N/A'}`,
       server.isp ? `ISP : ${server.isp}` : '',
@@ -655,18 +795,20 @@ function drawPerformanceSecurity(doc, model, pageNum, totalPages) {
       server.latency_warning?.impact ? `Impact : ${server.latency_warning.impact}` : '',
       server.latency_warning?.recommendation ? `Conseil : ${server.latency_warning.recommendation}` : '',
     ].filter(Boolean).join(' ');
-    y = paragraphBlock(doc, 'Localisation serveur', serverText, margin, y, contentWidth, {
-      accent: server.latency_warning?.warning ? YELLOW : GREEN,
+    y = paragraphBlock(doc, 'Localisation serveur', serverText, margin, y, cw, {
+      accent: server.latency_warning?.warning ? C_WARNING : C_SUCCESS,
       maxLines: 6,
     });
   }
 
+  // Opportunités PageSpeed
   if (model.sections.performance.opportunities.length > 0) {
+    if (y > ph - 70) { y = addNewPage(doc, model, pageNum, totalPages, 'Performance - suite'); y = sectionTitle(doc, 'Performance (suite)', y, margin); }
+    y = subtitle(doc, 'Optimisations PageSpeed recommandees', margin, y);
     y = drawTable(
-      doc,
-      y,
-      ['Optimisation PageSpeed', 'Description', 'Gain estime'],
-      model.sections.performance.opportunities.slice(0, 5).map((op) => [
+      doc, y,
+      ['Optimisation', 'Description', 'Gain estime'],
+      model.sections.performance.opportunities.slice(0, 6).map((op) => [
         op.title,
         op.description || '',
         op.savings_ms != null ? `~${Math.round(op.savings_ms)} ms` : 'N/A',
@@ -675,69 +817,82 @@ function drawPerformanceSecurity(doc, model, pageNum, totalPages) {
     );
   }
 
-  if (y > pageHeight - 95) {
-    y = addNewPage(doc, model, pageNum, totalPages, 'Securite - suite');
-  }
+  // ── Sécurité ──
+  if (y > ph - 95) { y = addNewPage(doc, model, pageNum, totalPages, 'Securite'); y = sectionTitle(doc, 'Securite', y, margin); }
+  else { y += 6; y = sectionTitle(doc, 'Securite', y, margin); }
 
-  y = sectionTitle(doc, 'Securite', y, margin);
-  y = drawMetricCards(doc, model.sections.security.metrics, margin, y, contentWidth);
+  y = drawMetricCards(doc, model.sections.security.metrics, margin, y, cw);
+  y += 4;
   y = drawTable(
-    doc,
-    y,
+    doc, y,
     ['Controle', 'Resultat', 'Statut', 'Explication'],
     model.sections.security.metrics.map((item) => [item.label, item.value, item.status, item.explanation]),
     margin
   );
 
+  // Headers manquants
   if (model.sections.security.missingHeaders.length > 0) {
+    if (y > ph - 70) { y = addNewPage(doc, model, pageNum, totalPages, 'Securite - suite'); y = sectionTitle(doc, 'Securite (suite)', y, margin); }
+    y = subtitle(doc, 'Headers de securite manquants', margin, y);
     y = drawTable(
-      doc,
-      y,
+      doc, y,
       ['Header manquant', 'Message'],
       model.sections.security.missingHeaders.map((item) => [item.header, item.message || 'Protection absente ou incomplete']),
       margin
     );
   }
 
+  // Fichiers sensibles
   if (model.sections.security.sensitiveFiles?.critical) {
+    if (y > ph - 60) { y = addNewPage(doc, model, pageNum, totalPages, 'Securite - suite'); y = sectionTitle(doc, 'Securite (suite)', y, margin); }
     const files = normalizeList(model.sections.security.sensitiveFiles.exposed_files).join(', ');
-    y = paragraphBlock(doc, 'Fichiers sensibles exposes', `${model.sections.security.sensitiveFiles.alert_message || 'Fichiers sensibles detectes.'} Fichiers : ${files || 'N/A'}`, margin, y, contentWidth, { accent: RED, maxLines: 5 });
+    y = paragraphBlock(doc, 'Fichiers sensibles exposes', `${model.sections.security.sensitiveFiles.alert_message || 'Fichiers sensibles detectes.'} Fichiers : ${files || 'N/A'}`, margin, y, cw, { accent: C_DANGER, maxLines: 5 });
   }
 
+  // Cookies
   if (model.sections.security.cookieIssues.length > 0) {
+    if (y > ph - 60) { y = addNewPage(doc, model, pageNum, totalPages, 'Securite - suite'); y = sectionTitle(doc, 'Securite (suite)', y, margin); }
+    y = subtitle(doc, 'Problemes de cookies', margin, y);
     y = drawTable(doc, y, ['Probleme cookie'], model.sections.security.cookieIssues.map((item) => [item]), margin);
   }
 }
 
 function drawSeoUx(doc, model, pageNum, totalPages) {
   const margin = 18;
-  const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  const ph = doc.internal.pageSize.getHeight();
+  const cw = doc.internal.pageSize.getWidth() - margin * 2;
   let y = addNewPage(doc, model, pageNum, totalPages, 'SEO et UX mobile');
 
+  // ── SEO ──
   y = sectionTitle(doc, 'SEO - Referencement', y, margin);
-  y = drawMetricCards(doc, model.sections.seo.metrics, margin, y, contentWidth);
+  y = drawMetricCards(doc, model.sections.seo.metrics, margin, y, cw);
+  y += 4;
   y = drawTable(
-    doc,
-    y,
+    doc, y,
     ['Critere SEO', 'Resultat', 'Statut', 'Explication business'],
     model.sections.seo.metrics.map((item) => [item.label, item.value, item.status, item.explanation]),
     margin
   );
 
-  y = sectionTitle(doc, 'UX Mobile', y, margin);
-  y = drawMetricCards(doc, model.sections.ux.metrics, margin, y, contentWidth);
+  // ── UX ──
+  if (y > ph - 95) { y = addNewPage(doc, model, pageNum, totalPages, 'UX Mobile'); y = sectionTitle(doc, 'UX Mobile', y, margin); }
+  else { y += 6; y = sectionTitle(doc, 'UX Mobile', y, margin); }
+
+  y = drawMetricCards(doc, model.sections.ux.metrics, margin, y, cw);
+  y += 4;
   y = drawTable(
-    doc,
-    y,
+    doc, y,
     ['Critere UX', 'Resultat', 'Statut', 'Explication business'],
     model.sections.ux.metrics.map((item) => [item.label, item.value, item.status, item.explanation]),
     margin
   );
 
+  // Issues UX
   if (model.sections.ux.issues.length > 0) {
+    if (y > ph - 70) { y = addNewPage(doc, model, pageNum, totalPages, 'UX Mobile - suite'); y = sectionTitle(doc, 'UX Mobile (suite)', y, margin); }
+    y = subtitle(doc, 'Problemes UX detectes', margin, y);
     y = drawTable(
-      doc,
-      y,
+      doc, y,
       ['Probleme detecte', 'Severite', 'Impact', 'Code'],
       model.sections.ux.issues.map((issue) => [issue.message, issue.severity || 'info', issue.impact || '', issue.type || '']),
       margin
@@ -747,69 +902,128 @@ function drawSeoUx(doc, model, pageNum, totalPages) {
 
 function drawRecommendations(doc, model, pageNum, totalPages) {
   const margin = 18;
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  const ph = doc.internal.pageSize.getHeight();
+  const cw = doc.internal.pageSize.getWidth() - margin * 2;
   let y = addNewPage(doc, model, pageNum, totalPages, "Plan d'action");
   y = sectionTitle(doc, "Plan d'action recommande", y, margin);
 
-  if (model.recommendations.length === 0) {
-    paragraphBlock(doc, 'Aucune recommandation', 'Aucune recommandation detaillee n est disponible pour ce scan.', margin, y, contentWidth);
+  // ── Compteur de recommandations ──
+  const recCount = model.recommendations.length;
+  const criticalCount = model.recommendations.filter((r) => r.priority === 'CRITIQUE').length;
+  const improvementCount = model.recommendations.filter((r) => r.priority === 'AMELIORATION').length;
+
+  doc.setFillColor(...C_CARD);
+  doc.roundedRect(margin, y, cw, 20, 3, 3, 'F');
+  doc.setDrawColor(...C_BORDER);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(margin, y, cw, 20, 3, 3, 'S');
+  doc.setFillColor(...C_PRIMARY);
+  doc.roundedRect(margin, y, 2.5, 20, 1, 1, 'F');
+  doc.setTextColor(...C_WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(`${recCount} recommandation(s) identifiee(s)`, margin + 8, y + 10);
+  doc.setTextColor(...C_TEXT_SEC);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  const summaryText = [
+    criticalCount > 0 ? `${criticalCount} critique(s)` : '',
+    improvementCount > 0 ? `${improvementCount} amelioration(s)` : '',
+  ].filter(Boolean).join('  |  ') || 'Aucune recommandation prioritaire identifiee.';
+  doc.text(summaryText, margin + 8, y + 16);
+  y += 26;
+
+  if (recCount === 0) {
+    y = paragraphBlock(doc, 'Aucune recommandation', 'Aucune recommandation detaillee n est disponible pour ce scan.', margin, y, cw);
     return;
   }
 
+  // ── Recommandations ──
   model.recommendations.forEach((rec, index) => {
-    if (y > pageHeight - 90) {
+    if (y > ph - 100) {
       y = addNewPage(doc, model, pageNum, totalPages, "Plan d'action - suite");
+      y = sectionTitle(doc, "Plan d'action recommande (suite)", y, margin);
     }
 
-    const accent = rec.priority === 'CRITIQUE' ? RED : rec.priority === 'AMELIORATION' ? GREEN : YELLOW;
+    const isCritical = rec.priority === 'CRITIQUE';
+    const isImprovement = rec.priority === 'AMELIORATION';
+    const accent = isCritical ? C_DANGER : isImprovement ? C_SUCCESS : C_WARNING;
     const diffColor = getDifficultyColor(rec.difficulty);
     const timeStr = t(rec.time, '30 minutes');
     const diffStr = t(rec.difficulty, 'Intermediaire');
+    const category = t(rec.category || rec.categorie || 'General');
 
-    const blockH = 14;
-    doc.setFillColor(0, 30, 60);
-    doc.roundedRect(margin, y, contentWidth, blockH, 2, 2, 'F');
-    doc.setFillColor(0, 212, 255);
-    doc.roundedRect(margin, y, 2, blockH, 1, 1, 'F');
+    // Hauteur estimée du bloc
+    const bodyLines = doc.splitTextToSize(
+      [rec.description, rec.impact ? `Impact : ${rec.impact}` : '', rec.impactBusiness ? `Impact business : ${rec.impactBusiness}` : '', `Action : ${rec.action}`, rec.howTo ? `Comment : ${rec.howTo}` : ''].filter(Boolean).join(' '),
+      cw - 16
+    );
+    const cardH = 38 + bodyLines.length * 4.5;
 
-    doc.setTextColor(0, 212, 255);
+    // Fond carte
+    doc.setFillColor(...C_CARD);
+    doc.roundedRect(margin, y, cw, cardH, 3, 3, 'F');
+    doc.setDrawColor(...C_BORDER);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(margin, y, cw, cardH, 3, 3, 'S');
+
+    // Bordure gauche colorée par priorité
+    doc.setFillColor(...accent);
+    doc.roundedRect(margin, y, 3, cardH, 1.5, 1.5, 'F');
+
+    // Badges en haut
+    let badgeX = margin + 8;
+    const prioBadge = isCritical ? 'URGENT' : isImprovement ? 'AMELIORATION' : 'IMPORTANT';
+    const prioColor = accent;
+    drawBadge(doc, prioBadge, badgeX, y + 4, prioColor, [prioColor[0], prioColor[1], prioColor[2]]);
+    badgeX += doc.getTextWidth(prioBadge) + 14;
+
+    // Badge catégorie
+    const catColor = [21, 102, 240];
+    drawBadge(doc, category, badgeX, y + 4, catColor, [catColor[0], catColor[1], catColor[2]]);
+    badgeX += doc.getTextWidth(category) + 14;
+
+    // Badge temps
+    const timeBadge = `Temps : ${timeStr}`;
+    const timeColor = [0, 212, 255];
+    drawBadge(doc, timeBadge, badgeX, y + 4, timeColor, [timeColor[0], timeColor[1], timeColor[2]]);
+    badgeX += doc.getTextWidth(timeBadge) + 14;
+
+    // Badge difficulté
+    const diffBadge = `Difficulte : ${diffStr}`;
+    drawBadge(doc, diffBadge, badgeX, y + 4, diffColor, [diffColor[0], diffColor[1], diffColor[2]]);
+
+    // Titre
+    doc.setTextColor(...C_WHITE);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.text(`Temps estime : ${timeStr}`, margin + 6, y + 5.5);
+    doc.setFontSize(10);
+    doc.text(`${index + 1}. ${rec.title}`, margin + 8, y + 20);
 
-    doc.setFillColor(...diffColor);
-    const diffLabel = `Difficulte : ${diffStr}`;
-    const diffLabelW = doc.getTextWidth(diffLabel) + 6;
-    const diffX = margin + 6 + doc.getTextWidth(`Temps estime : ${timeStr}`) + 16;
-    doc.roundedRect(diffX, y + 2, diffLabelW, 9, 1, 1, 'F');
-    doc.setTextColor(...WHITE);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.text(diffLabel, diffX + 3, y + 7.5);
+    // Corps
+    doc.setTextColor(...C_LIGHT);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.8);
+    bodyLines.forEach((line, li) => {
+      doc.text(line, margin + 8, y + 28 + li * 4.5);
+    });
 
-    y += blockH + 2;
-
-    const body = [
-      rec.description,
-      rec.impact ? `Impact : ${rec.impact}` : '',
-      rec.impactBusiness ? `Impact business : ${rec.impactBusiness}` : '',
-      `Action : ${rec.action}`,
-      rec.howTo ? `Comment : ${rec.howTo}` : '',
-    ].filter(Boolean).join(' ');
-    y = paragraphBlock(doc, `${index + 1}. ${rec.title}`, body, margin, y, contentWidth, { accent, maxLines: 10 });
+    y += cardH + 6;
   });
 
-  y = Math.min(y + 4, pageHeight - 42);
-  doc.setFillColor(...BLUE);
-  doc.roundedRect(margin, y, contentWidth, 20, 3, 3, 'F');
-  doc.setTextColor(...WHITE);
+  // ── Section CTA ──
+  y = Math.min(y + 4, ph - 48);
+  doc.setFillColor(...C_PRIMARY);
+  doc.roundedRect(margin, y, cw, 28, 4, 4, 'F');
+  doc.setFillColor(18, 88, 200);
+  doc.roundedRect(margin, y, cw, 3, 2, 2, 'F');
+  doc.setTextColor(...C_WHITE);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text("Besoin d'aide pour corriger ces problemes ?", margin + contentWidth / 2, y + 8, { align: 'center' });
+  doc.setFontSize(10);
+  doc.text("Besoin d'aide pour corriger ces problemes ?", margin + cw / 2, y + 10, { align: 'center' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text('Webisafe peut prioriser, corriger et recontroler votre site avec un rescan offert dans 30 jours.', margin + contentWidth / 2, y + 15, { align: 'center' });
+  doc.text('Webisafe peut prioriser, corriger et recontroler votre site.', margin + cw / 2, y + 16, { align: 'center' });
+  doc.text('Rescan offert 30 jours apres correction. Contactez-nous sur webisafe.tech', margin + cw / 2, y + 22, { align: 'center' });
 }
 
 export function generatePDF(reportData) {
