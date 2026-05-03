@@ -670,10 +670,15 @@ function buildCriticalAlerts(sec, ux, perf) {
 }
 
 // ── Handler principal ─────────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = ['https://webisafe.vercel.app', 'https://webisafe.ci'];
+
 export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    const origin = req.headers.origin || '';
+    if (ALLOWED_ORIGINS.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    // Autorise l'en-tête personnalisé X-User-Id utilisé par le frontend
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Id, x-user-id');
 
     if (req.method === 'OPTIONS') return res.status(200).end();

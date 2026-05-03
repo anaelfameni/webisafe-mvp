@@ -23,7 +23,7 @@ export default function Header({ user, onLogout, onAuthClick }) {
     { label: 'Accueil', path: '/' },
     { label: 'Fonctionnalités', path: '/#features' },
     { label: 'Tarifs', path: '/tarifs' },
-    { label: 'Affiliés', path: '/partenaire' },
+    { label: 'Affiliation', path: '/partenaire' },
     { label: 'Contact', path: '/contact' },
   ];
 

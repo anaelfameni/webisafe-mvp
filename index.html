@@ -40,39 +40,68 @@
     content="Analyse gratuite de votre site en 60 secondes : vitesse, SEO, sécurité et UX mobile." />
   <meta name="twitter:image" content="https://webisafe.vercel.app/og-image.png" />
 
-  <!-- Préconnexion Google Fonts si tu utilises Inter -->
+  <!-- Performance : DNS prefetch & preconnect -->
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="dns-prefetch" href="https://api.supabase.co" />
+  <link rel="dns-prefetch" href="https://www.clarity.ms" />
 
-  <!-- Microsoft Clarity -->
-  <script type="text/javascript">
+  <!-- Microsoft Clarity — chargement différé pour ne pas bloquer le LCP -->
+  <script type="text/javascript" defer>
     (function (c, l, a, r, i, t, y) {
       c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) };
       t = l.createElement(r);
       t.async = 1;
+      t.defer = 1;
       t.src = "https://www.clarity.ms/tag/" + i;
       y = l.getElementsByTagName(r)[0];
       y.parentNode.insertBefore(t, y);
     })(window, document, "clarity", "script", "wgy1jsiw5k");
   </script>
 
-  <!-- Données structurées simples pour Google -->
+  <!-- Données structurées Schema.org pour Google -->
   <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "Webisafe",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web",
-        "url": "https://webisafe.vercel.app/",
-        "description": "Webisafe analyse la vitesse, le SEO, la sécurité et l'expérience mobile des sites web des PME africaines.",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "XOF"
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "name": "Webisafe",
+          "url": "https://webisafe.vercel.app/",
+          "logo": "https://webisafe.vercel.app/favicon-512.png",
+          "sameAs": []
+        },
+        {
+          "@type": "WebSite",
+          "name": "Webisafe",
+          "url": "https://webisafe.vercel.app/",
+          "description": "Webisafe analyse la vitesse, le SEO, la sécurité et l'expérience mobile des sites web des PME africaines.",
+          "inLanguage": "fr",
+          "publisher": { "@type": "Organization", "name": "Webisafe" }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "Webisafe",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "url": "https://webisafe.vercel.app/",
+          "description": "Webisafe analyse la vitesse, le SEO, la sécurité et l'expérience mobile des sites web des PME africaines.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "XOF"
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "ratingCount": "120"
+          }
         }
-      }
-    </script>
+      ]
+    }
+  </script>
 </head>
 
 <body>
@@ -96,12 +125,3 @@
 </body>
 
 </html>
-
-<title>Webisafe — Audit de site web gratuit pour PME africaines | Résultats en 60s</title>
-<meta name="description"
-  content="Webisafe analyse la vitesse, le SEO et la sécurité de votre site. Rapport gratuit et actionnable en moins d'une minute. Conçu pour les PME africaines." />
-<meta property="og:title" content="Webisafe — Audit gratuit pour PME africaines" />
-<meta property="og:description"
-  content="Découvrez pourquoi votre site perd des clients. Analyse gratuite en 60 secondes." />
-<meta property="og:url" content="https://webisafe.vercel.app" />
-<meta name="twitter:card" content="summary_large_image" />

@@ -74,14 +74,35 @@
     {
       "source": "/sitemap.xml",
       "headers": [
-        {
-          "key": "Content-Type",
-          "value": "application/xml"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400"
-        }
+        { "key": "Content-Type", "value": "application/xml" },
+        { "key": "Cache-Control", "value": "public, max-age=86400, immutable" }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, immutable" }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*\\.(js|css|woff2|png|jpg|jpeg|gif|svg|ico|webp|avif))",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
       ]
     },
     {
@@ -89,39 +110,39 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://api.resend.com;"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.clarity.ms; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://api.resend.com https://www.clarity.ms; font-src 'self' https: data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
         },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=()"
-        },
-        {
-          "key": "Strict-Transport-Security",
-          "value": "max-age=31536000; includeSubDomains; preload"
-        }
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=()" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" },
+        { "key": "X-DNS-Prefetch-Control", "value": "on" }
       ]
     }
   ],
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/((?!sitemap.xml|robots.txt).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/.env", "destination": "/404" },
+    { "source": "/.env.local", "destination": "/404" },
+    { "source": "/.env.production", "destination": "/404" },
+    { "source": "/.git/(.*)", "destination": "/404" },
+    { "source": "/.git", "destination": "/404" },
+    { "source": "/wp-config.php.bak", "destination": "/404" },
+    { "source": "/wp-config.bak", "destination": "/404" },
+    { "source": "/backup.zip", "destination": "/404" },
+    { "source": "/backup.sql", "destination": "/404" },
+    { "source": "/phpinfo.php", "destination": "/404" },
+    { "source": "/server-status", "destination": "/404" },
+    { "source": "/.htpasswd", "destination": "/404" },
+    { "source": "/wp-admin", "destination": "/404" },
+    { "source": "/wp-login.php", "destination": "/404" },
+    { "source": "/admin", "destination": "/404" },
+    { "source": "/administrator", "destination": "/404" },
+    { "source": "/phpmyadmin", "destination": "/404" },
+    { "source": "/pma", "destination": "/404" },
+    { "source": "/cpanel", "destination": "/404" },
+    { "source": "/webmail", "destination": "/404" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/((?!sitemap.xml|robots.txt).*)", "destination": "/index.html" }
   ]
 }

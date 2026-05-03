@@ -115,6 +115,9 @@ export default defineConfig(({ mode }) => {
       port: 5173,
     },
     build: {
+      minify: 'esbuild',
+      cssMinify: true,
+      reportCompressedSize: false,
       rollupOptions: {
         output: {
           manualChunks(id: string) {
@@ -134,12 +137,30 @@ export default defineConfig(({ mode }) => {
               if (id.includes('@supabase')) {
                 return 'db'
               }
+              if (id.includes('recharts')) {
+                return 'charts'
+              }
+              if (id.includes('cheerio')) {
+                return 'parser'
+              }
               return 'vendor'
             }
           },
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: (assetInfo) => {
+            const info = assetInfo.name || ''
+            if (/\.(png|jpe?g|gif|svg|webp|avif)$/i.test(info)) {
+              return 'assets/images/[name]-[hash][extname]'
+            }
+            if (/\.css$/i.test(info)) {
+              return 'assets/css/[name]-[hash][extname]'
+            }
+            return 'assets/[name]-[hash][extname]'
+          },
         },
       },
-      chunkSizeWarningLimit: 600,
+      chunkSizeWarningLimit: 500,
     },
   }
 })

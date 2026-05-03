@@ -104,7 +104,7 @@ export default function AffiliateDashboard() {
     <div className="min-h-screen pt-28 pb-20 px-4 bg-dark-navy">
       <div className="max-w-4xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-3xl font-bold text-white mb-2">Dashboard Affilié</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Dashboard Affiliation</h1>
           <p className="text-text-secondary text-sm mb-8">Bonjour {stats.name} — voici vos performances.</p>
 
           <div className="bg-card-bg border border-border-color rounded-2xl p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">

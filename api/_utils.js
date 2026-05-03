@@ -1,3 +1,15 @@
+const ALLOWED_ORIGINS = ['https://webisafe.vercel.app', 'https://webisafe.ci'];
+
+export function setCorsHeaders(req, res) {
+  const origin = req.headers.origin || '';
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS,GET');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Id, x-user-id');
+}
+
 export function json(res, status, body) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
