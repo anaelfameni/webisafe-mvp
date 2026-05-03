@@ -1,0 +1,207 @@
+[
+  {
+    "test": {
+      "name": "google.com",
+      "url": "https://google.com",
+      "expect": {
+        "minScore": 70,
+        "shouldPass": true
+      }
+    },
+    "report": {
+      "name": "google.com",
+      "url": "https://google.com",
+      "duration": 20834,
+      "status": 200,
+      "success": true,
+      "globalScore": 72,
+      "grade": "B",
+      "scores": {
+        "performance": 77,
+        "security": 71,
+        "seo": 63,
+        "ux": 77
+      },
+      "criticalAlerts": 3,
+      "scannerErrors": {
+        "performance": null,
+        "security": null,
+        "seo": null,
+        "ux": null,
+        "extended": null
+      },
+      "error": null
+    },
+    "issues": [],
+    "passed": true
+  },
+  {
+    "test": {
+      "name": "orange.ci",
+      "url": "https://orange.ci",
+      "expect": {
+        "minScore": 50,
+        "shouldPass": true
+      }
+    },
+    "report": {
+      "name": "orange.ci",
+      "url": "https://orange.ci",
+      "duration": 13573,
+      "status": 200,
+      "success": true,
+      "globalScore": 73,
+      "grade": "B",
+      "scores": {
+        "performance": 97,
+        "security": 57,
+        "seo": 65,
+        "ux": 70
+      },
+      "criticalAlerts": 8,
+      "scannerErrors": {
+        "performance": null,
+        "security": null,
+        "seo": null,
+        "ux": null,
+        "extended": null
+      },
+      "error": null
+    },
+    "issues": [],
+    "passed": true
+  },
+  {
+    "test": {
+      "name": "mtn.ci",
+      "url": "https://mtn.ci",
+      "expect": {
+        "minScore": 50,
+        "shouldPass": true
+      }
+    },
+    "report": {
+      "name": "mtn.ci",
+      "url": "https://mtn.ci",
+      "duration": 23958,
+      "status": 200,
+      "success": true,
+      "globalScore": 71,
+      "grade": "B",
+      "scores": {
+        "performance": 57,
+        "security": 66,
+        "seo": 89,
+        "ux": 81
+      },
+      "criticalAlerts": 3,
+      "scannerErrors": {
+        "performance": null,
+        "security": null,
+        "seo": null,
+        "ux": null,
+        "extended": null
+      },
+      "error": null
+    },
+    "issues": [],
+    "passed": true
+  },
+  {
+    "test": {
+      "name": "hubspot.com",
+      "url": "https://hubspot.com",
+      "expect": {
+        "minScore": 60,
+        "shouldPass": true
+      }
+    },
+    "report": {
+      "name": "hubspot.com",
+      "url": "https://hubspot.com",
+      "duration": 58007,
+      "status": 200,
+      "success": true,
+      "globalScore": 77,
+      "grade": "B",
+      "scores": {
+        "performance": 40,
+        "security": 96,
+        "seo": 97,
+        "ux": 81
+      },
+      "criticalAlerts": 1,
+      "scannerErrors": {
+        "performance": null,
+        "security": null,
+        "seo": null,
+        "ux": null,
+        "extended": null
+      },
+      "error": null
+    },
+    "issues": [],
+    "passed": true
+  },
+  {
+    "test": {
+      "name": "webisafe.vercel.app",
+      "url": "https://webisafe.vercel.app",
+      "expect": {
+        "minScore": 75,
+        "shouldPass": true
+      }
+    },
+    "report": {
+      "name": "webisafe.vercel.app",
+      "url": "https://webisafe.vercel.app",
+      "duration": 16811,
+      "status": 200,
+      "success": true,
+      "globalScore": 75,
+      "grade": "B",
+      "scores": {
+        "performance": 71,
+        "security": 55,
+        "seo": 89,
+        "ux": 97
+      },
+      "criticalAlerts": 8,
+      "scannerErrors": {
+        "performance": null,
+        "security": null,
+        "seo": null,
+        "ux": null,
+        "extended": null
+      },
+      "error": null
+    },
+    "issues": [],
+    "passed": true
+  },
+  {
+    "test": {
+      "name": "domaine inexistant",
+      "url": "https://this-does-not-exist-12345.ci",
+      "expect": {
+        "shouldPass": false,
+        "shouldError": true
+      }
+    },
+    "report": {
+      "name": "domaine inexistant",
+      "url": "https://this-does-not-exist-12345.ci",
+      "duration": 446,
+      "status": 422,
+      "success": false,
+      "globalScore": null,
+      "grade": null,
+      "scores": null,
+      "criticalAlerts": 0,
+      "scannerErrors": {},
+      "error": "Impossible de joindre le site. Vérifiez l'URL."
+    },
+    "issues": [],
+    "passed": true
+  }
+]
