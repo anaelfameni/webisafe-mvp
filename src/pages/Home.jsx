@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../context/AuthContext';
 import { useLiveStats } from '../hooks/useLiveStats';
 import { supabase } from '../lib/supabaseClient';
 import { Zap, Shield, Search, Smartphone, ArrowRight, TrendingDown, Eye, Activity, Globe, Radio, Clock } from 'lucide-react';
