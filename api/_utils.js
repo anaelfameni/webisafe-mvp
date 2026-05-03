@@ -1,4 +1,8 @@
-const ALLOWED_ORIGINS = ['https://webisafe.vercel.app', 'https://webisafe.ci'];
+const ALLOWED_ORIGINS = [
+  'https://webisafe.vercel.app',
+  'https://webisafe.ci',
+  ...(process.env.NODE_ENV === 'development' ? ['http://localhost:5173'] : [])
+];
 
 export function setCorsHeaders(req, res) {
   const origin = req.headers.origin || '';

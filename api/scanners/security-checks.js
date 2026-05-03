@@ -411,17 +411,24 @@ export async function checkSensitiveFiles(baseUrl) {
                 headers: { 'User-Agent': UA },
                 signal: AbortSignal.timeout(4000),
             });
-            const cl = Number(res.headers.get('content-length') || 0);
-            // On lit un petit chunk pour confirmer qu'il y a réellement du contenu
-            // si content-length est absent (utile pour serveurs qui chunked).
-            let bodyLen = cl;
-            if (res.status === 200 && bodyLen === 0) {
-                try {
-                    const text = await res.text();
-                    bodyLen = text.length;
-                } catch { /* ignore */ }
+            if (res.status !== 200) continue;
+
+            // Lire le contenu pour distinguer un vrai fichier d'une SPA catch-all
+            const text = await res.text();
+            const bodyLen = text.length;
+
+            // Faux positif : Vercel/Netlify/GitHub Pages servent index.html (SPA catch-all)
+            // sur les routes inconnues → contient du HTML
+            const isSpaCatchAll = text.includes('<!DOCTYPE html') ||
+                                  text.includes('<html') ||
+                                  text.includes('<HTML') ||
+                                  bodyLen > 50000;
+
+            if (isSpaCatchAll) {
+                continue; // Pas un vrai fichier sensible exposé
             }
-            if (res.status === 200 && bodyLen > 0) {
+
+            if (bodyLen > 0) {
                 findings.push({
                     check_name: `sensitive_file_${file.path.replace(/[^a-z0-9]/gi, '_')}`,
                     status: 'fail',
@@ -502,6 +509,12 @@ export async function checkExposedAdminPanels(baseUrl) {
                         snippet = text.slice(0, 500).toLowerCase();
                     }
                 } catch { /* ignore */ }
+
+                // Faux positif : SPA catch-all (Vercel/Netlify) sert index.html sur routes inconnues
+                const isSpaCatchAll = snippet.includes('<!doctype html') || snippet.includes('<html');
+                if (isSpaCatchAll) {
+                    continue; // Pas un vrai panneau admin exposé
+                }
 
                 const matched = ADMIN_KEYWORDS.some((kw) => snippet.includes(kw));
                 if (matched) {
