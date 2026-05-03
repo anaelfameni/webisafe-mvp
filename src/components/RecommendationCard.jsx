@@ -81,7 +81,7 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
     const roiLabel = (Number(recommendation.priorite) <= 2) ? 'ROI élevé' : (Number(recommendation.priorite) <= 4 ? 'ROI moyen' : 'ROI faible');
 
     // Mask sensitive content for critical recommendations (server-side criticals)
-    const maskSensitive = Boolean(recommendation._mask_sensitive || recommendation.maskSensitive || recommendation.priorite === 1 || recommendation.priority === 'CRITIQUE');
+    const maskSensitive = isLocked && Boolean(recommendation._mask_sensitive || recommendation.maskSensitive || recommendation.priorite === 1 || recommendation.priority === 'CRITIQUE');
 
     if (maskSensitive) {
       return (
