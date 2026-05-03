@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
-export default function Header({ user, onLogout, onAuthClick }) {
+export default function Header({ onAuthClick }) {
+  const { user, profile, signOut } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -102,7 +104,7 @@ export default function Header({ user, onLogout, onAuthClick }) {
                   {user?.role === 'admin' ? 'Panel Admin' : 'Tableau de bord'}
                 </button>
                 <button
-                  onClick={onLogout}
+                  onClick={() => signOut()}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border-color hover:border-danger/40 text-sm text-white/50 hover:text-danger font-medium transition-all"
                 >
                   <LogOut size={15} />
@@ -174,7 +176,7 @@ export default function Header({ user, onLogout, onAuthClick }) {
                       <User size={14} className="text-primary" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-white text-sm font-semibold truncate">{user.name}</p>
+                      <p className="text-white text-sm font-semibold truncate">{profile?.full_name || user?.email}</p>
                       <p className="text-white/40 text-xs truncate">{user.email}</p>
                     </div>
                   </div>
@@ -186,7 +188,7 @@ export default function Header({ user, onLogout, onAuthClick }) {
                     {user?.role === 'admin' ? 'Panel Admin' : 'Tableau de bord'}
                   </button>
                   <button
-                    onClick={() => { onLogout(); setMobileMenuOpen(false); }}
+                    onClick={() => { signOut(); setMobileMenuOpen(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 text-white/50 text-sm font-medium hover:text-danger hover:border-danger/30 hover:bg-danger/5 transition-all"
                   >
                     <LogOut size={16} />

@@ -4,7 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import Home from './pages/Home';
-import { useAuth } from './hooks/useAuth';
+import { useAuth } from './context/AuthContext';
 import { supabase } from './lib/supabaseClient';
 
 const Analyse = lazy(() => import('./pages/Analyse'));
@@ -137,25 +137,12 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
 }
 
 function App() {
-  const { user, signup, login, logout } = useAuth();
+  const { user, handleAuth, signOut } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('login');
 
-  const handleAuth = (mode, data) => {
-    if (mode === 'signup') {
-      return signup(data.name, data.email, data.phone, data.password, data.phoneCountry);
-    }
-
-    return login(data.email, data.password);
-  };
-
-  const handleAuthWithRedirect = (mode, data) => {
-    const result = handleAuth(mode, data);
-    return result;
-  };
-
   const handleLogout = () => {
-    logout();
+    signOut();
     window.location.href = '/';
   };
 
