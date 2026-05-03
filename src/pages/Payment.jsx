@@ -235,7 +235,7 @@ export default function Payment({ user }) {
           <div className="mx-auto flex w-fit items-center gap-3 rounded-full bg-primary/10 px-4 py-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary font-bold text-white">W</div>
             <div className="text-left">
-              <p className="text-base font-bold text-white">Paiement securise</p>
+              <p className="text-base font-bold text-white">Paiement securisé</p>
               <p className="text-xs uppercase tracking-[0.24em] text-primary">Webisafe</p>
             </div>
           </div>

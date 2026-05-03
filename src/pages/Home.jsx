@@ -162,6 +162,10 @@ export default function Home() {
             </span>
           </motion.div>
 
+          <h1 className="sr-only">
+            Auditez la sécurité de votre site web en 30 secondes — Webisafe
+          </h1>
+
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

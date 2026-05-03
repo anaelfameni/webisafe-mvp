@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import { runAdvancedSecurityChecks } from './scanners/security-checks.js';
 import { runExtendedSecurityChecks } from './scanners/extended-security-checks.js';
+import { setCorsHeaders } from './_utils.js';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -670,11 +671,7 @@ function buildCriticalAlerts(sec, ux, perf) {
 }
 
 // ── Handler principal ─────────────────────────────────────────────────────────
-const ALLOWED_ORIGINS = [
-    'https://webisafe.vercel.app',
-    'https://webisafe.ci',
-    ...(process.env.NODE_ENV === 'development' ? ['http://localhost:5173'] : [])
-];
+
 
 export default async function handler(req, res) {
     const origin = req.headers.origin || '';

@@ -221,7 +221,7 @@ export default function PricingSection({ onScan }) {
           viewport={{ once: true }}
           className="text-center mt-8"
         >
-          <p className="text-text-secondary text-sm">Paiement securise par Wave</p>
+          <p className="text-text-secondary text-sm">Paiement sécurisé par Wave</p>
         </motion.div>
       </div>
     </section>

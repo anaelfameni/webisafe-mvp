@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const segments = [
   { id: 'critique', label: 'CRITIQUE', desc: 'Action urgente requise', range: '0-30', min: 0, max: 30, color: '#ef4444', glowColor: 'rgba(239, 68, 68, 0.4)', gradient: ['#ef4444', '#dc2626'], percent: 30 },
@@ -66,8 +66,13 @@ export default function ScoreGaugeChart({
   const [hoveredSeg, setHoveredSeg] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0, visible: false, seg: null });
   const activeSegment = getActiveSegment(currentScore);
+  const hasAnimated = useRef(false);
 
   useEffect(() => {
+    if (hasAnimated.current) {
+      setCurrentScore(score);
+      return;
+    }
     let frameId;
     const duration = compact ? 900 : 1200;
     const start = performance.now();
@@ -81,6 +86,8 @@ export default function ScoreGaugeChart({
       setCurrentScore(Math.round(easeOut(progress) * score));
       if (progress < 1) {
         frameId = requestAnimationFrame(update);
+      } else {
+        hasAnimated.current = true;
       }
     }
 

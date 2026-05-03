@@ -254,8 +254,8 @@ function normalizeScan(scan) {
   const uxM = metrics.ux ?? null;
 
   const globalScore =
-    Number.isFinite(Number(scan.global_score)) ? Number(scan.global_score)
-      : Number.isFinite(Number(scores.global)) ? Number(scores.global)
+    Number.isFinite(Number(scores.global)) ? Number(scores.global)
+      : Number.isFinite(Number(scan.global_score)) ? Number(scan.global_score)
         : null;
 
   const uxScore =
@@ -973,7 +973,7 @@ export default function Rapport() {
             {Array.isArray(norm?.extendedChecks) && norm.extendedChecks.length > 0 && (
               <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/60 p-5">
                 <p className="text-white font-semibold text-sm mb-3">
-                  Détail des vérifications étendues ({norm.extendedChecks.length})
+                  Détail des vérifications étendues
                 </p>
                 <div className="space-y-3">
                   {norm.extendedChecks
