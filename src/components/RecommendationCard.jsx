@@ -6,6 +6,66 @@ import { Lock } from 'lucide-react';
 // ET à l'ancien format :
 // { priority, title, description, impactBusiness, action, difficulty, time }
 
+const FAULT_TIME_MAP = {
+  ssl_expired: '10 minutes', ssl_misconfigured: '20 minutes', hsts_missing: '15 minutes',
+  csp_missing: '30 minutes', xframe_missing: '10 minutes', xcontent_missing: '10 minutes',
+  mixed_content: '45 minutes', images_unoptimized: '20 minutes', cache_missing: '15 minutes',
+  gzip_disabled: '10 minutes', js_render_blocking: '1 heure', css_render_blocking: '45 minutes',
+  meta_title_missing: '5 minutes', meta_description_missing: '5 minutes', h1_missing: '5 minutes',
+  alt_missing: '15 minutes', sitemap_missing: '20 minutes', robots_missing: '10 minutes',
+  xss_vulnerability: '2 à 4 heures', sql_injection: '3 à 6 heures',
+  wordpress_outdated: '15 minutes', plugin_outdated: '10 minutes',
+  no_https_redirect: '15 minutes', mobile_not_responsive: '2 à 8 heures', default: '30 minutes',
+};
+
+const FAULT_DIFFICULTY_MAP = {
+  ssl_expired: '⭐ Facile — Faisable sans développeur',
+  ssl_misconfigured: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  hsts_missing: '⭐⭐⭐ Technique — Modification fichier serveur',
+  csp_missing: '⭐⭐⭐ Technique — Connaissance HTTP requise',
+  xframe_missing: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  xcontent_missing: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  mixed_content: '⭐⭐ Intermédiaire — Inspection du code requise',
+  images_unoptimized: '⭐ Facile — Faisable sans développeur',
+  cache_missing: '⭐⭐ Intermédiaire — Plugin ou config serveur',
+  gzip_disabled: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  js_render_blocking: '⭐⭐⭐ Technique — Connaissance JavaScript',
+  css_render_blocking: '⭐⭐⭐ Technique — Connaissance CSS',
+  meta_title_missing: '⭐ Facile — Faisable sans développeur',
+  meta_description_missing: '⭐ Facile — Faisable sans développeur',
+  h1_missing: '⭐ Facile — Faisable sans développeur',
+  alt_missing: '⭐ Facile — Faisable sans développeur',
+  sitemap_missing: '⭐ Facile — Plugin WordPress ou outil en ligne',
+  robots_missing: '⭐⭐ Intermédiaire — Accès FTP requis',
+  xss_vulnerability: '⭐⭐⭐⭐ Expert — Développeur senior requis',
+  sql_injection: '⭐⭐⭐⭐ Expert — Développeur senior requis',
+  wordpress_outdated: '⭐ Facile — Faisable sans développeur',
+  plugin_outdated: '⭐ Facile — Faisable sans développeur',
+  no_https_redirect: '⭐⭐ Intermédiaire — Accès hébergeur requis',
+  mobile_not_responsive: '⭐⭐⭐⭐ Expert — Développeur requis',
+  default: '⭐⭐ Intermédiaire',
+};
+
+function getTemps(rec) {
+  if (rec.temps && String(rec.temps).trim()) return String(rec.temps).trim();
+  if (rec.time && String(rec.time).trim()) return String(rec.time).trim();
+  return FAULT_TIME_MAP[rec.faultType] || FAULT_TIME_MAP.default;
+}
+
+function getDifficulte(rec) {
+  const raw = rec.difficulte || rec.difficulty || '';
+  if (raw && String(raw).trim()) return String(raw).trim();
+  return FAULT_DIFFICULTY_MAP[rec.faultType] || FAULT_DIFFICULTY_MAP.default;
+}
+
+function getDifficulteColor(label) {
+  const l = String(label || '').toLowerCase();
+  if (l.includes('expert')) return 'text-red-400';
+  if (l.includes('technique')) return 'text-orange-400';
+  if (l.includes('intermédiaire') || l.includes('intermediaire')) return 'text-yellow-400';
+  return 'text-green-400';
+}
+
 function getCategorieStyle(categorie) {
   const cat = String(categorie || '').toLowerCase();
   if (cat.includes('sécurité') || cat.includes('securite')) {
@@ -48,21 +108,31 @@ function getCategorieStyle(categorie) {
   };
 }
 
-function getPrioriteLabel(priorite) {
+function isSecuriteCategory(categorie) {
+  const c = String(categorie || '').toLowerCase();
+  return c.includes('sécurité') || c.includes('securite') || c.includes('security');
+}
+
+function getPrioriteLabel(priorite, categorie) {
+  if (isSecuriteCategory(categorie)) return '🔴 Priorité urgente';
   const p = Number(priorite);
-  if (p === 1) return '🔴 Priorité critique';
+  if (p === 1) return '🔴 Priorité urgente';
   if (p === 2) return '🟠 Priorité haute';
   if (p <= 4) return '🟡 Priorité moyenne';
   return '🟢 Amélioration';
 }
 
 // Compat ancien format
-function getPriorityConfig(priority) {
+function getPriorityConfig(priority, categorie) {
+  const isUrgent = isSecuriteCategory(categorie) || priority === 'CRITIQUE';
   const configs = {
     CRITIQUE: { borderColor: 'border-danger/30', badgeBg: 'bg-danger/10', badgeText: 'text-danger', dot: 'bg-danger', label: '🔴 URGENT' },
-    IMPORTANT: { borderColor: 'border-warning/30', badgeBg: 'bg-warning/10', badgeText: 'text-warning', dot: 'bg-warning', label: '🟠 IMPORTANT' },
+    IMPORTANT: { borderColor: 'border-warning/30', badgeBg: 'bg-warning/10', badgeText: 'text-warning', dot: 'bg-warning', label: isUrgent ? '🔴 URGENT' : '🟠 IMPORTANT' },
     AMELIORATION: { borderColor: 'border-success/30', badgeBg: 'bg-success/10', badgeText: 'text-success', dot: 'bg-success', label: '🟢 AMÉLIORATION' },
   };
+  if (isUrgent && priority !== 'CRITIQUE' && priority !== 'AMELIORATION') {
+    return { ...configs.CRITIQUE };
+  }
   return configs[priority] ?? configs.IMPORTANT;
 }
 
@@ -75,10 +145,10 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
   if (isNewFormat) {
     // ── Nouveau format ──────────────────────────────────────────────────────
     const style = getCategorieStyle(recommendation.categorie);
-    const prioriteLabel = getPrioriteLabel(recommendation.priorite);
-    const difficulte = String(recommendation.difficulte || '').split(':')[0].trim();
-    const temps = String(recommendation.temps || '');
-    const roiLabel = (Number(recommendation.priorite) <= 2) ? 'ROI élevé' : (Number(recommendation.priorite) <= 4 ? 'ROI moyen' : 'ROI faible');
+    const prioriteLabel = getPrioriteLabel(recommendation.priorite, recommendation.categorie);
+    const tempsDisplay = getTemps(recommendation);
+    const difficulteDisplay = getDifficulte(recommendation);
+    const difficulteColor = getDifficulteColor(difficulteDisplay);
 
     // Mask sensitive content for critical recommendations (server-side criticals)
     const maskSensitive = isLocked && Boolean(recommendation._mask_sensitive || recommendation.maskSensitive || recommendation.priorite === 1 || recommendation.priority === 'CRITIQUE');
@@ -132,9 +202,9 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
             </span>
             <span className="text-white/50 text-xs">{prioriteLabel}</span>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/5 text-white/80">{roiLabel}</span>
-          </div>
+          <span className="text-xs font-medium text-cyan-400/80 bg-cyan-400/8 border border-cyan-400/15 px-2 py-1 rounded-lg flex-shrink-0 whitespace-nowrap">
+            ⏱️ {tempsDisplay}
+          </span>
         </div>
 
         {/* Action (titre de la recommandation) */}
@@ -151,18 +221,27 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
 
         {/* Impact */}
         {recommendation.impact && (
-          <div className={`${style.badgeBg} border ${style.borderColor} rounded-lg px-3 py-2`}>
+          <div className={`${style.badgeBg} border ${style.borderColor} rounded-lg px-3 py-2 mb-2`}>
             <p className={`${style.badgeText} text-xs font-medium`}>
               Impact : {recommendation.impact}
             </p>
           </div>
         )}
+
+        {/* Difficulté */}
+        <div className="flex items-center gap-1.5 pt-2 border-t border-white/5">
+          <span className="text-white/30 text-xs">🔧</span>
+          <span className={`text-xs font-medium ${difficulteColor}`}>{difficulteDisplay}</span>
+        </div>
       </motion.div>
     );
   }
 
   // ── Ancien format (compat) ────────────────────────────────────────────────
-  const config = getPriorityConfig(recommendation.priority);
+  const config = getPriorityConfig(recommendation.priority, recommendation.categorie);
+  const tempsOld = getTemps(recommendation);
+  const difficulteOld = getDifficulte(recommendation);
+  const difficulteOldColor = getDifficulteColor(difficulteOld);
 
   return (
     <motion.div
@@ -184,8 +263,8 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
         <span className={`text-xs font-semibold px-3 py-1 rounded-full ${config.badgeBg} ${config.badgeText}`}>
           {config.label}
         </span>
-        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/5 text-white/80">
-          {recommendation.priority === 'CRITIQUE' ? 'ROI élevé' : (recommendation.priority === 'IMPORTANT' ? 'ROI moyen' : 'ROI faible')}
+        <span className="text-xs font-medium text-cyan-400/80 bg-cyan-400/8 border border-cyan-400/15 px-2 py-1 rounded-lg whitespace-nowrap">
+          ⏱️ {tempsOld}
         </span>
       </div>
 
@@ -206,11 +285,16 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
       )}
 
       {recommendation.action && (
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-2 mb-2">
           <span className="text-success mt-0.5 flex-shrink-0">→</span>
           <p className="text-text-secondary text-sm">{recommendation.action}</p>
         </div>
       )}
+
+      <div className="flex items-center gap-1.5 pt-2 border-t border-white/5">
+        <span className="text-white/30 text-xs">🔧</span>
+        <span className={`text-xs font-medium ${difficulteOldColor}`}>{difficulteOld}</span>
+      </div>
     </motion.div>
   );
 }
