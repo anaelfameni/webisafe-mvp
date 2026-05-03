@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { setCorsHeaders } from './_utils.js'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const SUPABASE_URL =
@@ -12,6 +13,8 @@ const ADMIN_EMAIL = process.env.CONTACT_ADMIN_EMAIL || 'webisafe@gmail.com'
 const FROM_EMAIL = process.env.CONTACT_FROM_EMAIL || 'Webisafe <onboarding@resend.dev>'
 
 export default async function handler(req, res) {
+  setCorsHeaders(req, res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' })
   }

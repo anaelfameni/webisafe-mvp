@@ -7,7 +7,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
 
           <div className="flex items-center gap-2">
-            <img src="/logo.svg" alt="Webisafe" className="h-6" onError={e => e.target.style.display='none'} />
+            <img src="/logo.svg" alt="Webisafe" className="h-6" loading="lazy" onError={e => e.target.style.display='none'} />
             <span className="text-white/60 text-sm">
               © 2026 Webisafe. Tous droits réservés.
             </span>

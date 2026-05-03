@@ -173,6 +173,7 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
                           <img
                             src={getFlagImageUrl(selectedCountry.code)}
                             alt={`Drapeau ${selectedCountry.name}`}
+                            loading="lazy"
                             className="h-4 w-6 rounded-[2px] object-cover shadow-sm flex-shrink-0"
                           />
                           <span className="min-w-0 flex-1 truncate text-left">
