@@ -20,7 +20,7 @@ function PaymentStep({ icon, text }) {
 export default function Payment({ user }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { getScan } = useScans();
+  const { getScan, markAsPaid } = useScans();
 
   const scanId = searchParams.get('scan_id') || '';
   const urlToAudit = normalizeURL(searchParams.get('url') || '');
@@ -219,7 +219,7 @@ export default function Payment({ user }) {
             <p className="text-xs uppercase tracking-widest text-orange-400 font-bold mb-2">⚙️ Mode Admin</p>
             <p className="text-sm text-white/70 mb-4">Accédez directement à l'audit premium sans paiement.</p>
             <button
-              onClick={() => navigate(`/rapport/${scanId}`)}
+              onClick={() => { markAsPaid(scanId); navigate(`/rapport/${scanId}`); }}
               className="inline-flex items-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600 px-6 py-3 text-sm font-bold text-white transition"
             >
               <ShieldCheck size={16} />
