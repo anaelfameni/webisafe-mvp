@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Activity, Bell, TrendingUp, CheckCircle2, Copy, Loader2, ArrowRight,
-  Eye, BarChart3, Badge, AlertTriangle, ChevronDown, ChevronUp, Zap, Clock
+  Eye, BarChart3, BadgeCheck, ChevronDown, ChevronUp, Zap, Clock
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { WAVE_PHONE_DISPLAY } from '../utils/wavePayment';
@@ -59,7 +59,7 @@ const FEATURES = [
     color: 'red',
   },
   {
-    icon: <Badge size={22} />,
+    icon: <BadgeCheck size={22} />,
     tag: 'Acquisition passive',
     title: 'Badge "Sécurisé par Webisafe"',
     desc: 'Un script de 2 lignes dans le footer de votre site. Affiche votre score en temps réel. Chaque visiteur de votre site voit le nom Webisafe.',
