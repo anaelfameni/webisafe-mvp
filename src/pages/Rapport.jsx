@@ -929,25 +929,10 @@ export default function Rapport() {
                 combined.push({ priorite: 4, categorie: 'Amélioration', action: 'Audit supplémentaire recommandé', explication: 'Nous pouvons proposer des gains supplémentaires après une revue approfondie.', impact: "Opportunités d'optimisation identifiées" });
               }
 
-              const total = combined.length;
-              let visible = 3;
-              if (total <= 2) visible = 2;
-              else if (total === 3) visible = 3;
-              else if (total === 4) visible = 2;
-              else if (total >= 5) visible = 3;
-
-              const visibleItems = combined.slice(0, visible);
-              const blurredItems = combined.slice(visible);
-
               return (
                 <>
-                  {visibleItems.map((r, i) => (
-                    <RecommendationCard key={`v-${i}`} recommendation={r} index={i} isLocked={false} />
-                  ))}
-                  {blurredItems.map((r, i) => (
-                    <div key={`b-${i}`} className="filter blur-sm">
-                      <RecommendationCard recommendation={r} index={visible + i} isLocked={true} />
-                    </div>
+                  {combined.map((r, i) => (
+                    <RecommendationCard key={`r-${i}`} recommendation={r} index={i} isLocked={false} />
                   ))}
                 </>
               );

@@ -500,8 +500,6 @@ export default function Analyse() {
           <p className="text-lg text-white">{extractDomain(url)}</p>
         </motion.div>
 
-        <CriticalAlertsBanner alerts={criticalAlerts} />
-
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
           <PremiumScoreCard
             score={globalScore}
@@ -521,6 +519,8 @@ export default function Analyse() {
             }
           />
         </motion.div>
+
+        <CriticalAlertsBanner alerts={criticalAlerts} />
 
         <LatencyWarningBadge serverLocation={serverLocation} />
 
