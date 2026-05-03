@@ -166,10 +166,9 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 1.2, ease: 'easeOut' }}
-            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight flex flex-col items-center gap-2"
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6 leading-tight"
           >
-            <span>Analysez votre site web</span>
-            <span className="shiny-text">en 1 seul clic</span>
+            Auditez la sécurité, le SEO et la performance de votre site web en 30 secondes
           </motion.h1>
 
           <motion.p
