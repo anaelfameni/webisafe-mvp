@@ -196,7 +196,7 @@ export default function Admin({ user }) {
 
         <div className="p-4 border-t border-white/10">
           <p className="text-white/40 text-xs mb-3 truncate">{user?.email}</p>
-          <button onClick={() => { window.location.href = '/'; }} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 transition text-white text-sm font-semibold">
+          <button onClick={() => { navigate('/'); }} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 transition text-white text-sm font-semibold">
             <LogOut size={14} /> ← Retour à l'accueil
           </button>
         </div>

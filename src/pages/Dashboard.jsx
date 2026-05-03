@@ -644,7 +644,7 @@ export default function Dashboard({ user }) {
               <p className="text-white/40 text-xs truncate">{user.email}</p>
             </div>
           </div>
-          <button onClick={() => { window.location.href = '/'; }} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 transition text-white text-sm font-semibold mb-2">
+          <button onClick={() => { navigate('/'); }} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 transition text-white text-sm font-semibold mb-2">
             <LogOut size={14} /> ← Retour à l'accueil
           </button>
         </div>

@@ -3,6 +3,16 @@ import { supabase } from '../lib/supabaseClient'
 import { isAdminCredentials, buildAdminUser } from '../utils/adminAuth'
 
 const AUTH_KEY = 'webisafe_auth'
+const USERS_KEY = 'webisafe_users'
+
+function safeParse(json, fallback) {
+  try { return JSON.parse(json); } catch { return fallback; }
+}
+
+function getLegacyUsers() {
+  if (typeof window === 'undefined') return [];
+  return safeParse(localStorage.getItem(USERS_KEY) || '[]', []);
+}
 
 const AuthContext = createContext({})
 
@@ -19,7 +29,7 @@ export function AuthProvider({ children }) {
         fetchProfile(session.user.id)
         return
       }
-      // Fallback : ancien auth localStorage (compatibilité)
+      // Fallback 1 : ancien auth localStorage (compatibilité admin)
       const stored = localStorage.getItem(AUTH_KEY)
       if (stored) {
         try {
@@ -33,6 +43,18 @@ export function AuthProvider({ children }) {
         } catch {
           localStorage.removeItem(AUTH_KEY)
         }
+      }
+      // Fallback 2 : anciens comptes clients dans webisafe_users
+      const legacyUsers = getLegacyUsers()
+      const lastLegacy = legacyUsers[legacyUsers.length - 1]
+      if (lastLegacy?.email) {
+        const safeUser = { ...lastLegacy }
+        delete safeUser.password
+        setUser(safeUser)
+        setProfile({ full_name: safeUser.name, role: 'user' })
+        localStorage.setItem(AUTH_KEY, JSON.stringify(safeUser))
+        setLoading(false)
+        return
       }
       setLoading(false)
     })
@@ -82,8 +104,24 @@ export function AuthProvider({ children }) {
       }
 
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) return { success: false, error: 'Email ou mot de passe incorrect' }
-      return { success: true, redirectTo: '/dashboard' }
+      if (!error) return { success: true, redirectTo: '/dashboard' }
+
+      // Fallback : anciens comptes localStorage (compatibilité)
+      const legacyUsers = getLegacyUsers()
+      const found = legacyUsers.find(
+        (u) => String(u.email || '').trim().toLowerCase() === String(email || '').trim().toLowerCase() &&
+               u.password === password
+      )
+      if (found) {
+        const safeUser = { ...found }
+        delete safeUser.password
+        setUser(safeUser)
+        setProfile({ full_name: safeUser.name, role: 'user' })
+        localStorage.setItem(AUTH_KEY, JSON.stringify(safeUser))
+        return { success: true, redirectTo: '/dashboard' }
+      }
+
+      return { success: false, error: 'Email ou mot de passe incorrect' }
     }
   }
 
