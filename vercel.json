@@ -26,14 +26,6 @@
       "memory": 128,
       "maxDuration": 5
     },
-    "api/cron/monthly-scan.js": {
-      "memory": 512,
-      "maxDuration": 60
-    },
-    "api/cron/ssl-check.js": {
-      "memory": 256,
-      "maxDuration": 30
-    },
     "api/subscriptions.js": {
       "memory": 128,
       "maxDuration": 10
@@ -66,7 +58,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.cloudflareworkers.com https://*.supabase.co;"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://api.resend.com;"
         },
         {
           "key": "X-Frame-Options",
