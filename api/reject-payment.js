@@ -1,4 +1,4 @@
-import { json, readJsonBody, sendResendEmail, setCorsHeaders } from './_utils.js';
+import { json, readJsonBody, sendResendEmail, setCorsHeaders, checkRateLimit } from './_utils.js';
 import { buildPaymentRejectedEmail } from '../src/utils/paymentEmails.js';
 
 export default async function handler(req, res) {
@@ -6,6 +6,11 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') {
     return json(res, 405, { success: false, error: 'Method not allowed' });
+  }
+
+  const rateLimit = checkRateLimit(req, 10, 60000);
+  if (!rateLimit.allowed) {
+    return json(res, 429, { success: false, error: `Trop de requêtes. Réessayez dans ${rateLimit.retryAfter}s.` });
   }
 
   try {

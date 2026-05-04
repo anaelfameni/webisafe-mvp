@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { json, setCorsHeaders } from './_utils.js';
+import { json, setCorsHeaders, requireAdmin } from './_utils.js';
 
 const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
   ? createClient(
@@ -13,6 +13,10 @@ export default async function handler(req, res) {
   setCorsHeaders(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
+
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
+
   if (!supabase) return json(res, 503, { error: 'Service indisponible' });
 
   const limit = parseInt(req.query?.limit || '50', 10);

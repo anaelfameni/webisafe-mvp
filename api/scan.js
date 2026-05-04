@@ -4,7 +4,7 @@ import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import { runAdvancedSecurityChecks } from './scanners/security-checks.js';
 import { runExtendedSecurityChecks } from './scanners/extended-security-checks.js';
-import { setCorsHeaders } from './_utils.js';
+import { setCorsHeaders, checkRateLimit } from './_utils.js';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -74,6 +74,17 @@ function applyScoreCap(score, failedChecks = []) {
     return Math.min(score, cap);
 }
 
+const PRIVATE_IP_PATTERNS = [
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+  /^192\.168\./,
+  /^0\./,
+  /^::1$/,
+  /^fc00:/i,
+  /^fe80:/i,
+];
+
 function validateUrl(input) {
     if (!input || typeof input !== 'string') {
         return { valid: false, error: 'URL requise.' };
@@ -84,6 +95,13 @@ function validateUrl(input) {
     }
     if (!['http:', 'https:'].includes(parsed.protocol)) {
         return { valid: false, error: 'Seuls HTTP et HTTPS sont acceptés.' };
+    }
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname.endsWith('.local')) {
+        return { valid: false, error: 'Les URLs locales ne sont pas autorisées.' };
+    }
+    if (PRIVATE_IP_PATTERNS.some((re) => re.test(hostname))) {
+        return { valid: false, error: 'Les adresses IP privées ne sont pas autorisées.' };
     }
     return { valid: true, url: parsed.href };
 }
@@ -699,6 +717,11 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST')
         return res.status(405).json({ success: false, error: 'Method Not Allowed' });
+
+    const rateLimit = checkRateLimit(req, 5, 60000);
+    if (!rateLimit.allowed) {
+        return res.status(429).json({ success: false, error: `Trop de scans. Réessayez dans ${rateLimit.retryAfter}s.`, type: 'RATE_LIMITED' });
+    }
 
     let body;
     try { body = await readJsonBody(req); }

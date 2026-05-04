@@ -3,7 +3,6 @@ export const WAVE_PHONE = '+2250170907780';
 export const WAVE_PHONE_DISPLAY = '+225 01 70 90 77 80';
 export const WAVE_SUPPORT_WHATSAPP = '2250170907780';
 export const REPORT_FIX_WHATSAPP = '2250595335662';
-export const ADMIN_TOKEN = 'WEBISAFE_ADMIN_2025';
 
 export function generateWavePaymentCode(random = Math.random) {
   const digits = Array.from({ length: 4 }, () => Math.floor(random() * 10)).join('');

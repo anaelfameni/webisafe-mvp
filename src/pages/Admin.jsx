@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Loader2, RefreshCw, ShieldAlert, LayoutDashboard, CreditCard,
@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import ToastMessage from '../components/ToastMessage';
 import { fetchPaymentRequests, markScanPaid, sendConfirmPayment, sendRejectPayment, updatePaymentRequest } from '../utils/paymentApi';
-import { ADMIN_TOKEN, computePaymentStats, formatFcfa, getRelativeTimeLabel, isPendingPaymentStatus } from '../utils/wavePayment';
+import { computePaymentStats, formatFcfa, getRelativeTimeLabel, isPendingPaymentStatus } from '../utils/wavePayment';
+import { supabase } from '../lib/supabaseClient';
 
 function AdminKpiCard({ value, label, tone, icon }) {
   const toneClasses = {
@@ -41,9 +42,7 @@ const ADMIN_NAV = [
 
 export default function Admin({ user }) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
-  const isAuthorized = token === ADMIN_TOKEN || user?.role === 'admin';
+  const isAuthorized = user?.role === 'admin';
 
   const [payments, setPayments] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
@@ -61,6 +60,14 @@ export default function Admin({ user }) {
   useEffect(() => { if (!isAuthorized) navigate('/', { replace: true }); }, [isAuthorized, navigate]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2800); return () => clearTimeout(t); }, [toast]);
 
+  async function getAdminHeaders() {
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    };
+  }
+
   const loadPayments = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -76,7 +83,7 @@ export default function Admin({ user }) {
 
   const loadSubscriptions = useCallback(async (silent = false) => {
     try {
-      const res = await fetch('/api/subscriptions');
+      const res = await fetch('/api/subscriptions', { headers: await getAdminHeaders() });
       if (res.ok) {
         const data = await res.json();
         setSubscriptions(data.subscriptions || []);
@@ -128,7 +135,7 @@ export default function Admin({ user }) {
     try {
       const res = await fetch('/api/confirm-subscription', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminHeaders(),
         body: JSON.stringify({ subscription_id: sub.id, validated_by: 'admin' }),
       });
       if (!res.ok) throw new Error('Erreur activation');
@@ -145,7 +152,7 @@ export default function Admin({ user }) {
     try {
       await fetch('/api/reject-subscription', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminHeaders(),
         body: JSON.stringify({ subscription_id: rejectingSubscription.id, rejection_reason: subRejectionReason }),
       });
       setToast({ type: 'success', message: 'Abonnement rejeté. Email envoyé.' });

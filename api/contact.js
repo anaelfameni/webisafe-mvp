@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { setCorsHeaders } from './_utils.js'
+import { setCorsHeaders, checkRateLimit, json } from './_utils.js'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const SUPABASE_URL =
@@ -19,10 +19,32 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Méthode non autorisée' })
   }
 
+  const rateLimit = checkRateLimit(req, 5, 60000);
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ error: `Trop de messages. Réessayez dans ${rateLimit.retryAfter}s.` });
+  }
+
   const { name, email, subject, message } = req.body || {}
 
   if (!name || !email || !message) {
     return res.status(400).json({ error: 'Champs obligatoires manquants' })
+  }
+
+  // Sanitize + validate
+  const trimmedName = String(name).trim();
+  const trimmedEmail = String(email).trim().toLowerCase();
+  const trimmedSubject = String(subject || '').trim();
+  const trimmedMessage = String(message).trim();
+
+  if (trimmedName.length < 2 || trimmedName.length > 100) {
+    return res.status(400).json({ error: 'Le nom doit faire entre 2 et 100 caractères.' });
+  }
+  if (trimmedMessage.length < 10 || trimmedMessage.length > 5000) {
+    return res.status(400).json({ error: 'Le message doit faire entre 10 et 5000 caractères.' });
+  }
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!EMAIL_RE.test(trimmedEmail)) {
+    return res.status(400).json({ error: 'Adresse email invalide.' });
   }
 
   // Vérification config serveur
@@ -47,7 +69,7 @@ export default async function handler(req, res) {
   try {
     const { error: dbError } = await supabase
       .from('contact_messages')
-      .insert({ name, email, subject: subject || null, message })
+      .insert({ name: trimmedName, email: trimmedEmail, subject: trimmedSubject || null, message: trimmedMessage })
 
     if (dbError) {
       console.error('[contact] Supabase insert error:', dbError)
