@@ -392,6 +392,24 @@ async function scanSEO(url) {
     const metaRobots = $('meta[name="robots"]').attr('content')?.toLowerCase() ?? '';
     const isIndexable = !metaRobots.includes('noindex');
     const h1Count = $('h1').length;
+
+    // ── Détection SPA (React, Vue, Angular, Next, Nuxt, SvelteKit) ─────────────
+    // Sur une SPA le contenu principal (H1, paragraphes…) est injecté côté client
+    // et absent du HTML statique servi par le serveur.
+    const spaRootIds = ['#root', '#app', '#__next', '#__nuxt', '#__sveltekit'];
+    const hasSpaRoot = spaRootIds.some(sel => $(sel).length > 0);
+    const bodyText = $('body').clone().find('script, style, noscript').remove().end().text().trim();
+    const isEmptyBody = bodyText.length < 200;
+    const hasScriptBundles = $('script[src*="/assets/"]').length > 0 ||
+                             $('script[src*="/chunk"]').length > 0 ||
+                             $('script[src*="/bundle"]').length > 0 ||
+                             $('script[src*="main."]').length > 0 ||
+                             $('script[src*="index."]').length > 0;
+    const isSPA = hasSpaRoot && (isEmptyBody || hasScriptBundles);
+
+    // Si c'est une SPA et qu'aucun H1 n'est trouvé dans le HTML statique,
+    // on suppose qu'il est rendu côté client → on ne pénalise pas.
+    const effectiveH1Count = (isSPA && h1Count === 0) ? 1 : h1Count;
     const ogTitle = $('meta[property="og:title"]').attr('content');
     const ogDesc = $('meta[property="og:description"]').attr('content');
     const ogImage = $('meta[property="og:image"]').attr('content');
@@ -424,8 +442,8 @@ async function scanSEO(url) {
     if (description.length > 0) rawScore += 10;
     if (hasSitemap) rawScore += 10;
     if (hasCanonical) rawScore += 5;
-    if (h1Count === 1) rawScore += 5;
-    else if (h1Count > 1) rawScore += 2;
+    if (effectiveH1Count === 1) rawScore += 5;
+    else if (effectiveH1Count > 1) rawScore += 2;
     if (hasOpenGraph) rawScore += 5;
 
     const failedChecks = [];
@@ -435,8 +453,8 @@ async function scanSEO(url) {
     if (!hasCanonical) failedChecks.push('no_canonical');
     if (!isIndexable) failedChecks.push('not_indexable');
     if (!hasOpenGraph) failedChecks.push('no_open_graph');
-    if (h1Count === 0) failedChecks.push('no_h1');
-    else if (h1Count > 1) failedChecks.push('multiple_h1');
+    if (effectiveH1Count === 0) failedChecks.push('no_h1');
+    else if (effectiveH1Count > 1) failedChecks.push('multiple_h1');
 
     let cappedScore = applyScoreCap(Math.min(100, rawScore), failedChecks);
     // Floor minimum pour les pages applicatives (ex: Google) qui manquent d'éléments de landing
@@ -453,6 +471,8 @@ async function scanSEO(url) {
         has_description: description.length > 0,
         description_length: description.length,
         h1_count: h1Count,
+        h1_detected_in_static_html: h1Count > 0,
+        spa_detected: isSPA,
         has_viewport: hasViewport,
         has_open_graph: hasOpenGraph,
         has_canonical: hasCanonical,
