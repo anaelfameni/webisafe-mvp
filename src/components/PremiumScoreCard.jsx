@@ -1,6 +1,6 @@
 import ScoreGaugeChart from './ScoreGaugeChart';
 
-export default function PremiumScoreCard({ score, ctaButton, onClose, compact = false, badgeLiftMobile = false }) {
+export default function PremiumScoreCard({ score, domain, ctaButton, onClose, compact = false, badgeLiftMobile = false }) {
   const now = new Date();
   const formattedDate = now.toLocaleDateString('fr-FR', {
     day: '2-digit',
@@ -16,7 +16,7 @@ export default function PremiumScoreCard({ score, ctaButton, onClose, compact = 
       >
         <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-[radial-gradient(circle,_rgba(99,179,237,0.06)_0%,_transparent_70%)] pointer-events-none" />
 
-        <div className={`flex ${compact ? 'flex-col items-center' : 'flex-col md:flex-row'} items-center justify-between ${compact ? 'gap-6' : 'gap-8 md:gap-16'} w-full z-10`}>
+        <div className={`flex ${compact ? 'flex-col items-center' : 'flex-col md:flex-row'} items-center justify-between ${compact ? 'gap-6' : 'gap-8 md:gap-16'} w-full z-10 pb-12`}>
           <ScoreGaugeChart score={score} compact={compact} showLegend={!compact} badgeLiftMobile={badgeLiftMobile} />
 
           {!compact && (
@@ -33,7 +33,7 @@ export default function PremiumScoreCard({ score, ctaButton, onClose, compact = 
                   (score >= 30 && score < 50 && seg.label === 'MAUVAIS') ||
                   (score >= 50 && score < 70 && seg.label === 'ACCEPTABLE') ||
                   (score >= 70 && score < 90 && seg.label === 'BON') ||
-                  (score >= 90 && score < 100 && seg.label === 'EXCELLENT');
+                  (score >= 90 && score <= 100 && seg.label === 'EXCELLENT');
 
                 return (
                   <div
@@ -79,7 +79,7 @@ export default function PremiumScoreCard({ score, ctaButton, onClose, compact = 
         <div className="w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-10 mt-4 mb-4" />
 
         <div className="flex items-center justify-between w-full z-10">
-          <span className="text-xs text-white">webisafe.ci · Analyse complète</span>
+          <span className="text-xs text-white">Analyse complète</span>
           <span className="text-xs text-white">Analysé le {formattedDate}</span>
         </div>
 

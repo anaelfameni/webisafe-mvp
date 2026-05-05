@@ -57,7 +57,7 @@ export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewD
               )}
               {metric.status && (
                 <span>
-                  {metric.status === 'pass' ? '✅' : metric.status === 'warn' ? '⚠️' : '❌'}
+                  {metric.status === 'pass' ? '✅' : metric.status === 'warn' ? '⚠️' : metric.status === 'unknown' ? '—' : '❌'}
                 </span>
               )}
             </div>

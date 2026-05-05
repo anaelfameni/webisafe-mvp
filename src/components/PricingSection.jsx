@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { Check, ArrowRight, MessageCircle, Shield, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export default function PricingSection({ onScan }) {
+export default function PricingSection({ onScan, hideHeader = false }) {
   const navigate = useNavigate();
 
   const plans = [
@@ -84,8 +84,9 @@ export default function PricingSection({ onScan }) {
   ];
 
   return (
-    <section id="pricing" className="py-20 px-4">
+    <section id="pricing" className={`${hideHeader ? 'py-6' : 'py-20'} px-4`}>
       <div className="max-w-7xl mx-auto">
+        {!hideHeader && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -97,8 +98,9 @@ export default function PricingSection({ onScan }) {
             Pas d'abonnement caché. Des tarifs pensés pour les PME.
           </p>
         </motion.div>
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {plans.map((plan, index) => (
             <motion.div
               key={index}

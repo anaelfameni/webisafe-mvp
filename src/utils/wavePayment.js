@@ -1,8 +1,22 @@
-export const WAVE_PAYMENT_AMOUNT = 35000;
-export const WAVE_PHONE = '+2250170907780';
-export const WAVE_PHONE_DISPLAY = '+225 01 70 90 77 80';
-export const WAVE_SUPPORT_WHATSAPP = '2250170907780';
-export const REPORT_FIX_WHATSAPP = '2250595335662';
+import {
+  SUPPORT_PHONE_RAW,
+  REPORT_FIX_PHONE_RAW,
+  SUPPORT_PHONE,
+  WAVE_BUSINESS_LINKS,
+} from '../config/brand';
+
+export const WAVE_PAYMENT_AMOUNT = 35000;        // Montant net affiché historiquement
+export const WAVE_PAYMENT_TOTAL = 35350;           // Montant TTC avec frais Wave
+export const WAVE_PROTECT_TOTAL = 15150;           // Montant TTC Protect avec frais Wave
+export const WAVE_PHONE = SUPPORT_PHONE_RAW;
+export const WAVE_PHONE_DISPLAY = SUPPORT_PHONE;
+export const WAVE_SUPPORT_WHATSAPP = SUPPORT_PHONE_RAW;
+export const REPORT_FIX_WHATSAPP = REPORT_FIX_PHONE_RAW;
+
+export function getWaveBusinessLink(type = 'audit') {
+  if (type === 'protect') return WAVE_BUSINESS_LINKS.protect;
+  return WAVE_BUSINESS_LINKS.audit;
+}
 
 export function generateWavePaymentCode(random = Math.random) {
   const digits = Array.from({ length: 4 }, () => Math.floor(random() * 10)).join('');

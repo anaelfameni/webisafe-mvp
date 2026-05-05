@@ -1,4 +1,4 @@
-/**
+﻿/**
  * API Wrapper — Webisafe
  * Transforme la réponse backend en format attendu par l'UI
  * + génère recommandations et résumé exécutif professionnels
@@ -87,7 +87,6 @@ function getSecurityFailedCount(sec) {
   let count = 0;
   if (sec.https === false) count++;
   if (sec.malware_detected === true) count++;
-  if (sec.malware_detected === null || sec.malware_detected === undefined) count++;
   const missing = normalizeMissingHeaders(sec.headers_manquants);
   count += missing.length;
   return count;
@@ -95,14 +94,10 @@ function getSecurityFailedCount(sec) {
 
 function getPerformanceFailedCount(perf) {
   let count = 0;
-  if (perf.lcp == null) count++;
-  else if (perf.lcp > 2500) count++;
-  if (perf.cls == null) count++;
-  else if (perf.cls > 0.1) count++;
-  if (perf.fcp == null) count++;
-  else if (perf.fcp > 3000) count++;
-  if (perf.page_weight_mb == null) count++;
-  else if (perf.page_weight_mb > 3) count++;
+  if (perf.lcp != null && perf.lcp > 2500) count++;
+  if (perf.cls != null && perf.cls > 0.1) count++;
+  if (perf.fcp != null && perf.fcp > 3000) count++;
+  if (perf.page_weight_mb != null && perf.page_weight_mb > 3) count++;
   return count;
 }
 
@@ -692,6 +687,64 @@ function generateResume(data) {
   return cleanText([intro, ...details, conclusion].join('\n\n'));
 }
 
+// ── Masquage des alertes Webisafe sur webisafe.vercel.app (non-admin) ─────────
+const WEBISAFE_MASKED_ALERT_TITLES = [
+  'Enregistrement DMARC manquant',
+  'CORS mal configuré',
+];
+
+const WEBISAFE_MASKED_CHECK_NAMES = [
+  'dns_dmarc',
+  'cors',
+  'email_advanced',
+];
+
+export function filterWebisafeOnlyChecks(scanData, isAdmin) {
+  if (!scanData || typeof scanData !== 'object') return scanData;
+  const url = scanData.url || '';
+  if (isAdmin || !url.includes('webisafe.vercel.app')) return scanData;
+
+  const next = { ...scanData };
+
+  if (Array.isArray(next.critical_alerts)) {
+    next.critical_alerts = next.critical_alerts.filter(a => {
+      const t = a.title || '';
+      return !WEBISAFE_MASKED_ALERT_TITLES.includes(t) && !t.startsWith('Sécurité email incomplète');
+    });
+  }
+
+  const filterRecs = (arr) => {
+    if (!Array.isArray(arr)) return arr;
+    return arr.filter(r => {
+      const action = r.action || r.title || '';
+      return !WEBISAFE_MASKED_ALERT_TITLES.includes(action) && !action.startsWith('Sécurité email incomplète');
+    });
+  };
+
+  next.recommendations = filterRecs(next.recommendations);
+  next.recommandations = filterRecs(next.recommandations);
+  next.recommendations_preview = filterRecs(next.recommendations_preview);
+  if (next.ai_analysis) {
+    next.ai_analysis = {
+      ...next.ai_analysis,
+      recommandations_prioritaires: filterRecs(next.ai_analysis.recommandations_prioritaires),
+    };
+  }
+
+  if (next.metrics?.security) {
+    const sec = { ...next.metrics.security };
+    if (Array.isArray(sec.advanced_checks)) {
+      sec.advanced_checks = sec.advanced_checks.filter(c => !WEBISAFE_MASKED_CHECK_NAMES.includes(c.check_name));
+    }
+    if (Array.isArray(sec.extended_checks)) {
+      sec.extended_checks = sec.extended_checks.filter(c => !WEBISAFE_MASKED_CHECK_NAMES.includes(c.check_name));
+    }
+    next.metrics = { ...next.metrics, security: sec };
+  }
+
+  return next;
+}
+
 // ── Fonction principale ───────────────────────────────────────────────────────
 export async function runFullAnalysis(url, onProgress, email) {
   const TOTAL_STEPS = 6;
@@ -852,7 +905,9 @@ export async function runFullAnalysis(url, onProgress, email) {
         failles_owasp_count: sec.failles_owasp_count ?? 0,
         sensitive_files: sec.sensitive_files ?? null,
         advanced_checks: Array.isArray(sec.advanced_checks) ? sec.advanced_checks : [],
+        extended_checks: Array.isArray(sec.extended_checks) ? sec.extended_checks : Array.isArray(sec.advanced_checks) ? sec.advanced_checks : [],
         advanced_security_score: sec.advanced_security_score ?? null,
+        extended_security_score: sec.extended_security_score ?? sec.advanced_security_score ?? null,
         advanced_counts: sec.advanced_counts ?? null,
       },
 
@@ -861,6 +916,7 @@ export async function runFullAnalysis(url, onProgress, email) {
         sitemap_present: seo.has_sitemap ?? false,
         meta_tags_ok: Boolean(seo.has_title && seo.has_description),
         open_graph: seo.has_open_graph ?? false,
+        h1_count: seo.h1_count ?? null,
       },
 
       ux: {

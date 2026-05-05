@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Lock, MapPin, X } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Lock, MapPin, Wrench, X } from 'lucide-react';
+import LargeSiteDisclaimer from '../components/LargeSiteDisclaimer';
 
+import CriticalAlertsBanner from '../components/CriticalAlertsBanner';
 import ScanProgress from '../components/ScanProgress';
 import PremiumScoreCard from '../components/PremiumScoreCard';
 import ScoreCard from '../components/ScoreCard';
@@ -12,76 +14,14 @@ import HighlightedTechText from '../components/HighlightedTechText';
 import WaveCheckoutModal from '../components/WaveCheckoutModal';
 import AuthModal from '../components/AuthModal';
 
-import { runFullAnalysis } from '../utils/api';
+import { runFullAnalysis, filterWebisafeOnlyChecks } from '../utils/api';
 import { useScans } from '../hooks/useScans';
 import { useAuth } from '../hooks/useAuth';
 import { normalizeURL, extractDomain } from '../utils/validators';
 import { sendNurtureEmail } from '../utils/emailApi';
-
-// ── Bandeau Alertes ───────────────────────────────────────────────────────────
-const CriticalAlertsBanner = ({ alerts }) => {
-  const [dismissed, setDismissed] = useState([]);
-
-  if (!Array.isArray(alerts) || alerts.length === 0) return null;
-
-  const visible = alerts.filter((_, i) => !dismissed.includes(i));
-  if (visible.length === 0) return null;
-
-  const SEVERITY_STYLE = {
-    critical: 'bg-red-500/15 border-red-500/40 text-red-300',
-    high: 'bg-orange-500/15 border-orange-500/40 text-orange-300',
-    warning: 'bg-yellow-500/15 border-yellow-500/40 text-yellow-200',
-  };
-
-  const SEVERITY_ICON = {
-    critical: '🚨',
-    high: '⚠️',
-    warning: '🌍',
-  };
-
-  return (
-    <div className="space-y-3 mb-8">
-      <AnimatePresence>
-        {alerts.map((alert, i) => {
-          if (dismissed.includes(i)) return null;
-          const style = SEVERITY_STYLE[alert.severity] ?? SEVERITY_STYLE.warning;
-          const icon = SEVERITY_ICON[alert.severity] ?? '⚠️';
-
-          return (
-            <motion.div
-              key={`${alert.title}-${i}`}
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className={`flex items-start gap-3 p-4 rounded-xl border ${style}`}
-            >
-              <span className="text-xl flex-shrink-0">{icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm">{alert.title}</p>
-                {alert.message && (
-                  <p className="text-white/70 text-xs mt-0.5">{alert.message}</p>
-                )}
-                {alert.impact && (
-                  <p className="text-white/50 text-xs mt-0.5">Impact : {alert.impact}</p>
-                )}
-                {alert.recommendation && (
-                  <p className="text-white/50 text-xs mt-0.5">Conseil : {alert.recommendation}</p>
-                )}
-              </div>
-              <button
-                onClick={() => setDismissed((d) => [...d, i])}
-                className="flex-shrink-0 text-white/30 hover:text-white/70 transition-colors"
-                aria-label="Fermer"
-              >
-                <X size={14} />
-              </button>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
-    </div>
-  );
-};
+import { SUPPORT_PHONE } from '../config/brand';
+import { trackClarityEvent } from '../lib/clarity';
+import { supabase } from '../lib/supabaseClient';
 
 // ── Badge latence / CDN ───────────────────────────────────────────────────────
 const LatencyWarningBadge = ({ serverLocation }) => {
@@ -104,7 +44,7 @@ const LatencyWarningBadge = ({ serverLocation }) => {
           <p className="text-yellow-200/80 text-xs mt-1">{latency_warning.message}</p>
         )}
         {latency_warning.recommendation && (
-          <p className="text-white/50 text-xs mt-1">💡 {latency_warning.recommendation}</p>
+          <p className="text-white/50 text-xs mt-1"> {latency_warning.recommendation}</p>
         )}
       </div>
     </motion.div>
@@ -116,9 +56,9 @@ const ErrorState = ({ error }) => {
   const navigate = useNavigate();
 
   const ERROR_CONFIG = {
-    INVALID_URL: { title: 'URL invalide', icon: '🔗', action: "Corriger l'URL" },
-    SITE_UNREACHABLE: { title: 'Site inaccessible', icon: '🔌', action: 'Réessayer' },
-    SCAN_ERROR: { title: "Erreur d'analyse", icon: '⚠️', action: 'Réessayer' },
+    INVALID_URL: { title: 'URL invalide', icon: '', iconLabel: 'Lien', action: "Corriger l'URL" },
+    SITE_UNREACHABLE: { title: 'Site inaccessible', icon: '', iconLabel: 'Déconnecté', action: 'Réessayer' },
+    SCAN_ERROR: { title: "Erreur d'analyse", icon: '', iconLabel: 'Avertissement', action: 'Réessayer' },
   };
 
   const config = ERROR_CONFIG[error?.type] ?? ERROR_CONFIG.SCAN_ERROR;
@@ -126,7 +66,7 @@ const ErrorState = ({ error }) => {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="text-center max-w-md">
-        <div className="text-6xl mb-6">{config.icon}</div>
+        <div className="text-6xl mb-6" aria-hidden="true" title={config.iconLabel}>{config.icon}</div>
         <h2 className="text-2xl font-bold text-white mb-3">{config.title}</h2>
         <p className="text-white/60 mb-2">
           {error?.error ?? "Une erreur inattendue s'est produite."}
@@ -160,33 +100,41 @@ function getPerformanceMetrics(scanData) {
 
   if (!vitals) return [];
 
+  const getVitalStatus = (rating) => {
+    if (rating === 'good') return 'pass';
+    if (rating === 'needs_improvement') return 'warn';
+    if (rating === 'poor') return 'fail';
+    return 'unknown';
+  };
+
   return [
     {
       label: 'LCP',
-      value: `${vitals.lcp.value ?? 'N/A'}ms`,
-      status: vitals.lcp.rating === 'good' ? 'pass' : vitals.lcp.rating === 'needs_improvement' ? 'warn' : 'fail',
+      value: vitals.lcp.value != null ? `${vitals.lcp.value}ms` : 'Non mesure',
+      status: getVitalStatus(vitals.lcp.rating),
     },
     {
       label: 'CLS',
-      value: vitals.cls.value ?? 'N/A',
-      status: vitals.cls.rating === 'good' ? 'pass' : vitals.cls.rating === 'needs_improvement' ? 'warn' : 'fail',
+      value: vitals.cls.value ?? 'Non mesure',
+      status: getVitalStatus(vitals.cls.rating),
     },
     {
       label: 'FCP',
-      value: `${vitals.fcp.value ?? 'N/A'}ms`,
-      status: vitals.fcp.rating === 'good' ? 'pass' : vitals.fcp.rating === 'needs_improvement' ? 'warn' : 'fail',
+      value: vitals.fcp.value != null ? `${vitals.fcp.value}ms` : 'Non mesure',
+      status: getVitalStatus(vitals.fcp.rating),
     },
     {
       label: 'Taille Page',
-      value: perf?.poids_page_mb != null ? `${perf.poids_page_mb}MB` : 'N/A',
+      value: perf?.poids_page_mb != null ? `${perf.poids_page_mb}MB` : 'Non mesure',
+      status: perf?.poids_page_mb == null ? 'unknown' : perf.poids_page_mb > 3 ? 'fail' : perf.poids_page_mb > 2 ? 'warn' : 'pass',
     },
     {
-      label: 'Requêtes',
-      value: perf?.nb_requetes != null ? String(perf.nb_requetes) : 'N/A',
+      label: 'Requetes',
+      value: perf?.nb_requetes != null ? String(perf.nb_requetes) : 'Non mesure',
+      status: perf?.nb_requetes == null ? 'unknown' : perf.nb_requetes > 100 ? 'fail' : perf.nb_requetes > 60 ? 'warn' : 'pass',
     },
   ];
 }
-
 function getSecurityMetrics(scanData) {
   const sec = scanData?.security ?? {};
   const summary = scanData?.summary ?? {};
@@ -221,6 +169,7 @@ function getSecurityMetrics(scanData) {
 
 function getSeoMetrics(scanData) {
   const seo = scanData?.seo ?? {};
+  const h1Count = Number.isFinite(Number(seo.h1_count)) ? Number(seo.h1_count) : null;
   return [
     {
       label: 'Indexation Google',
@@ -236,6 +185,11 @@ function getSeoMetrics(scanData) {
       label: 'Meta Tags',
       value: seo.meta_tags_ok ? 'OK' : 'Incomplets',
       status: seo.meta_tags_ok ? 'pass' : 'fail',
+    },
+    {
+      label: 'H1',
+      value: h1Count != null ? String(h1Count) : 'Non mesuré',
+      status: h1Count == null ? 'unknown' : h1Count === 1 ? 'pass' : h1Count > 1 ? 'warn' : 'fail',
     },
     {
       label: 'Open Graph',
@@ -266,9 +220,86 @@ function getUxMetrics(scanData) {
     {
       label: 'Score Vitesse Mobile',
       value: ux.vitesse_mobile != null ? `${ux.vitesse_mobile}/100` : 'N/A',
-      status: ux.vitesse_mobile >= 70 ? 'pass' : 'warn',
+      status: ux.vitesse_mobile >= 80 ? 'pass' : 'warn', 
     },
   ];
+}
+
+function buildImprovementSentence(recommendations) {
+  const improvements = (recommendations ?? [])
+    .map((rec) => rec?.action || rec?.title || rec?.titre)
+    .filter(Boolean)
+    .slice(0, 4);
+
+  if (improvements.length === 0) return null;
+
+  return `Améliorations à faire détectées : ${improvements.join(' ; ')} ; une fois appliquées, elles peuvent renforcer la confiance des visiteurs, améliorer la visibilité Google et augmenter les conversions.`;
+}
+
+function buildFreeScanNarrative(globalScore, perfScore, secScore, seoScore, uxScore, criticalAlerts, recommendations) {
+  const g = globalScore ?? 0;
+  const perf = perfScore ?? 0;
+  const sec = secScore ?? 0;
+  const seo = seoScore ?? 0;
+  const ux = uxScore ?? 0;
+  const criticals = (criticalAlerts ?? []).filter(
+    (a) => a.severity === 'critical' || a.severity === 'high'
+  );
+  const totalRecs = recommendations?.length ?? 0;
+  const lines = [];
+
+  if (g >= 80) {
+    lines.push(
+      `Avec un score global de ${g}/100, votre site présente une excellente base technique. Quelques optimisations ciblées permettraient d'atteindre l'excellence.`
+    );
+  } else if (g >= 60) {
+    lines.push(
+      `Avec un score global de ${g}/100, votre site fonctionne — mais des problèmes techniques freinent sa croissance et limitent sa visibilité sur Google.`
+    );
+  } else if (g >= 40) {
+    lines.push(
+      `Avec un score global de ${g}/100, votre site est en dessous de la moyenne. Ces lacunes ont un impact direct sur votre trafic, votre crédibilité et vos ventes en ligne.`
+    );
+  } else {
+    lines.push(
+      `Avec un score global de ${g}/100, votre site présente des problèmes critiques. Sans corrections, vous perdez des visiteurs et exposez vos données à des risques sérieux.`
+    );
+  }
+
+  const weakAreas = [];
+  if (perf > 0 && perf < 60) weakAreas.push(`performance ${perf}/100`);
+  if (sec > 0 && sec < 60) weakAreas.push(`sécurité ${sec}/100`);
+  if (seo > 0 && seo < 60) weakAreas.push(`SEO ${seo}/100`);
+  if (ux > 0 && ux < 60) weakAreas.push(`expérience mobile ${ux}/100`);
+
+  if (weakAreas.length > 0) {
+    const suffix =
+      totalRecs > 0
+        ? ` ${totalRecs} correction${totalRecs > 1 ? 's' : ''} prioritaire${totalRecs > 1 ? 's' : ''} ont été identifiées.`
+        : '';
+    lines.push(`Points faibles détectés : ${weakAreas.join(', ')}.${suffix}`);
+  } else if (g < 80) {
+    lines.push(
+      `Les scores sont corrects dans l'ensemble, mais quelques optimisations permettraient d'améliorer votre classement Google et votre taux de conversion.`
+    );
+  }
+
+  if (criticals.length > 0) {
+    lines.push(
+      `${criticals.length} alerte${criticals.length > 1 ? 's' : ''} critique${criticals.length > 1 ? 's' : ''} ${
+        criticals.length > 1 ? 'nécessitent' : 'nécessite'
+      } une correction urgente pour protéger vos visiteurs et votre réputation.`
+    );
+  } else if (g >= 60) {
+    lines.push(
+      `Aucune alerte critique détectée — votre site ne présente pas de danger immédiat pour vos visiteurs.`
+    );
+  }
+
+  const improvementSentence = buildImprovementSentence(recommendations);
+  if (improvementSentence) lines.push(improvementSentence);
+
+  return lines.join('\n\n');
 }
 
 // ── Page principale ───────────────────────────────────────────────────────────
@@ -278,6 +309,7 @@ export default function Analyse() {
   const { saveScan } = useScans();
 
   const { isAuthenticated, user, signup, login } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const url = searchParams.get('url') || '';
   const email = searchParams.get('email') || '';
@@ -298,6 +330,8 @@ export default function Analyse() {
   const [userEmail, setUserEmail] = useState(email || '');
   const [hasPaid, setHasPaid] = useState(false);
 
+  const displayData = useMemo(() => filterWebisafeOnlyChecks(scanData, isAdmin), [scanData, isAdmin]);
+
   // Affiche FreemiumGate automatiquement après 3s si pas encore payé
   useEffect(() => {
     if (scanState === 'results' && scanData && !isUnlocked && !hasPaid) {
@@ -314,6 +348,7 @@ export default function Analyse() {
   }, [isAuthenticated, user]);
 
   const performScan = useCallback(async () => {
+    trackClarityEvent('scan_initiated', url);
     if (!url) {
       setScanError({ type: 'INVALID_URL', error: 'Aucune URL spécifiée.' });
       setScanState('error');
@@ -341,10 +376,21 @@ export default function Analyse() {
       const id = saveScan(scanPayload);
       const storedScan = { ...scanPayload, id };
 
+      try {
+        await supabase.from('scan_events').insert({
+          domain: extractDomain(url),
+          score: storedScan.scores?.global ?? storedScan.global_score ?? null,
+          country: storedScan.metrics?.performance?.server_location?.country ?? 'CI',
+          created_at: new Date().toISOString(),
+        });
+      } catch (_) {
+      }
+
       setScanId(id);
       setScanData(storedScan);
       setHasPaid(false);
       setScanState('results');
+      trackClarityEvent('scan_completed', url);
 
       // Email nurturing post-scan gratuit
       try {
@@ -382,6 +428,7 @@ export default function Analyse() {
    * → Si non connecté : ouvre AuthModal en mode signup
    */
   const handleOpenAuth = useCallback(() => {
+    trackClarityEvent('freemium_gate_opened');
     setShowFreemiumGate(false);
 
     if (isAuthenticated) {
@@ -440,6 +487,7 @@ export default function Analyse() {
    * Étape 3 : WaveCheckoutModal → redirige vers /payment
    */
   const handleWavePay = useCallback(async (payEmail) => {
+    trackClarityEvent('payment_redirected', scanId);
     setUserEmail(payEmail);
     setShowWaveModal(false);
     if (!scanId) return;
@@ -484,38 +532,50 @@ export default function Analyse() {
   if (scanState === 'error' || !scanData) return <ErrorState error={scanError} />;
 
   // ── Valeurs sûres ─────────────────────────────────────────────────────────
-  const globalScore = Number.isFinite(Number(scanData.global_score))
-    ? Number(scanData.global_score)
-    : Number.isFinite(Number(scanData?.scores?.global))
-      ? Number(scanData.scores.global)
+  const globalScore = Number.isFinite(Number(displayData.global_score))
+    ? Number(displayData.global_score)
+    : Number.isFinite(Number(displayData?.scores?.global))
+      ? Number(displayData.scores.global)
       : 0;
 
-  const performanceScore = scanData?.scores?.performance ?? null;
-  const securityScore = scanData?.scores?.security ?? null;
-  const seoScore = scanData?.scores?.seo ?? null;
-  const uxScore = scanData?.scores?.ux_mobile ?? scanData?.scores?.ux ?? null;
+  const performanceScore = displayData?.scores?.performance ?? null;
+  const securityScore = displayData?.scores?.security ?? null;
+  const seoScore = displayData?.scores?.seo ?? null;
+  const uxScore = displayData?.scores?.ux_mobile ?? displayData?.scores?.ux ?? null;
 
-  const criticalAlerts = scanData.critical_alerts ?? [];
+  const criticalAlerts = displayData.critical_alerts ?? [];
   const serverLocation =
-    scanData.metrics?.performance?.server_location ??
-    scanData.performance?.server_location ??
+    displayData.metrics?.performance?.server_location ??
+    displayData.performance?.server_location ??
     null;
-  const conclusionText = scanData?.summary?.resume_executif || '';
+  const conclusionText = buildFreeScanNarrative(
+    globalScore,
+    performanceScore,
+    securityScore,
+    seoScore,
+    uxScore,
+    criticalAlerts,
+    displayData?.recommendations ?? []
+  );
 
   return (
     <div className="min-h-screen pt-24 pb-32 px-4">
       <div className="max-w-5xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-10"
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-1 text-white hover:text-primary text-sm mb-4 transition-colors"
         >
-          <h1 className="text-4xl lg:text-5xl font-bold text-white mb-3">
-            Résultats de l'audit
-          </h1>
-          <p className="text-lg text-white">{extractDomain(url)}</p>
-        </motion.div>
+          <ArrowLeft size={16} /> Retour à l'accueil
+        </button>
 
+        <div className="mb-8">
+          <p className="text-primary text-sm font-semibold uppercase tracking-[0.24em] mb-2">
+            Rapport d'audit gratuit
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">
+            Analyse de {extractDomain(url)}
+          </h1>
+        </div>
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
           <PremiumScoreCard
             score={globalScore}
@@ -536,38 +596,44 @@ export default function Analyse() {
           />
         </motion.div>
 
+        <LargeSiteDisclaimer url={normalizeURL(url)} score={globalScore} />
+
         <CriticalAlertsBanner alerts={criticalAlerts} />
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
           <ScoreCard
             title="Performance"
             icon="⚡"
+            iconLabel="Performance"
             score={performanceScore}
-            metrics={getPerformanceMetrics(scanData)}
+            metrics={getPerformanceMetrics(displayData)}
             isPaid={hasPaid}
             onViewDetails={handleViewDetails}
           />
           <ScoreCard
             title="Sécurité"
             icon="🔒"
+            iconLabel="Sécurité"
             score={securityScore}
-            metrics={getSecurityMetrics(scanData)}
+            metrics={getSecurityMetrics(displayData)}
             isPaid={hasPaid}
             onViewDetails={handleViewDetails}
           />
           <ScoreCard
             title="SEO"
             icon="🔍"
+            iconLabel="SEO"
             score={seoScore}
-            metrics={getSeoMetrics(scanData)}
+            metrics={getSeoMetrics(displayData)}
             isPaid={hasPaid}
             onViewDetails={handleViewDetails}
           />
           <ScoreCard
             title="UX Mobile"
             icon="📱"
+            iconLabel="Mobile"
             score={uxScore}
-            metrics={getUxMetrics(scanData)}
+            metrics={getUxMetrics(displayData)}
             isPaid={hasPaid}
             onViewDetails={handleViewDetails}
           />
@@ -616,33 +682,61 @@ export default function Analyse() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
           className="mb-12"
         >
+          <div className="space-y-4">
+            {hasPaid ? (
+              <>
+                {(
+                  displayData.ai_analysis?.recommandations_prioritaires?.length >
+                  0
+                    ? displayData.ai_analysis.recommandations_prioritaires
+                    : displayData.recommendations ?? []
+                ).map((rec, index) => (
+                  <RecommendationCard
+                    key={`unlocked_${index}`}
+                    recommendation={rec}
+                    index={index}
+                    isLocked={false}
+                  />
+                ))}
 
-        <div className="space-y-4">
-          {hasPaid ? (
-            <>
-              {(
-                scanData.ai_analysis?.recommandations_prioritaires?.length > 0
-                  ? scanData.ai_analysis.recommandations_prioritaires
-                  : scanData.recommendations ?? []
-              ).map((rec, index) => (
-                <RecommendationCard
-                  key={`unlocked_${index}`}
-                  recommendation={rec}
-                  index={index}
-                  isLocked={false}
-                />
-              ))}
-            </>
-          ) : (() => {
-            const totalRecs = scanData.recommendations?.length ?? 0;
-            const allRecs = scanData.recommendations ?? [];
-            const isExactly3 = totalRecs === 3;
+                {/* CTA Corrections clé-en-main — ferme la boucle pour Aïcha */}
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="mt-6 rounded-2xl border border-primary/20 bg-primary/5 p-6 md:p-8"
+                >
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
+                    <div className="flex-shrink-0 rounded-xl bg-primary/10 p-3">
+                      <Wrench size={28} className="text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-white mb-1">
+                        Trop technique ? On s'en occupe.
+                      </h3>
+                      <p className="text-sm text-white/70 max-w-xl">
+                        Ne cherchez pas un développeur. Notre équipe corrige vos problèmes de sécurité, performance et SEO — en 48h, en français, via Wave.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        navigate(`/corrections?url=${encodeURIComponent(normalizeURL(url))}`)
+                      }
+                      className="flex-shrink-0 flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-hover text-white font-semibold rounded-xl transition-colors shadow-[0_0_20px_rgba(21,102,240,0.4)]"
+                    >
+                      Faites corriger par WebiSafe <ArrowRight size={16} />
+                    </button>
+                  </div>
+                </motion.div>
+              </>
+            ) : (() => {
+              const totalRecs = displayData.recommendations?.length ?? 0;
+              const allRecs = displayData.recommendations ?? [];
+              const isExactly3 = totalRecs === 3;
 
-            if (isExactly3) {
+              if (isExactly3) {
                 return (
                   <>
                     {allRecs.slice(1).map((rec, index) => (
@@ -663,7 +757,7 @@ export default function Analyse() {
                         />
                       </div>
                       <div className="absolute inset-0 bg-gradient-to-t from-dark-navy/80 via-dark-navy/40 to-transparent flex flex-col items-center justify-center gap-3">
-                        <p className="text-white font-bold text-sm">🔒 Recommandation la plus critique</p>
+                        <p className="text-white font-bold text-sm"><span aria-hidden="true">🔒</span> Recommandation la plus critique</p>
                         <button
                           onClick={() => setShowFreemiumGate(true)}
                           className="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-[0_0_24px_rgba(21,102,240,0.5)] transition-all text-sm"
@@ -678,7 +772,7 @@ export default function Analyse() {
 
               return (
                 <>
-                  {(scanData.recommendations_preview ?? []).map((rec, index) => (
+                  {(displayData.recommendations_preview ?? []).map((rec, index) => (
                     <RecommendationCard
                       key={`preview_${index}`}
                       recommendation={rec}
@@ -698,7 +792,7 @@ export default function Analyse() {
                             difficulte: 'Moyenne',
                             temps: '2h',
                           }}
-                          index={index + (scanData.recommendations_preview?.length ?? 0)}
+                          index={index + (displayData.recommendations_preview?.length ?? 0)}
                           isLocked={true}
                         />
                       ))}
@@ -710,7 +804,7 @@ export default function Analyse() {
                       aria-label="Obtenir le rapport complet"
                     >
                       <span className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-[0_0_24px_rgba(21,102,240,0.5)] transition-all">
-                        🔒 Obtenir le rapport complet
+                        <span aria-hidden="true">🔒</span> Obtenir le rapport complet
                         <ArrowRight size={16} />
                       </span>
                     </button>
@@ -719,7 +813,7 @@ export default function Analyse() {
                   <div className="text-center py-4">
                     <p className="text-white text-sm mb-4">
                       <Lock size={14} className="inline mr-1" />
-                      {totalRecs - (scanData.recommendations_preview?.length ?? 0)}{' '}
+                      {totalRecs - (displayData.recommendations_preview?.length ?? 0)}{' '}
                       corrections critiques supplémentaires disponibles
                     </p>
                   </div>
@@ -751,8 +845,6 @@ export default function Analyse() {
           </div>
           <div className="flex items-center justify-center gap-2 mt-2 text-text-secondary/50 text-xs">
             <span>Paiement par Wave</span>
-            <span>·</span>
-            <span>+225 01 70 90 77 80</span>
           </div>
         </div>
       )}
@@ -765,7 +857,7 @@ export default function Analyse() {
         onClose={() => setShowFreemiumGate(false)}
         onUnlock={handleUnlock}
         onUpgrade={handleOpenAuth}
-        scanData={scanData}
+        scanData={displayData}
       />
 
       {/* 2. AuthModal — affiché uniquement si non connecté */}

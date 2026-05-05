@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Loader2, RefreshCw, ShieldAlert, LayoutDashboard, CreditCard,
   Activity, TrendingUp, Bell, Settings, Users, Menu, X, LogOut,
-  CheckCircle2, XCircle, AlertTriangle, ArrowRight, Eye,
+  CheckCircle2, XCircle, AlertTriangle, ArrowRight, Eye, Wrench,
 } from 'lucide-react';
 import ToastMessage from '../components/ToastMessage';
 import { fetchPaymentRequests, markScanPaid, sendConfirmPayment, sendRejectPayment, updatePaymentRequest } from '../utils/paymentApi';
+import { fetchCorrectionRequests } from '../utils/correctionApi';
 import { computePaymentStats, formatFcfa, getRelativeTimeLabel, isPendingPaymentStatus } from '../utils/wavePayment';
 import { supabase } from '../lib/supabaseClient';
 
@@ -35,6 +36,7 @@ const ADMIN_NAV = [
   { id: 'payments', label: 'Paiements', icon: <CreditCard size={18} />, badge: 'payments' },
   { id: 'subscriptions', label: 'Abonnements', icon: <Users size={18} />, badge: 'subscriptions' },
   { id: 'scans', label: 'Scans', icon: <Activity size={18} /> },
+  { id: 'corrections', label: 'Corrections', icon: <Wrench size={18} />, badge: 'corrections' },
   { id: 'revenue', label: 'Revenus', icon: <TrendingUp size={18} /> },
   { id: 'alerts', label: 'Alertes Système', icon: <Bell size={18} /> },
   { id: 'settings', label: 'Paramètres', icon: <Settings size={18} /> },
@@ -46,6 +48,7 @@ export default function Admin({ user }) {
 
   const [payments, setPayments] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
+  const [correctionRequests, setCorrectionRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [actionId, setActionId] = useState(null);
@@ -91,13 +94,23 @@ export default function Admin({ user }) {
     } catch { /* non-bloquant */ }
   }, []);
 
+  const loadCorrections = useCallback(async () => {
+    try {
+      const headers = await getAdminHeaders();
+      const token = headers?.Authorization?.replace('Bearer ', '');
+      const rows = await fetchCorrectionRequests(token);
+      setCorrectionRequests(rows || []);
+    } catch { /* non-bloquant */ }
+  }, []);
+
   useEffect(() => {
     if (!isAuthorized) return;
     loadPayments();
     loadSubscriptions();
+    loadCorrections();
     const interval = setInterval(() => { loadPayments(true); loadSubscriptions(true); }, 30000);
     return () => clearInterval(interval);
-  }, [isAuthorized, loadPayments, loadSubscriptions]);
+  }, [isAuthorized, loadPayments, loadSubscriptions, loadCorrections]);
 
   const pendingPayments = useMemo(() => payments.filter(p => isPendingPaymentStatus(p.status)), [payments]);
   const pendingSubscriptions = useMemo(() => subscriptions.filter(s => s.status === 'pending'), [subscriptions]);
@@ -165,7 +178,7 @@ export default function Admin({ user }) {
 
   if (!isAuthorized) return null;
 
-  const PAGE_TITLES = { overview: 'Vue d\'ensemble', payments: 'Paiements', subscriptions: 'Abonnements Protect', scans: 'Scans', revenue: 'Revenus', alerts: 'Alertes Système', settings: 'Paramètres' };
+  const PAGE_TITLES = { overview: 'Vue d\'ensemble', payments: 'Paiements', subscriptions: 'Abonnements Protect', scans: 'Scans', corrections: 'Demandes de correction', revenue: 'Revenus', alerts: 'Alertes Système', settings: 'Paramètres' };
 
   return (
     <div className="flex min-h-screen bg-[#0A0F1E]">
@@ -196,6 +209,9 @@ export default function Admin({ user }) {
               )}
               {item.badge === 'subscriptions' && pendingSubscriptions.length > 0 && (
                 <span className="ml-auto bg-primary text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{pendingSubscriptions.length}</span>
+              )}
+              {item.badge === 'corrections' && correctionRequests.filter(c => c.status === 'pending').length > 0 && (
+                <span className="ml-auto bg-warning text-black text-xs font-bold px-1.5 py-0.5 rounded-full">{correctionRequests.filter(c => c.status === 'pending').length}</span>
               )}
             </button>
           ))}
@@ -391,6 +407,51 @@ export default function Admin({ user }) {
                       </table>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* PAGE: Corrections */}
+              {activePage === 'corrections' && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-white font-bold text-lg">Demandes de correction</h2>
+                    <button onClick={() => loadCorrections()} className="inline-flex items-center gap-2 text-xs text-white/50 hover:text-white transition">
+                      <RefreshCw size={12} /> Actualiser
+                    </button>
+                  </div>
+
+                  {correctionRequests.length === 0 ? (
+                    <div className="bg-[#111827] border border-white/10 rounded-2xl p-8 text-center">
+                      <Wrench size={32} className="mx-auto text-white/20 mb-3" />
+                      <p className="text-white/50 text-sm">Aucune demande de correction pour le moment.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {correctionRequests.map(req => (
+                        <div key={req.id} className={`rounded-2xl border p-5 ${req.status === 'pending' ? 'border-warning/30 bg-[#1E293B]' : req.status === 'in_progress' ? 'border-primary/30 bg-primary/5' : 'border-success/30 bg-success/5'}`}>
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <p className="text-white font-bold text-sm">{req.name}</p>
+                              <p className="text-white/40 text-xs mt-1">{req.email} · {req.phone || 'Pas de téléphone'}</p>
+                            </div>
+                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${req.status === 'pending' ? 'bg-warning/10 text-warning' : req.status === 'in_progress' ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'}`}>
+                              {req.status === 'pending' ? 'EN ATTENTE' : req.status === 'in_progress' ? 'EN COURS' : 'TERMINÉ'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                            <div><p className="text-white/40 text-xs">Site</p><p className="text-white mt-0.5 break-all">{req.url}</p></div>
+                            <div><p className="text-white/40 text-xs">Pack</p><p className="text-white mt-0.5 capitalize">{req.pack}</p></div>
+                          </div>
+                          {req.message && (
+                            <div className="bg-white/5 rounded-xl p-3 mb-4">
+                              <p className="text-white/60 text-xs">{req.message}</p>
+                            </div>
+                          )}
+                          <p className="text-white/30 text-xs">Demande reçue le {new Date(req.created_at).toLocaleString('fr-FR')}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

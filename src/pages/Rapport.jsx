@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+﻿import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Download,
@@ -18,8 +18,10 @@ import {
   X,
   RefreshCw,
   Loader2,
+  Wrench,
 } from 'lucide-react';
 
+import CriticalAlertsBanner from '../components/CriticalAlertsBanner';
 import PremiumScoreCard from '../components/PremiumScoreCard';
 import RecommendationCard from '../components/RecommendationCard';
 import HighlightedTechText from '../components/HighlightedTechText';
@@ -33,19 +35,22 @@ import { formatDate, extractDomain } from '../utils/validators';
 import { buildPremiumExplanationParagraphs } from '../utils/premiumExplanation';
 import { fetchLatestPaymentRequest, fetchRemoteScan } from '../utils/paymentApi';
 import { REPORT_FIX_WHATSAPP, WAVE_SUPPORT_WHATSAPP } from '../utils/wavePayment';
-import { isKnownLargeSite, getLargeSiteDisclaimer } from '../utils/knownSites';
-import { runFullAnalysis } from '../utils/api';
+import LargeSiteDisclaimer from '../components/LargeSiteDisclaimer';
+import { runFullAnalysis, filterWebisafeOnlyChecks } from '../utils/api';
+import { trackClarityEvent } from '../lib/clarity';
 
 // ── Helpers UI ────────────────────────────────────────────────────────────────
 function MetricRow({ label, value, status }) {
+  const statusLabel = status === 'pass' ? 'Conforme' : status === 'warn' ? 'Attention' : status === 'unknown' ? 'Non mesuré' : 'Non conforme';
+
   return (
     <div className="flex items-center justify-between py-3 border-b border-border-color last:border-0">
       <span className="text-text-secondary text-sm">{label}</span>
       <div className="flex items-center gap-2">
         <span className="text-text-primary text-sm font-medium">{value ?? 'N/A'}</span>
         {status && (
-          <span>
-            {status === 'pass' ? '✅' : status === 'warn' ? '⚠️' : '❌'}
+          <span role="status" aria-label={statusLabel}>
+            <span aria-hidden="true">{status === 'pass' ? '✅' : status === 'warn' ? '⚠️' : status === 'unknown' ? '—' : '❌'}</span>
           </span>
         )}
       </div>
@@ -66,58 +71,6 @@ function SeverityPill({ severity }) {
     <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold ${cls}`}>
       {label}
     </span>
-  );
-}
-
-function CriticalAlertsBanner({ alerts }) {
-  const [dismissed, setDismissed] = useState([]);
-  if (!Array.isArray(alerts) || alerts.length === 0) return null;
-  const visible = alerts.filter((_, i) => !dismissed.includes(i));
-  if (visible.length === 0) return null;
-
-  const SEVERITY_STYLE = {
-    critical: 'bg-red-500/15 border-red-500/40 text-red-300',
-    high: 'bg-orange-500/15 border-orange-500/40 text-orange-300',
-    warning: 'bg-yellow-500/15 border-yellow-500/40 text-yellow-200',
-  };
-  const SEVERITY_ICON = { critical: '🚨', high: '⚠️', warning: '🌍' };
-
-  return (
-    <div className="space-y-3 mb-8">
-      <AnimatePresence>
-        {alerts.map((alert, i) => {
-          if (dismissed.includes(i)) return null;
-          const style = SEVERITY_STYLE[alert.severity] ?? SEVERITY_STYLE.warning;
-          const icon = SEVERITY_ICON[alert.severity] ?? '⚠️';
-          return (
-            <motion.div
-              key={`${alert.title}-${i}`}
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className={`flex items-start gap-3 p-4 rounded-xl border ${style}`}
-            >
-              <span className="text-xl flex-shrink-0">{icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm">{alert.title}</p>
-                {alert.message && <p className="text-white/70 text-xs mt-0.5">{alert.message}</p>}
-                {alert.impact && <p className="text-white/50 text-xs mt-0.5">Impact : {alert.impact}</p>}
-                {alert.recommendation && (
-                  <p className="text-white/50 text-xs mt-0.5">Conseil : {alert.recommendation}</p>
-                )}
-              </div>
-              <button
-                onClick={() => setDismissed((d) => [...d, i])}
-                className="flex-shrink-0 text-white/30 hover:text-white/70 transition-colors"
-                aria-label="Fermer"
-              >
-                <X size={14} />
-              </button>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
-    </div>
   );
 }
 
@@ -153,9 +106,21 @@ function ServerLocationBox({ serverLocation }) {
 }
 
 // ── Disclaimer grands sites ───────────────────────────────────────────────────
+function buildImprovementSentence(recommendations) {
+  const improvements = (recommendations ?? [])
+    .map((rec) => rec?.action || rec?.title || rec?.titre)
+    .filter(Boolean)
+    .slice(0, 4);
+
+  if (improvements.length === 0) return null;
+
+  return `Améliorations à faire détectées : ${improvements.join(' ; ')} ; leur correction peut renforcer la confiance, fluidifier l'expérience utilisateur et transformer davantage de visiteurs en prospects ou clients.`;
+}
+
 function buildSmartNarrative(norm) {
   const scores = norm?.scores ?? {};
   const alerts = norm?.criticalAlerts ?? [];
+  const recommendations = norm?.recommendations ?? [];
   const lines = [];
   const g = scores.global ?? 0;
   const s = {
@@ -195,22 +160,10 @@ function buildSmartNarrative(norm) {
     lines.push("Aucune alerte critique détectée — votre site inspire confiance aux visiteurs et aux moteurs de recherche.");
   }
 
-  return lines.slice(0, 3);
-}
+  const improvementSentence = buildImprovementSentence(recommendations);
+  if (improvementSentence) lines.push(improvementSentence);
 
-function LargeSiteDisclaimer({ url, score }) {
-  const disclaimer = isKnownLargeSite(url) ? getLargeSiteDisclaimer(score) : null;
-  if (!disclaimer) return null;
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -4 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-sm text-blue-300"
-    >
-      <span className="font-semibold">ℹ️ {disclaimer.title} : </span>
-      {disclaimer.message}
-    </motion.div>
-  );
+  return lines.slice(0, 4);
 }
 
 // ── Formatage date du scan ────────────────────────────────────────────────────
@@ -274,7 +227,27 @@ function normalizeScan(scan) {
   const missingHeaders = secM?.headers_manquants ?? scan.security?.headers_manquants ?? [];
   const cookieIssues = secM?.cookie_issues ?? scan.security?.cookie_issues ?? [];
   const sensitiveFiles = secM?.sensitive_files ?? scan.security?.sensitive_files ?? null;
-  const extendedChecks = secM?.extended_checks ?? scan.security?.extended_checks ?? [];
+  const extendedChecks = [
+    ...(Array.isArray(secM?.extended_checks) ? secM.extended_checks : []),
+    ...(Array.isArray(secM?.extendedChecks) ? secM.extendedChecks : []),
+    ...(Array.isArray(secM?.details) ? secM.details : []),
+    ...(Array.isArray(secM?.advanced_checks) ? secM.advanced_checks : []),
+    ...(Array.isArray(scan.security?.extended_checks) ? scan.security.extended_checks : []),
+    ...(Array.isArray(scan.security?.extendedChecks) ? scan.security.extendedChecks : []),
+    ...(Array.isArray(scan.security?.details) ? scan.security.details : []),
+    ...(Array.isArray(scan.security?.advanced_checks) ? scan.security.advanced_checks : []),
+    ...(Array.isArray(scan.extended_checks) ? scan.extended_checks : []),
+    ...(Array.isArray(scan.extendedChecks) ? scan.extendedChecks : []),
+  ].filter((check, index, all) => (
+    check?.check_name && index === all.findIndex((item) => item?.check_name === check.check_name)
+  ));
+  const extendedSecurityScore =
+    secM?.extended_security_score ??
+    secM?.advanced_security_score ??
+    scan.security?.extended_security_score ??
+    scan.security?.advanced_security_score ??
+    null;
+
   const criticalAlerts = Array.isArray(scan.critical_alerts) ? scan.critical_alerts : [];
 
   // Date du scan : priorité au champ backend scanned_at
@@ -306,6 +279,8 @@ function normalizeScan(scan) {
     cookieIssues,
     sensitiveFiles,
     extendedChecks,
+    extendedSecurityScore,
+    recommendations: scan.recommendations ?? scan.recommandations ?? [],
   };
 }
 
@@ -313,9 +288,10 @@ function normalizeScan(scan) {
 export default function Rapport() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { getScan, saveScan } = useScans();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || location.state?.adminBypass === true;
 
   const [scan, setScan] = useState(null);
   const [paymentRequest, setPaymentRequest] = useState(null);
@@ -326,6 +302,7 @@ export default function Rapport() {
   const [isRescanning, setIsRescanning] = useState(false);
 
   useEffect(() => {
+    trackClarityEvent('report_viewed', id);
     let active = true;
 
     async function bootstrap() {
@@ -395,6 +372,7 @@ export default function Rapport() {
   // ── Rescan ────────────────────────────────────────────────────────────────
   const handleRescan = useCallback(async () => {
     if (!scan?.url || isRescanning) return;
+    trackClarityEvent('rescan_triggered', id);
     setIsRescanning(true);
     try {
       const freshData = await runFullAnalysis(scan.url, () => { }, scan?.email || scan?.user_email || '');
@@ -415,7 +393,17 @@ export default function Rapport() {
     }
   }, [scan, isRescanning, id, saveScan]);
 
-  const norm = useMemo(() => normalizeScan(scan), [scan]);
+  const displayScan = useMemo(() => filterWebisafeOnlyChecks(scan, isAdmin), [scan, isAdmin]);
+  const pdfScan = useMemo(() => {
+    if (!scan) return null;
+    const merged = { ...scan };
+    if (displayScan?.recommendations) merged.recommendations = displayScan.recommendations;
+    if (displayScan?.critical_alerts) merged.critical_alerts = displayScan.critical_alerts;
+    if (displayScan?.metrics) merged.metrics = displayScan.metrics;
+    return merged;
+  }, [scan, displayScan]);
+
+  const norm = useMemo(() => normalizeScan(displayScan), [displayScan]);
 
   if (loading && !scan) {
     return (
@@ -492,11 +480,14 @@ export default function Rapport() {
   }
 
   const handleDownloadPDF = () => {
-    try { generatePDF(scan); }
+    if (!pdfScan) return;
+    trackClarityEvent('pdf_downloaded', id);
+    try { generatePDF(pdfScan); }
     catch (error) { console.error('Erreur PDF:', error); }
   };
 
   const handleShare = () => {
+    trackClarityEvent('report_shared', id);
     navigator.clipboard.writeText(window.location.href).then(() => {
       setCopied(true);
       setShareTooltip(true);
@@ -540,10 +531,10 @@ export default function Rapport() {
         >
           <div>
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/')}
               className="flex items-center gap-1 text-white hover:text-primary text-sm mb-2 transition-colors"
             >
-              <ArrowLeft size={16} /> Retour
+              <ArrowLeft size={16} /> Retour à l'accueil
             </button>
             <div className="flex flex-col">
               <h1 className="text-xl font-bold text-white">
@@ -551,7 +542,7 @@ export default function Rapport() {
               </h1>
               {/* Date + durée du scan */}
               <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-white/50 text-xs">🕐 Analysé le {scanDateText}{scanTimeText && <span className="text-white/40"> · {scanTimeText}</span>}</p>
+                <p className="text-white/50 text-xs"><span aria-hidden="true">🕐</span> Analysé le {scanDateText}{scanTimeText && <span className="text-white/40"> · {scanTimeText}</span>}</p>
                 {scan.scan_duration_ms && (
                   <p className="text-white/30 text-xs">
                     · en {(scan.scan_duration_ms / 1000).toFixed(1)}s
@@ -657,7 +648,7 @@ export default function Rapport() {
               const badge = getScoreBadge(cat.score ?? 0);
               return (
                 <div key={cat.name} className="bg-dark-navy rounded-xl p-4 text-center">
-                  <span className="text-2xl">{cat.icon}</span>
+                  <span className="text-2xl" aria-hidden="true" title={cat.name}>{cat.icon}</span>
                   <p className="text-white font-bold text-xl mt-2">
                     {cat.score ?? 'N/A'}
                     {cat.score != null && <span className="text-white text-sm">/100</span>}
@@ -718,7 +709,7 @@ export default function Rapport() {
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-success hover:bg-success/90 text-white rounded-full font-semibold transition-all"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-success hover:bg-success/90 text-white rounded-full font-medium transition-all"
                 >
                   <MessageCircle size={16} />
                   Contacter Webisafe pour corriger
@@ -731,7 +722,7 @@ export default function Rapport() {
         {/* ── PERFORMANCE ────────────────────────────────────────────────── */}
         <section id="performance" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">⚡ Performance</h2>
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span aria-hidden="true">⚡</span> Performance</h2>
 
             {perfM?.partial && (
               <div className="mb-4 rounded-xl border border-yellow-500/25 bg-yellow-500/10 p-4 text-yellow-200 text-xs">
@@ -781,7 +772,7 @@ export default function Rapport() {
         {/* ── SECURITY ───────────────────────────────────────────────────── */}
         <section id="security" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">🔒 Sécurité</h2>
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span aria-hidden="true">🔒</span> Sécurité</h2>
 
             <MetricRow label="Score Sécurité" value={`${norm?.scores?.security ?? 'N/A'}/100`} />
             <MetricRow
@@ -796,14 +787,14 @@ export default function Rapport() {
             <MetricRow
               label="Malware (VirusTotal)"
               value={
-                secM?.malware_detected === true ? '🚨 Détecté'
+                secM?.malware_detected === true ? '<span aria-hidden="true">🚨</span> Détecté'
                   : secM?.malware_detected === false ? 'Aucun'
-                    : 'N/A'
+                    : 'Non vérifié'
               }
               status={
                 secM?.malware_detected === true ? 'fail'
                   : secM?.malware_detected === false ? 'pass'
-                    : null
+                    : 'unknown'
               }
             />
             <MetricRow
@@ -815,7 +806,7 @@ export default function Rapport() {
             {/* Fichiers sensibles */}
             {norm?.sensitiveFiles?.critical && (
               <div className="mt-6 rounded-2xl border border-red-500/25 bg-red-500/10 p-5">
-                <p className="text-red-200 font-semibold text-sm">🚨 Fichiers sensibles exposés</p>
+                <p className="text-red-200 font-semibold text-sm"><span aria-hidden="true">🚨</span> Fichiers sensibles exposés</p>
                 {norm.sensitiveFiles.alert_message && (
                   <p className="text-red-200/80 text-xs mt-1">{norm.sensitiveFiles.alert_message}</p>
                 )}
@@ -871,8 +862,10 @@ export default function Rapport() {
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">🛡️ Sécurité Avancée</h2>
             <MetricRow
               label="Score Sécurité Avancée"
-              value={`${secM?.extended_security_score ?? 'N/A'}/100`}
+              value={norm?.extendedSecurityScore != null ? `${norm.extendedSecurityScore}/100` : 'N/A'}
+              status={norm?.extendedSecurityScore == null ? 'unknown' : norm.extendedSecurityScore >= 80 ? 'pass' : norm.extendedSecurityScore >= 60 ? 'warn' : 'fail'}
             />
+
             <MetricRow
               label="WAF détecté"
               value={(() => {
@@ -1160,7 +1153,7 @@ export default function Rapport() {
                   )}
                   {medium.length > 0 && (
                     <div className="mb-4">
-                      <p className="text-orange-300 text-xs font-semibold uppercase tracking-wider mb-2"> Priorité moyenne</p>
+                      <p className="text-orange-300 text-xs font-semibold uppercase tracking-wider mb-2"> Corrections</p>
                       <div className="space-y-3">
                         {medium.map((r, i) => (
                           <RecommendationCard key={`r-medium-${i}`} recommendation={r} index={i} isLocked={false} />
@@ -1219,11 +1212,18 @@ export default function Rapport() {
               )}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-6 py-3 bg-success hover:bg-success/90 text-white rounded-full font-medium text-sm transition-all"
+              className="flex items-center gap-2 px-6 py-3 bg-success hover:bg-success/90 text-white rounded-full font-medium transition-all"
             >
               <MessageCircle size={16} />
               Contacter Webisafe pour corriger
             </a>
+            <Link
+              to={`/corrections?url=${encodeURIComponent(scan.url || '')}`}
+              className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-full font-medium text-sm transition-all"
+            >
+              <Wrench size={16} />
+              Voir les packs de correction
+            </Link>
             <Link
               to="/contact"
               className="flex items-center gap-2 px-6 py-3 bg-card-bg border border-border-color hover:border-primary/50 text-text-primary rounded-full text-sm transition-all"

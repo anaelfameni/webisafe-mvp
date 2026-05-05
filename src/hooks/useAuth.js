@@ -85,6 +85,32 @@ function setGlobalUser(user) {
   notifyAuthChanged();
 }
 
+const DEFAULT_USERS = [
+  {
+    id: 'client_user',
+    name: 'Client Test',
+    email: 'client@test.com',
+    password: '123client123',
+    createdAt: new Date().toISOString(),
+    plan: 'free',
+    scansToday: 0,
+    lastScanDate: null,
+  },
+];
+
+function seedDefaultUsers() {
+  if (!isBrowser()) return;
+  const users = getUsers();
+  let changed = false;
+  for (const defaultUser of DEFAULT_USERS) {
+    if (!users.some((u) => normalizeEmail(u.email) === normalizeEmail(defaultUser.email))) {
+      users.push(defaultUser);
+      changed = true;
+    }
+  }
+  if (changed) saveUsers(users);
+}
+
 function getUsers() {
   if (!isBrowser()) return [];
   return safeParse(localStorage.getItem(USERS_KEY) || '[]', []);
@@ -102,6 +128,7 @@ function removePassword(user) {
 }
 
 export function useAuth() {
+  seedDefaultUsers();
   ensureAuthLoaded();
 
   const [user, setUser] = useState(authUser);

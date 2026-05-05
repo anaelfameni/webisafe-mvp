@@ -24,6 +24,7 @@ export default function Header({ onAuthClick }) {
   const navItems = [
     { label: 'Accueil', path: '/' },
     { label: 'Fonctionnalités', path: '/#features' },
+    { label: 'Protect', path: '/protect' },
     { label: 'Tarifs', path: '/tarifs' },
     { label: 'Affiliation', path: '/partenaire' },
     { label: 'Contact', path: '/contact' },
@@ -93,21 +94,21 @@ export default function Header({ onAuthClick }) {
           </nav>
 
           {/* Desktop Actions */}
-          <div className="hidden lg:flex flex-1 items-center justify-end gap-3">
+          <div className="hidden lg:flex flex-1 items-center justify-end gap-3 ml-8">
             {user ? (
               <>
                 <button
                   onClick={() => navigate(user?.role === 'admin' ? '/admin' : '/dashboard')}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card-bg border border-border-color hover:border-primary/50 text-sm text-text-primary font-medium transition-all"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-card-bg border border-border-color hover:border-primary/50 text-xs text-text-primary font-medium transition-all"
                 >
-                  <LayoutDashboard size={15} className="text-primary" />
+                  <LayoutDashboard size={14} className="text-primary" />
                   {user?.role === 'admin' ? 'Panel Admin' : 'Tableau de bord'}
                 </button>
                 <button
-                  onClick={() => signOut()}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border-color hover:border-danger/40 text-sm text-white/50 hover:text-danger font-medium transition-all"
+                  onClick={() => { signOut(); navigate('/'); }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-color hover:border-danger/40 text-xs text-white/50 hover:text-danger font-medium transition-all"
                 >
-                  <LogOut size={15} />
+                  <LogOut size={14} />
                   Se déconnecter
                 </button>
               </>
@@ -188,7 +189,7 @@ export default function Header({ onAuthClick }) {
                     {user?.role === 'admin' ? 'Panel Admin' : 'Tableau de bord'}
                   </button>
                   <button
-                    onClick={() => { signOut(); setMobileMenuOpen(false); }}
+                    onClick={() => { signOut(); setMobileMenuOpen(false); navigate('/'); }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 text-white/50 text-sm font-medium hover:text-danger hover:border-danger/30 hover:bg-danger/5 transition-all"
                   >
                     <LogOut size={16} />

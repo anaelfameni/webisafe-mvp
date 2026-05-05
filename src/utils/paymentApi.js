@@ -59,12 +59,14 @@ export async function fetchRemoteScan(scanId) {
     return null;
   }
 
+  const scanData = row.data || row.results_json || {};
+
   return {
-    ...(row.data || {}),
+    ...scanData,
     id: row.id,
-    url: row.url || row.data?.url,
-    email: row.email || row.data?.email,
-    scanDate: row.scan_date || row.data?.scanDate,
+    url: row.url || scanData?.url,
+    email: row.email || scanData?.email || scanData?.user_email,
+    scanDate: row.scan_date || row.scanned_at || scanData?.scanDate || scanData?.scanned_at,
     paid: Boolean(row.paid),
   };
 }

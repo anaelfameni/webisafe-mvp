@@ -22,6 +22,25 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
   const [password, setPassword] = useState('');
 
   const [showPassword, setShowPassword] = useState(false);
+
+  // Indicateur de force du mot de passe
+  function getPasswordStrength(pw) {
+    if (!pw || pw.length < 8) return { level: 0, label: 'Trop court (8 min)', color: 'bg-red-500' };
+    let score = 0;
+    if (/[a-z]/.test(pw)) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    const levels = [
+      { label: 'Faible', color: 'bg-red-500' },
+      { label: 'Moyen', color: 'bg-orange-500' },
+      { label: 'Bon', color: 'bg-yellow-400' },
+      { label: 'Fort', color: 'bg-green-500' },
+    ];
+    return { level: score, label: levels[score - 1]?.label || 'Faible', color: levels[score - 1]?.color || 'bg-red-500' };
+  }
+
+  const passwordStrength = getPasswordStrength(password);
   const [showCountryMenu, setShowCountryMenu] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,6 +79,14 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
       const localPhone = normalizePhoneDigits(phone);
       if (localPhone.length < 6) {
         setError('Le numéro de téléphone doit contenir au moins 6 chiffres.');
+        return;
+      }
+      if (password.length < 8) {
+        setError('Le mot de passe doit contenir au moins 8 caractères.');
+        return;
+      }
+      if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+        setError('Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.');
         return;
       }
     }
@@ -168,6 +195,9 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
                         <button
                           type="button"
                           onClick={() => setShowCountryMenu((current) => !current)}
+                          aria-expanded={showCountryMenu}
+                          aria-haspopup="listbox"
+                          aria-label="Sélectionner le pays du numéro de téléphone"
                           className="w-full flex items-center gap-3 px-3 py-3 bg-dark-navy border border-border-color rounded-xl text-white focus:outline-none focus:border-primary transition-colors text-sm"
                         >
                           <img
@@ -281,7 +311,8 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="••••••••"
                     required
-                    minLength={4}
+                    minLength={8}
+                    aria-describedby="password-strength"
                     className="w-full pl-10 pr-10 py-3 bg-dark-navy border border-border-color rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-primary transition-colors text-sm"
                   />
                   <button
@@ -292,6 +323,22 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                {mode === 'signup' && password.length > 0 && (
+                  <div className="mt-2" id="password-strength" role="status" aria-live="polite">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${passwordStrength.color} transition-all duration-300`}
+                          style={{ width: `${(passwordStrength.level / 4) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-text-secondary">{passwordStrength.label}</span>
+                    </div>
+                    <p className="text-[10px] text-text-secondary/70 mt-1">
+                      8 caractères minimum, avec majuscule, minuscule et chiffre.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {error && (

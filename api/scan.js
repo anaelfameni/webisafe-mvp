@@ -107,9 +107,28 @@ function validateUrl(input) {
 }
 
 // ── Cache Supabase ────────────────────────────────────────────────────────────
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 heures
+
 async function readCache(normalizedUrl) {
-    // Cache désactivé : chaque scan recalcule les scores avec la logique à jour
-    return null;
+    if (!supabase) return null;
+    try {
+        const { data, error } = await supabase
+            .from('scans')
+            .select('id, score, results_json, paid, scanned_at')
+            .eq('url', normalizedUrl)
+            .gte('scanned_at', new Date(Date.now() - CACHE_TTL_MS).toISOString())
+            .order('scanned_at', { ascending: false })
+            .limit(1)
+            .single();
+        
+        if (error || !data) return null;
+        
+        // Vérifier si l'utilisateur premium force un nouveau scan (via query param)
+        return data;
+    } catch (e) {
+        console.warn('[CACHE] Erreur lecture:', e.message);
+        return null;
+    }
 }
 
 async function saveToDb(scanId, url, score, results, userEmail = null) {
@@ -153,24 +172,20 @@ async function scanPerformance(url, apiKey) {
         const pageWeightMb = lr.audits?.['total-byte-weight']?.numericValue != null
             ? Math.round((lr.audits['total-byte-weight'].numericValue / 1_048_576) * 100) / 100
             : null;
+        const requestCount = lr.audits?.['network-requests']?.details?.items?.length ?? null;
 
         const failedChecks = [];
-        if (lcp === null) failedChecks.push('lcp_unavailable');
-        else if (lcp > 4000) failedChecks.push('lcp_poor');
+        if (lcp > 4000) failedChecks.push('lcp_poor');
         else if (lcp > 2500) failedChecks.push('lcp_needs_improvement');
 
-        if (cls === null) failedChecks.push('cls_unavailable');
-        else if (cls > 0.25) failedChecks.push('cls_poor');
+        if (cls > 0.25) failedChecks.push('cls_poor');
         else if (cls > 0.1) failedChecks.push('cls_needs_improvement');
 
-        if (fcp === null) failedChecks.push('fcp_unavailable');
-        else if (fcp > 3000) failedChecks.push('fcp_poor');
+        if (fcp > 3000) failedChecks.push('fcp_poor');
 
-        if (tbt === null) failedChecks.push('tbt_unavailable');
-        else if (tbt > 600) failedChecks.push('tbt_poor');
+        if (tbt > 600) failedChecks.push('tbt_poor');
 
-        if (pageWeightMb === null) failedChecks.push('weight_unavailable');
-        else if (pageWeightMb > 5) failedChecks.push('weight_very_heavy');
+        if (pageWeightMb > 5) failedChecks.push('weight_very_heavy');
         else if (pageWeightMb > 3) failedChecks.push('weight_heavy');
 
         const opportunities = Object.entries(lr.audits ?? {})
@@ -188,6 +203,7 @@ async function scanPerformance(url, apiKey) {
             raw_score: rawScore,
             lcp, cls, fcp, tbt,
             page_weight_mb: pageWeightMb,
+            nb_requetes: requestCount,
             failed_checks: failedChecks,
             opportunities,
             partial: false,
@@ -208,6 +224,7 @@ async function scanPerformance(url, apiKey) {
                 raw_score: score,
                 lcp: null, cls: null, fcp: null, tbt: null,
                 page_weight_mb: null,
+                nb_requetes: null,
                 failed_checks: ['pagespeed_unavailable'],
                 opportunities: [],
                 partial: true,
@@ -218,6 +235,7 @@ async function scanPerformance(url, apiKey) {
                 raw_score: null,
                 lcp: null, cls: null, fcp: null, tbt: null,
                 page_weight_mb: null,
+                nb_requetes: null,
                 failed_checks: ['pagespeed_unavailable', 'site_unreachable'],
                 opportunities: [],
                 partial: true,
@@ -261,6 +279,66 @@ async function getServerLocation(domain) {
                 },
         };
     } catch { return null; }
+}
+
+// ── Détection technologie ─────────────────────────────────────────────────────
+function detectTechnology(html = '') {
+    if (!html || html.length < 50) return { cms: null, technologies: [], has_wordpress: false };
+    const techs = [];
+    let cms = null;
+
+    // CMS
+    if (/wp-content|wp-includes|WordPress/i.test(html)) { cms = 'WordPress'; techs.push('WordPress'); }
+    else if (/Drupal\.settings|drupal/i.test(html)) { cms = 'Drupal'; techs.push('Drupal'); }
+    else if (/Joomla/i.test(html)) { cms = 'Joomla'; techs.push('Joomla'); }
+    else if (/Shopify/i.test(html)) { cms = 'Shopify'; techs.push('Shopify'); }
+    else if (/Wix/i.test(html)) { cms = 'Wix'; techs.push('Wix'); }
+    else if (/Squarespace/i.test(html)) { cms = 'Squarespace'; techs.push('Squarespace'); }
+    else if (/prestashop/i.test(html)) { cms = 'PrestaShop'; techs.push('PrestaShop'); }
+    else if (/magento/i.test(html)) { cms = 'Magento'; techs.push('Magento'); }
+    else if (/ghost/i.test(html)) { cms = 'Ghost'; techs.push('Ghost'); }
+
+    // Frameworks / build tools
+    if (/react/i.test(html)) techs.push('React');
+    if (/vue\.js|vuejs/i.test(html)) techs.push('Vue.js');
+    if (/angular/i.test(html)) techs.push('Angular');
+    if (/next\.js|__next/i.test(html)) techs.push('Next.js');
+    if (/nuxt|__nuxt/i.test(html)) techs.push('Nuxt.js');
+    if (/sveltekit|__sveltekit/i.test(html)) techs.push('SvelteKit');
+    if (/gatsby/i.test(html)) techs.push('Gatsby');
+
+    // Analytics
+    if (/google-analytics|gtag|googletagmanager/i.test(html)) techs.push('Google Analytics');
+    if (/facebook\.com\/tr|fbq/i.test(html)) techs.push('Facebook Pixel');
+    if (/hotjar/i.test(html)) techs.push('Hotjar');
+
+    // CDN / Hosting clues
+    if (/cloudflare/i.test(html)) techs.push('Cloudflare');
+    if (/fastly/i.test(html)) techs.push('Fastly');
+
+    return { cms, technologies: techs, has_wordpress: cms === 'WordPress' };
+}
+
+// ── Sauvegarde analytics (fire-and-forget) ────────────────────────────────────
+async function saveScanAnalytics(domain, countryCode, scores, cms, hosting, sslValid, lcpMs) {
+    if (!supabase) return;
+    try {
+        await supabase.from('scan_analytics').insert({
+            domain,
+            country_code: countryCode || 'CI',
+            score_security: scores.security ?? null,
+            score_performance: scores.performance ?? null,
+            score_seo: scores.seo ?? null,
+            score_ux: scores.ux ?? null,
+            score_global: scores.global ?? null,
+            cms_detected: cms || null,
+            hosting_detected: hosting || null,
+            ssl_valid: sslValid ?? null,
+            has_wordpress: cms === 'WordPress',
+            load_time_ms: lcpMs ?? null,
+            is_public: true,
+        });
+    } catch (e) { console.warn('[ANALYTICS] insert error:', e.message); }
 }
 
 // ── Sécurité ──────────────────────────────────────────────────────────────────
@@ -498,6 +576,7 @@ async function scanSEO(url) {
         is_indexable: isIndexable,
         failed_checks: failedChecks,
         partial: false,
+        html_snippet: html.slice(0, 5000),
     };
 }
 
@@ -884,9 +963,30 @@ export default async function handler(req, res) {
         // ✅ FIX : userId passé en null (non déclaré dans ce handler)
         await saveToDb(scanId, normalizedUrl, globalScore, results, email || null);
 
+        // ── MOAT : détection technologie + dataset analytics (fire-and-forget) ──
+        const tech = detectTechnology(seo?.html_snippet || '');
+        const geoInfo = await getServerLocation(domain);
+        saveScanAnalytics(
+            domain,
+            geoInfo?.country_code || 'CI',
+            { security: scores.security, performance: scores.performance, seo: scores.seo, ux: scores.ux, global: globalScore },
+            tech.cms,
+            geoInfo?.isp || null,
+            sec?.https ?? null,
+            perf?.lcp ?? null
+        );
+
+        // Injecte la technologie détectée dans la réponse pour le frontend
+        results.detected_technology = {
+            cms: tech.cms,
+            technologies: tech.technologies,
+            hosting_country: geoInfo?.country || null,
+            hosting_isp: geoInfo?.isp || null,
+            is_local_africa: geoInfo?.is_local_africa ?? null,
+        };
+
         return res.json(results);
 
-        // ✅ FIX : accolade parasite supprimée — le catch est directement lié au try
     } catch (error) {
         console.error('[SCAN] Erreur fatale:', error);
         return res.status(500).json({

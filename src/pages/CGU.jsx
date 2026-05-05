@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { SUPPORT_EMAIL } from '../config/brand';
 
 export default function CGU() {
   useEffect(() => { window.scrollTo(0, 0); }, []);
@@ -80,8 +81,8 @@ export default function CGU() {
             <h2 className="text-lg font-semibold text-white mb-3">7. Contact</h2>
             <p>
               Pour toute question relative aux présentes CGU :{' '}
-              <a href="mailto:webisafe@gmail.com" className="text-primary hover:underline">
-                webisafe@gmail.com
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">
+                {SUPPORT_EMAIL}
               </a>
             </p>
           </section>

@@ -6,7 +6,7 @@ import { ArrowRight, CheckCircle, Target, Users, Share2, Wallet } from 'lucide-r
 export default function Partenaire() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState(3);
-  const [form, setForm] = useState({ name: '', wavePhone: '', email: '', channel: '' });
+  const [form, setForm] = useState({ name: '', wavePhone: '', email: '', channel: '', otherChannel: '' });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -279,6 +279,16 @@ export default function Partenaire() {
                   </label>
                 ))}
               </div>
+
+              {form.channel === 'other' && (
+                <input
+                  type="text"
+                  value={form.otherChannel}
+                  onChange={(e) => setForm((p) => ({ ...p, otherChannel: e.target.value }))}
+                  placeholder="Précisez comment vous comptez recommander..."
+                  className="w-full mt-2 px-4 py-3 bg-[#060C1A] border border-white/10 rounded-xl text-white placeholder:text-white/25 focus:outline-none focus:border-primary transition"
+                />
+              )}
             </div>
 
             {error && (
@@ -293,7 +303,7 @@ export default function Partenaire() {
                   const res = await fetch('/api/affiliate-register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: form.name, email: form.email, phone: form.wavePhone, channel: form.channel })
+                    body: JSON.stringify({ name: form.name, email: form.email, phone: form.wavePhone, channel: form.channel, otherChannel: form.otherChannel })
                   });
                   const data = await res.json();
                   if (!res.ok) throw new Error(data.error || 'Erreur inscription');

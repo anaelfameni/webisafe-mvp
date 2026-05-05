@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLiveStats } from '../hooks/useLiveStats';
 import { supabase } from '../lib/supabaseClient';
 import { Zap, Shield, Search, Smartphone, ArrowRight, TrendingDown, Eye, Activity, Globe, Radio, Clock } from 'lucide-react';
+import { SUPPORT_PHONE } from '../config/brand';
 import toast from 'react-hot-toast';
 import URLInput from '../components/URLInput';
 import PricingSection from '../components/PricingSection';
@@ -132,7 +133,7 @@ export default function Home() {
     {
       question: 'Quels paiements acceptez-vous ?',
       answer:
-        'Nous acceptons le paiement via Wave. Envoyez 35 000 FCFA au +225 01 70 90 77 80 et votre rapport sera disponible dès que votre paiement sera confirmé.',
+        `Nous acceptons le paiement via Wave. Envoyez 35 000 FCFA au ${SUPPORT_PHONE} et votre rapport sera disponible dès que votre paiement sera confirmé.`,
     },
   ];
 
@@ -156,9 +157,9 @@ export default function Home() {
             transition={{ duration: 1.2, ease: 'easeOut' }}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full mb-6"
           >
-            <span className="text-sm">🌍</span>
+            <span className="text-sm">🩺</span>
             <span className="text-primary text-sm font-medium">
-              Premier outil d'audit web d'Afrique francophone
+              Le médecin de votre site web. Diagnostic gratuit. Traitement sur devis.
             </span>
           </motion.div>
 
@@ -175,14 +176,6 @@ export default function Home() {
             <span>Analysez votre site web</span>
             <span className="shiny-text">en 1 seul clic</span>
           </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55, duration: 1.2, ease: 'easeOut' }}
-          >
-          
-          </motion.p>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -221,7 +214,6 @@ export default function Home() {
             transition={{ delay: 1.2, duration: 1.2 }}
             className="text-text-secondary/60 text-sm mt-6"
           >
-            Aucune inscription requise · Résultats en 30 secondes · 100% gratuit
           </motion.p>
         </div>
       </section>
@@ -263,7 +255,7 @@ export default function Home() {
       <section id="features" className="py-20 px-4 bg-card-bg/30">
         <div className="max-w-7xl mx-auto">
           <motion.div {...animationProps} className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Données mises à jour en temps réel depuis nos serveurs de surveillance analyse pour vous</h2>
+            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Des données de surveillance analysées en temps réel pour votre site</h2>
             <p className="text-text-secondary max-w-2xl mx-auto">
               Pas des métriques techniques — des impacts concrets sur votre business
             </p>

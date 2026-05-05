@@ -3,22 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Activity, Bell, TrendingUp, CheckCircle2, Copy, Loader2, ArrowRight,
-  Eye, BarChart3, BadgeCheck, ChevronDown, ChevronUp, Zap, Clock
+  Eye, BarChart3, BadgeCheck, ChevronDown, ChevronUp, Zap, Clock, ShieldCheck, Smartphone
 } from 'lucide-react';
+import { SUPPORT_EMAIL } from '../config/brand';
 import { useAuth } from '../hooks/useAuth';
-import { WAVE_PHONE_DISPLAY } from '../utils/wavePayment';
+import { WAVE_PHONE_DISPLAY, getWaveBusinessLink } from '../utils/wavePayment';
 import ToastMessage from '../components/ToastMessage';
 import { isValidURL } from '../utils/validators';
 import { sendProtectReceiptEmail } from '../utils/emailApi';
 
-const PROTECT_PRICE = 15000;
+const PROTECT_PRICE = 15150; // TTC avec frais Wave
 
 const FEATURES = [
   {
     icon: <Activity size={22} />,
     tag: 'Surveillance continue',
     title: 'Monitoring Uptime 24h/24',
-    desc: 'Vérification toutes les 5 minutes. Si votre site ne répond pas, vous recevez une alerte immédiate — avant vos clients.',
+    desc: 'Vérification toutes les 5 minutes. Si votre site ne répond pas, vous recevez une alerte immédiate afin de pas perdre un client.',
     detail: 'Temps de réponse · Incidents · Disponibilité',
     highlight: '288 vérifications par jour',
     color: 'green',
@@ -80,8 +81,8 @@ const COLORS = {
 };
 
 const FAQ = [
-  { q: 'Comment fonctionne le paiement ?', a: 'Vous envoyez 15 000 FCFA sur Wave au numéro Webisafe, avec votre code unique en note. Notre équipe valide le paiement sous 2h ouvrées et active votre abonnement.' },
-  { q: 'Puis-je résilier à tout moment ?', a: 'Oui, sans engagement ni frais de résiliation. Envoyez un email à webisafe@gmail.com et votre surveillance s\'arrêtera en fin de mois en cours.' },
+  { q: 'Comment fonctionne le paiement ?', a: "Cliquez sur le bouton Wave, payez directement depuis l'application avec le montant prérempli, puis confirmez votre numéro. Notre équipe valide sous 2h ouvrées et active votre abonnement." },
+  { q: 'Puis-je résilier à tout moment ?', a: `Oui, sans engagement ni frais de résiliation. Envoyez un email à ${SUPPORT_EMAIL} et votre surveillance s'arrêtera en fin de mois en cours.` },
   { q: 'Que se passe-t-il si mon site est souvent en panne ?', a: 'Vous recevez une alerte à chaque incident. Un tableau de bord dans votre espace client affiche l\'historique de disponibilité en temps réel.' },
 ];
 
@@ -190,7 +191,7 @@ export default function Protect() {
           <h1 className="text-2xl font-bold text-white mb-3">Demande envoyée ✓</h1>
           <p className="text-white/60 text-sm mb-6 leading-relaxed">
             Votre demande est reçue. Vous recevrez un email de confirmation sous <strong className="text-white">2h ouvrées</strong>.<br />
-            Pour toute question : <a href="mailto:webisafe@gmail.com" className="text-primary hover:underline">webisafe@gmail.com</a>
+            Pour toute question : <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">{SUPPORT_EMAIL}</a>
           </p>
           <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 mb-6">
             <p className="text-white/50 text-xs mb-1">Votre code de confirmation</p>
@@ -246,12 +247,12 @@ export default function Protect() {
 
           <div className="flex items-center justify-center gap-4 mt-6">
             <div className="text-center">
-              <p className="text-4xl font-black text-white">15 000</p>
+              <p className="text-4xl font-black text-white">{PROTECT_PRICE.toLocaleString('fr-FR')}</p>
               <p className="text-white/50 text-sm">FCFA / mois</p>
             </div>
             <div className="h-12 w-px bg-white/10" />
             <div className="text-left">
-              <p className="text-white/60 text-sm">Paiement via Wave Mobile</p>
+              <p className="text-white/60 text-sm">Paiement sécurisé Wave Business</p>
               <p className="text-white/40 text-xs">Sans engagement · Résiliable à tout moment</p>
             </div>
           </div>
@@ -274,7 +275,7 @@ export default function Protect() {
       {/* ── Scénarios réels ── */}
       <div className="max-w-4xl mx-auto mb-20">
         <div className="text-center mb-10">
-          <h2 className="text-2xl font-bold text-white mb-3">Dormez tranquille — votre site ne dort jamais</h2>
+          <h2 className="text-2xl font-bold text-white mb-3">Dormez tranquille, votre site ne dort jamais</h2>
           <p className="text-white/50 text-sm max-w-xl mx-auto">Voici 3 situations que nos abonnés ne vivent plus depuis Protect.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-5">
@@ -282,7 +283,7 @@ export default function Protect() {
             {
               emoji: '🌙',
               before: 'Votre site tombe à 3h du matin',
-              after: 'Vous recevez une alerte en moins de 5 minutes — avant le premier client du matin.',
+              after: 'Vous recevez une alerte en moins de 5 minutes, avant le premier client du matin.',
               tag: 'Uptime',
               color: 'blue',
             },
@@ -441,9 +442,6 @@ export default function Protect() {
             <p className="text-warning text-sm tracking-widest">★★★★★</p>
           </div>
         </div>
-        <p className="text-white/25 text-[11px] text-center mt-3">
-          Format obligatoire : une phrase / prénom + initiale / secteur + ville / pas de photo si refus
-        </p>
       </div>
 
       {/* ── Souscription + FAQ ── */}
@@ -458,7 +456,7 @@ export default function Protect() {
             </div>
             <div className="mt-6 p-4 bg-white/5 border border-white/10 rounded-2xl">
               <p className="text-white/60 text-sm">Une autre question ? Écrivez-nous :</p>
-              <a href="mailto:webisafe@gmail.com" className="text-primary text-sm font-semibold hover:underline">webisafe@gmail.com</a>
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary text-sm font-semibold hover:underline">{SUPPORT_EMAIL}</a>
             </div>
           </div>
 
@@ -524,37 +522,44 @@ export default function Protect() {
                   <p className="text-white/40 text-xs mt-1">Protect Basic · 1 mois</p>
                 </div>
 
-                <div className="space-y-3 mb-5">
-                  <div className="bg-[#060C1A] border border-white/10 rounded-2xl p-4">
-                    <p className="text-white/50 text-xs mb-2">① Envoyez sur Wave Mobile</p>
-                    <div className="flex items-center justify-between">
-                      <p className="text-primary font-bold text-lg">{WAVE_PHONE_DISPLAY}</p>
-                      <button onClick={() => handleCopy(WAVE_PHONE_DISPLAY, 'Numéro copié !')} className="flex items-center gap-1 text-xs text-white/40 hover:text-primary transition bg-white/5 px-2 py-1 rounded-lg">
-                        <Copy size={11} /> Copier
-                      </button>
-                    </div>
-                  </div>
+                {/* ── Bouton Wave Business ── */}
+                <div className="mb-5">
+                  <a
+                    href={getWaveBusinessLink('protect')}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#1B4DB6] px-5 py-3.5 text-base font-bold text-white shadow-lg shadow-blue-900/30 transition hover:bg-[#1640A0]"
+                  >
+                    <Smartphone size={20} />
+                    Payer {PROTECT_PRICE.toLocaleString('fr-FR')} FCFA avec Wave
+                  </a>
+                  <p className="mt-2 text-center text-[11px] text-white/40">
+                    Le lien ouvre l&apos;application Wave. Le montant est déjà prérempli.
+                  </p>
+                </div>
 
-                  <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4">
-                    <p className="text-white/50 text-xs mb-2">② Note Wave obligatoire</p>
-                    <div className="flex items-center justify-between">
-                      <p className="text-primary font-bold text-lg tracking-widest">{paymentCode}</p>
-                      <button onClick={() => handleCopy(paymentCode, 'Code copié !')} className="flex items-center gap-1 text-xs text-primary/70 hover:text-primary transition bg-primary/10 px-2 py-1 rounded-lg">
-                        <Copy size={11} /> Copier
-                      </button>
-                    </div>
-                    <p className="text-white/30 text-xs mt-1">Ce code identifie votre paiement</p>
+                {/* ── Référence + SLA ── */}
+                <div className="mb-5 rounded-2xl border border-white/10 bg-[#060C1A] p-4 text-center">
+                  <p className="text-[11px] text-white/40">Votre référence</p>
+                  <p className="mt-1 text-lg font-bold tracking-widest text-primary">{paymentCode}</p>
+                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400">
+                    <ShieldCheck size={10} /> Validation sous 2h ouvrées
                   </div>
                 </div>
 
-                <label className="block text-white/70 text-xs font-semibold uppercase tracking-wider mb-2">③ Votre numéro Wave expéditeur</label>
+                <label className="block text-white/70 text-xs font-semibold uppercase tracking-wider mb-2">
+                  Votre numéro Wave (pour valider rapidement)
+                </label>
                 <input type="tel" value={wavePhone} onChange={e => { setWavePhone(e.target.value); setErrors(p => ({ ...p, wavePhone: '' })); }}
                   placeholder="+225 07 00 00 00 00"
                   className={`w-full px-4 py-3 bg-[#060C1A] border rounded-xl text-white placeholder:text-white/25 focus:outline-none transition mb-1 ${errors.wavePhone ? 'border-danger' : 'border-white/10 focus:border-primary'}`} />
                 {errors.wavePhone && <p className="text-danger text-xs mb-3">{errors.wavePhone}</p>}
+                <p className="text-white/30 text-[11px] mb-4">
+                  Nous croisons ce numéro avec votre paiement Wave pour une validation instantanée.
+                </p>
 
                 <button onClick={handleSubmit} disabled={submitting}
-                  className="relative overflow-hidden w-full mt-4 py-3.5 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2">
+                  className="relative overflow-hidden w-full mt-2 py-3.5 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2">
                   <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-[shimmer_2.5s_infinite]" />
                   <span className="relative">{submitting ? <><Loader2 size={16} className="animate-spin" /> Envoi en cours...</> : "J'ai payé — Confirmer mon abonnement"}</span>
                 </button>

@@ -6,7 +6,7 @@ import {
   CreditCard, ArrowUpCircle, LogOut, User, Bell, Menu, X,
   ArrowRight, BarChart3, CheckCircle2, ExternalLink, Plus, Trash2,
   Download, TrendingUp, TrendingDown, AlertTriangle, Activity,
-  Sparkles, PartyPopper, Handshake, Users, ChevronRight,
+  Sparkles, PartyPopper, Handshake, Users, ChevronRight, Wrench,
 } from 'lucide-react';
 import { useScans } from '../hooks/useScans';
 import { getScoreBadge, getScoreColor } from '../utils/calculateScore';
@@ -246,6 +246,11 @@ function PageReports({ scans, isPaid, validatedPremiumMap, navigate }) {
                   <Download size={14} /> Télécharger PDF
                 </button>
               )}
+              {isPaid(lastScan.id) && (
+                <button onClick={() => navigate(`/corrections?url=${encodeURIComponent(lastScan.url || '')}`)} className="inline-flex items-center gap-2 px-4 py-2 bg-success/10 text-success border border-success/30 rounded-xl text-sm font-semibold transition hover:bg-success/20">
+                  <Wrench size={14} /> Corriger mon site
+                </button>
+              )}
               <button onClick={() => navigate(isPaid(lastScan.id) ? `/rapport/${lastScan.id}` : `/analyse?url=${encodeURIComponent(lastScan.url)}`)} className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white rounded-xl text-sm transition hover:bg-white/20">
                 <ExternalLink size={14} /> Voir en ligne
               </button>
@@ -290,6 +295,7 @@ function PageReports({ scans, isPaid, validatedPremiumMap, navigate }) {
                   </div>
                   <div className="flex gap-2">
                     {paid && <button onClick={() => generatePDF(scan)} className="p-2 text-white/40 hover:text-primary rounded-lg hover:bg-primary/10 transition"><Download size={14} /></button>}
+                    {paid && <button onClick={() => navigate(`/corrections?url=${encodeURIComponent(scan.url || '')}`)} className="p-2 text-white/40 hover:text-success rounded-lg hover:bg-success/10 transition" title="Corriger ce site"><Wrench size={14} /></button>}
                     <button onClick={() => navigate(paid ? `/rapport/${scan.id}` : `/analyse?url=${encodeURIComponent(scan.url)}`)} className="flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs hover:bg-primary/20 transition">
                       <ExternalLink size={12} /> {paid ? 'Rapport' : 'Voir'}
                     </button>
@@ -371,8 +377,8 @@ function PagePerformance({ scans }) {
     { label: 'CLS', value: vitals.cls?.value != null ? vitals.cls.value : 'N/A', rating: vitals.cls?.rating, desc: 'Cumulative Layout Shift — stabilité visuelle. Objectif : < 0.1.' },
     { label: 'FCP', value: vitals.fcp?.value != null ? `${vitals.fcp.value}ms` : 'N/A', rating: vitals.fcp?.rating, desc: 'First Contentful Paint — premier affichage visible. Objectif : < 1 800ms.' },
   ];
-  const ratingColor = r => r === 'good' ? '#22C55E' : r === 'needs_improvement' ? '#EAB308' : '#EF4444';
-  const ratingLabel = r => r === 'good' ? 'Bon' : r === 'needs_improvement' ? 'À améliorer' : 'Critique';
+  const ratingColor = r => r === 'good' ? '#22C55E' : r === 'needs_improvement' ? '#EAB308' : r === 'poor' ? '#EF4444' : '#94A3B8';
+  const ratingLabel = r => r === 'good' ? 'Bon' : r === 'needs_improvement' ? 'À améliorer' : r === 'poor' ? 'Critique' : 'Non mesuré';
 
   return (
     <div className="space-y-6">

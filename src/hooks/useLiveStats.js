@@ -1,6 +1,27 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient' // ton import existant
 
+function readLocalScanEvents() {
+  try {
+    const scans = JSON.parse(localStorage.getItem('webisafe_scans') || '[]')
+    if (!Array.isArray(scans)) return []
+    return scans.slice(0, 10).map((scan) => ({
+      domain: (() => {
+        try {
+          return new URL(scan.url).hostname.replace(/^www\./, '')
+        } catch {
+          return scan.url || scan.domain || 'Site analysé'
+        }
+      })(),
+      score: scan.scores?.global ?? scan.global_score ?? null,
+      country: scan.metrics?.performance?.server_location?.country ?? 'CI',
+      created_at: scan.scanned_at || scan.savedAt || scan.created_at || new Date().toISOString(),
+    }))
+  } catch {
+    return []
+  }
+}
+
 export function useLiveStats() {
   const [totalScans, setTotalScans]   = useState(null)
   const [activity, setActivity]       = useState([])
@@ -21,8 +42,15 @@ export function useLiveStats() {
         .order('created_at', { ascending: false })
         .limit(10)
 
-      setTotalScans(count || 0)
-      setActivity(data || [])
+      const localActivity = readLocalScanEvents()
+      const remoteActivity = Array.isArray(data) ? data : []
+      const mergedActivity = [...remoteActivity, ...localActivity]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 10)
+
+      setTotalScans(Math.max(count || 0, localActivity.length))
+      setActivity(mergedActivity)
+
       setLoading(false)
     }
 

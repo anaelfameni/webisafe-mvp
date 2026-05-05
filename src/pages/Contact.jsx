@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MessageCircle, Mail, Send, CheckCircle, MapPin, Clock } from 'lucide-react';
+import { SUPPORT_EMAIL } from '../config/brand';
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -68,7 +69,7 @@ export default function Contact() {
           className="text-center mb-12"
         >
           <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4">
-            Contactez-<span className="gradient-text">nous</span>
+            Contactez-<span className="shiny-text">nous</span>
           </h1>
           <p className="text-text-secondary text-lg max-w-xl mx-auto">
             Une question ? Un besoin spécifique ? Notre équipe vous répond rapidement.
@@ -103,8 +104,8 @@ export default function Contact() {
             <div className="bg-card-bg border border-border-color rounded-2xl p-6">
               <Mail size={24} className="text-primary mb-3" />
               <h3 className="text-white font-bold mb-1">Email</h3>
-              <a href="mailto:webisafe@gmail.com" className="text-primary text-sm hover:underline">
-                webisafe@gmail.com
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary text-sm hover:underline">
+                {SUPPORT_EMAIL}
               </a>
               <p className="text-text-secondary text-xs mt-2">
                 Réponse sous 24h ouvrées

@@ -4,7 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import Home from './pages/Home';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import { supabase } from './lib/supabaseClient';
 
 const Analyse = lazy(() => import('./pages/Analyse'));
@@ -12,6 +12,7 @@ const Rapport = lazy(() => import('./pages/Rapport'));
 const Payment = lazy(() => import('./pages/Payment'));
 const Admin = lazy(() => import('./pages/Admin'));
 const Tarifs = lazy(() => import('./pages/Tarifs'));
+const Statistiques = lazy(() => import('./pages/Statistiques'));
 const Contact = lazy(() => import('./pages/Contact'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Partenaire = lazy(() => import('./pages/Partenaire'));
@@ -22,6 +23,7 @@ const Confidentialite = lazy(() => import('./pages/Confidentialite'));
 const APropos = lazy(() => import('./pages/APropos'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Protect = lazy(() => import('./pages/Protect'));
+const Corrections = lazy(() => import('./pages/Corrections'));
 
 function PageLoader() {
   return (
@@ -108,6 +110,7 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
             <Route path="/admin" element={<Admin user={user} />} />
             <Route path="/rapport/:id" element={<Rapport />} />
             <Route path="/tarifs" element={<Tarifs />} />
+            <Route path="/statistiques" element={<Statistiques />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/dashboard" element={<Dashboard user={user} />} />
             <Route path="/partenaire" element={<Partenaire user={user} />} />
@@ -117,12 +120,30 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
             <Route path="/confidentialite" element={<Confidentialite />} />
             <Route path="/a-propos" element={<APropos />} />
             <Route path="/protect" element={<Protect />} />
+            <Route path="/corrections" element={<Corrections />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </main>
 
-      {!isFullscreenRoute && <Footer />}
+      {!isFullscreenRoute && (
+        <div className={location.pathname === '/' ? 'mb-12' : ''}>
+          <Footer />
+        </div>
+      )}
+
+      {!isFullscreenRoute && location.pathname === '/' && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-primary/10 backdrop-blur-md border-t border-primary/20 py-2.5 overflow-hidden">
+          <div className="flex whitespace-nowrap animate-marquee">
+            {[...Array(6)].map((_, i) => (
+              <span key={i} className="mx-8 text-xs sm:text-sm font-medium text-primary/90 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                Premier écosystème complet d'audit, correction et surveillance web conçu pour l'Afrique
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!isFullscreenRoute && (
         <AuthModal
@@ -137,13 +158,23 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
 }
 
 function App() {
-  const { user, handleAuth, signOut } = useAuth();
+  const { user, login, signup, logout } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('login');
 
   const handleLogout = () => {
-    signOut();
+    logout();
     window.location.href = '/';
+  };
+
+  const handleAuth = (mode, data) => {
+    if (mode === 'login') {
+      return login(data.email, data.password);
+    }
+    if (mode === 'signup') {
+      return signup(data.name, data.email, data.phone, data.password, data.phoneCountry);
+    }
+    return { success: false, error: 'Mode inconnu' };
   };
 
   return (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle, Loader2, Circle } from 'lucide-react';
+import { CheckCircle, Loader2, Circle, ArrowLeft } from 'lucide-react';
 
 const SCAN_STEPS = [
   'Connexion au site...',
@@ -23,6 +24,7 @@ const FACTS = [
 ];
 
 export default function ScanProgress({ currentStep, url }) {
+  const navigate = useNavigate();
   const [factIndex, setFactIndex] = useState(0);
   const progress = ((currentStep + 1) / SCAN_STEPS.length) * 100;
 
@@ -35,6 +37,12 @@ export default function ScanProgress({ currentStep, url }) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative">
+      <button
+        onClick={() => navigate('/')}
+        className="absolute top-6 left-6 flex items-center gap-1 text-white/60 hover:text-white text-sm transition-colors"
+      >
+        <ArrowLeft size={16} /> Retour à l'accueil
+      </button>
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

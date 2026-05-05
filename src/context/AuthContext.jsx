@@ -1,139 +1,51 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
-import { isAdminCredentials, buildAdminUser } from '../utils/adminAuth'
-
-const AUTH_KEY = 'webisafe_auth'
-const USERS_KEY = 'webisafe_users'
-
-function safeParse(json, fallback) {
-  try { return JSON.parse(json); } catch { return fallback; }
-}
-
-function getLegacyUsers() {
-  if (typeof window === 'undefined') return [];
-  return safeParse(localStorage.getItem(USERS_KEY) || '[]', []);
-}
+import { createContext, useContext } from 'react'
+import { useAuth as useAuthHook } from '../hooks/useAuth'
 
 const AuthContext = createContext({})
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // On wrappe le hook localStorage pour que tous les composants
+  // qui importent useAuth du contexte fonctionnent avec le même système
+  const hook = useAuthHook()
 
-  useEffect(() => {
-    // Récupère la session Supabase existante au chargement (reconnexion auto)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user)
-        fetchProfile(session.user.id)
-        return
+  // Construit un profile compatible avec l'ancienne API
+  const profile = hook.user
+    ? {
+        role: hook.user.role || 'user',
+        full_name: hook.user.name || hook.user.email,
       }
-      // Fallback 1 : ancien auth localStorage (compatibilité admin)
-      const stored = localStorage.getItem(AUTH_KEY)
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored)
-          if (parsed?.email) {
-            setUser(parsed)
-            setProfile({ full_name: parsed.name, role: parsed.role || 'user' })
-            setLoading(false)
-            return
-          }
-        } catch {
-          localStorage.removeItem(AUTH_KEY)
-        }
-      }
-      // Fallback 2 : anciens comptes clients dans webisafe_users
-      const legacyUsers = getLegacyUsers()
-      const lastLegacy = legacyUsers[legacyUsers.length - 1]
-      if (lastLegacy?.email) {
-        const safeUser = { ...lastLegacy }
-        delete safeUser.password
-        setUser(safeUser)
-        setProfile({ full_name: safeUser.name, role: 'user' })
-        localStorage.setItem(AUTH_KEY, JSON.stringify(safeUser))
-        setLoading(false)
-        return
-      }
-      setLoading(false)
-    })
+    : null
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setUser(session?.user ?? null)
-        if (session?.user) await fetchProfile(session.user.id)
-        else { setProfile(null); setLoading(false) }
-      }
-    )
-    return () => subscription.unsubscribe()
-  }, [])
-
-  async function fetchProfile(userId) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    setProfile(data)
-    setLoading(false)
-  }
-
-  // ✅ C'est cette fonction que tu passes à AuthModal en tant que onAuth
-  async function handleAuth(mode, { name, email, phone, password }) {
+  // Adapte handleAuth pour matcher l'API ancienne du contexte
+  async function handleAuth(mode, { name, email, phone, password, phoneCountry }) {
     if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: name, phone } // → stocké dans raw_user_meta_data → trigger → profiles
-        }
-      })
-      if (error) return { success: false, error: error.message }
+      const result = hook.signup(name, email, phone, password, phoneCountry)
+      if (!result.success) return { success: false, error: result.error }
       return { success: true, redirectTo: '/dashboard' }
     }
 
     if (mode === 'login') {
-      // Admin local (pas dans Supabase)
-      if (isAdminCredentials(email, password)) {
-        const adminUser = buildAdminUser()
-        setUser(adminUser)
-        setProfile({ full_name: adminUser.name, role: 'admin' })
-        localStorage.setItem(AUTH_KEY, JSON.stringify(adminUser))
+      const result = hook.login(email, password)
+      if (!result.success) return { success: false, error: result.error }
+      if (result.user?.role === 'admin') {
         return { success: true, redirectTo: '/admin' }
       }
-
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (!error) return { success: true, redirectTo: '/dashboard' }
-
-      // Fallback : anciens comptes localStorage (compatibilité)
-      const legacyUsers = getLegacyUsers()
-      const found = legacyUsers.find(
-        (u) => String(u.email || '').trim().toLowerCase() === String(email || '').trim().toLowerCase() &&
-               u.password === password
-      )
-      if (found) {
-        const safeUser = { ...found }
-        delete safeUser.password
-        setUser(safeUser)
-        setProfile({ full_name: safeUser.name, role: 'user' })
-        localStorage.setItem(AUTH_KEY, JSON.stringify(safeUser))
-        return { success: true, redirectTo: '/dashboard' }
-      }
-
-      return { success: false, error: 'Email ou mot de passe incorrect' }
+      return { success: true, redirectTo: '/dashboard' }
     }
   }
 
   async function signOut() {
-    await supabase.auth.signOut()
-    localStorage.removeItem(AUTH_KEY)
-    setUser(null)
-    setProfile(null)
+    hook.logout()
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, handleAuth, signOut }}>
+    <AuthContext.Provider value={{
+      user: hook.user,
+      profile,
+      loading: hook.loading,
+      handleAuth,
+      signOut,
+    }}>
       {children}
     </AuthContext.Provider>
   )

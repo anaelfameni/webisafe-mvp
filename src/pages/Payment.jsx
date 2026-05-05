@@ -4,9 +4,8 @@ import { CheckCircle2, Copy, Loader2, ShieldCheck, Smartphone } from 'lucide-rea
 import ToastMessage from '../components/ToastMessage';
 import { useScans } from '../hooks/useScans';
 import { createPaymentRequest, fetchLatestPaymentRequest, markScanPaid, notifyAdmin, updatePaymentRequest } from '../utils/paymentApi';
-import { buildPaymentNotificationSuccessToast } from '../utils/paymentToast';
 import { isValidEmail, normalizeURL } from '../utils/validators';
-import { WAVE_PAYMENT_AMOUNT, WAVE_PHONE_DISPLAY, formatFcfa, generateWavePaymentCode } from '../utils/wavePayment';
+import { WAVE_PAYMENT_AMOUNT, WAVE_PAYMENT_TOTAL, WAVE_PHONE_DISPLAY, formatFcfa, generateWavePaymentCode, getWaveBusinessLink } from '../utils/wavePayment';
 
 function PaymentStep({ icon, text }) {
   return (
@@ -20,7 +19,7 @@ function PaymentStep({ icon, text }) {
 export default function Payment({ user }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { getScan } = useScans();
+  const { getScan, markAsPaid } = useScans();
 
   const scanId = searchParams.get('scan_id') || '';
   const urlToAudit = normalizeURL(searchParams.get('url') || '');
@@ -35,6 +34,7 @@ export default function Payment({ user }) {
   const [submitted, setSubmitted] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [toast, setToast] = useState(null);
+  const [showManualFallback, setShowManualFallback] = useState(false);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -60,17 +60,17 @@ export default function Payment({ user }) {
           setEmail((current) => current || latestRequest.user_email || defaultEmail);
           setWavePhone(latestRequest.wave_phone || '');
         } else {
-          const created = await createPaymentRequest({
+          // Pas de sauvegarde en base tant que le client n'a pas cliqué 'J'ai payé'
+          if (!active) return;
+          setPaymentRequest({
+            id: null,
             payment_code: generateWavePaymentCode(),
             scan_id: scanId,
             user_email: defaultEmail || null,
             url_to_audit: urlToAudit,
-            amount: WAVE_PAYMENT_AMOUNT,
+            amount: WAVE_PAYMENT_TOTAL,
             status: 'pending',
           });
-
-          if (!active) return;
-          setPaymentRequest(created);
         }
       } catch {
         if (!active) return;
@@ -80,7 +80,7 @@ export default function Payment({ user }) {
           scan_id: scanId,
           user_email: defaultEmail || null,
           url_to_audit: urlToAudit,
-          amount: WAVE_PAYMENT_AMOUNT,
+          amount: WAVE_PAYMENT_TOTAL,
           status: 'pending',
         });
         setToast({ type: 'error', message: 'Erreur reseau. Reessayez.' });
@@ -131,7 +131,18 @@ export default function Payment({ user }) {
     try {
       let currentRequest = paymentRequest;
 
-      if (currentRequest.id) {
+      if (!currentRequest.id) {
+        // Création dans la base UNIQUEMENT au clic sur 'J'ai payé'
+        currentRequest = await createPaymentRequest({
+          payment_code: currentRequest.payment_code,
+          scan_id: scanId,
+          user_email: email,
+          url_to_audit: urlToAudit,
+          amount: WAVE_PAYMENT_TOTAL,
+          status: 'waiting_validation',
+          wave_phone: wavePhone,
+        });
+      } else {
         currentRequest =
           (await updatePaymentRequest(currentRequest.id, {
             wave_phone: wavePhone,
@@ -142,6 +153,7 @@ export default function Payment({ user }) {
 
       setPaymentRequest(currentRequest);
 
+      // Notification admin envoyée UNIQUEMENT au clic sur 'J'ai payé'
       try {
         await notifyAdmin({
           payment_code: currentRequest.payment_code,
@@ -151,7 +163,7 @@ export default function Payment({ user }) {
           scan_id: scanId,
         });
       } catch {
-        setToast(buildPaymentNotificationSuccessToast());
+        // Échec silencieux de la notification admin
       }
 
       setSubmitted(true);
@@ -221,7 +233,8 @@ export default function Payment({ user }) {
             <button
               onClick={async () => {
                 await markScanPaid(scanId);
-                navigate(`/rapport/${scanId}`);
+                markAsPaid(scanId);
+                navigate(`/rapport/${scanId}`, { state: { adminBypass: true } });
               }}
               className="inline-flex items-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600 px-6 py-3 text-sm font-bold text-white transition"
             >
@@ -236,13 +249,13 @@ export default function Payment({ user }) {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary font-bold text-white">W</div>
             <div className="text-left">
               <p className="text-base font-bold text-white">Paiement securisé</p>
-              <p className="text-xs uppercase tracking-[0.24em] text-primary">Webisafe</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-primary">Wave Business</p>
             </div>
           </div>
 
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1 text-xs font-semibold text-primary">
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-xs font-semibold text-emerald-400">
             <ShieldCheck size={14} />
-            Paiement Manuel Wave
+            Validation sous 2h ouvrées
           </div>
 
           <p className="mt-4 text-sm italic text-white/70">
@@ -252,51 +265,36 @@ export default function Payment({ user }) {
 
         <div className="mt-8 text-center">
           <p className="text-5xl font-bold text-white">{formatFcfa(paymentRequest.amount)}</p>
-          <p className="mt-2 text-sm text-white/50">Audit Premium Webisafe - One-time</p>
+          <p className="mt-2 text-sm text-white/50">Audit Premium Webisafe — One-time</p>
         </div>
 
+        {/* ── Bouton Wave Business ── */}
         <div className="mt-8">
-          <p className="mb-3 text-sm font-semibold text-white">Envoyer sur Wave :</p>
-          <div className="rounded-2xl bg-[#1E293B] p-4 text-center">
-            <p className="text-2xl font-bold text-primary">{WAVE_PHONE_DISPLAY}</p>
-            <button
-              type="button"
-              onClick={() => handleCopy(WAVE_PHONE_DISPLAY, 'Numero copie !')}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20"
-            >
-              <Copy size={16} />
-              Copier le numero
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <p className="mb-3 text-sm font-semibold text-white">
-            Important - Mettez ce code dans le champ Note de Wave :
+          <a
+            href={getWaveBusinessLink('audit')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#1B4DB6] px-6 py-4 text-lg font-bold text-white shadow-lg shadow-blue-900/30 transition hover:bg-[#1640A0]"
+          >
+            <Smartphone size={22} />
+            Payer {formatFcfa(paymentRequest.amount)} avec Wave
+          </a>
+          <p className="mt-3 text-center text-xs text-white/40">
+            Le lien ouvre l&apos;application Wave sur votre téléphone. Le montant est déjà prérempli.
           </p>
-          <div className="rounded-2xl border border-primary bg-primary/10 p-4 text-center">
-            <p className="text-3xl font-bold tracking-[0.28em] text-primary">
-              {paymentRequest.payment_code}
-            </p>
-            <button
-              type="button"
-              onClick={() => handleCopy(paymentRequest.payment_code, 'Code copie !')}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20"
-            >
-              <Copy size={16} />
-              Copier le code
-            </button>
-            <p className="mt-3 text-xs text-white/40">
-              Ce code nous permet d&apos;identifier votre paiement.
-            </p>
-          </div>
         </div>
 
-        <div className="mt-6 space-y-3">
-          <p className="text-sm font-semibold text-white">Comment payer en 3 etapes :</p>
-          <PaymentStep icon="1" text="Ouvrez Wave puis choisissez Envoyer de l'argent." />
-          <PaymentStep icon="2" text={`Entrez ${WAVE_PHONE_DISPLAY} et ${formatFcfa(WAVE_PAYMENT_AMOUNT)}.`} />
-          <PaymentStep icon="3" text={`Dans Note/Motif, collez le code ${paymentRequest.payment_code}.`} />
+        {/* ── Référence discrète ── */}
+        <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/40 p-4 text-center">
+          <p className="text-xs text-white/40">Votre référence de commande</p>
+          <p className="mt-1 text-xl font-bold tracking-widest text-primary">{paymentRequest.payment_code}</p>
+          <button
+            type="button"
+            onClick={() => handleCopy(paymentRequest.payment_code, 'Code copié !')}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs text-white/30 hover:text-primary transition"
+          >
+            <Copy size={12} /> Copier
+          </button>
         </div>
 
         <div className="mt-8 flex items-center gap-4">
@@ -307,7 +305,9 @@ export default function Payment({ user }) {
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
           <div>
-            <label className="mb-2 block text-sm font-medium text-white">Votre numero Wave :</label>
+            <label className="mb-2 block text-sm font-medium text-white">
+              Votre numéro Wave (pour valider rapidement) :
+            </label>
             <input
               type="tel"
               value={wavePhone}
@@ -321,6 +321,9 @@ export default function Payment({ user }) {
               }`}
             />
             {fieldErrors.wavePhone && <p className="mt-2 text-xs text-danger">{fieldErrors.wavePhone}</p>}
+            <p className="mt-2 text-xs text-white/40">
+              Nous croisons ce numéro avec votre paiement Wave pour une validation instantanée.
+            </p>
           </div>
 
           <div>
@@ -345,14 +348,47 @@ export default function Payment({ user }) {
             disabled={submitting || !wavePhone.trim() || !email.trim()}
             className="w-full rounded-xl bg-primary px-5 py-4 text-lg font-bold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? 'Soumission en cours...' : "J'ai payé - Soumettre"}
+            {submitting ? 'Soumission en cours...' : "J'ai payé — Valider ma commande"}
           </button>
         </form>
+
+        {/* ── Fallback manuel ── */}
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={() => setShowManualFallback((s) => !s)}
+            className="text-xs text-white/30 hover:text-white/60 transition underline"
+          >
+            {showManualFallback ? 'Masquer le paiement manuel' : 'Problème avec le lien ? Payer manuellement'}
+          </button>
+        </div>
+
+        {showManualFallback && (
+          <div className="mt-4 space-y-4 rounded-2xl border border-white/10 bg-[#0F172A]/40 p-5">
+            <p className="text-sm font-semibold text-white">Paiement manuel</p>
+            <div className="rounded-2xl bg-[#1E293B] p-4 text-center">
+              <p className="text-2xl font-bold text-primary">{WAVE_PHONE_DISPLAY}</p>
+              <button
+                type="button"
+                onClick={() => handleCopy(WAVE_PHONE_DISPLAY, 'Numéro copié !')}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20"
+              >
+                <Copy size={16} />
+                Copier le numéro
+              </button>
+            </div>
+            <div className="space-y-3">
+              <PaymentStep icon="1" text="Ouvrez Wave puis choisissez Envoyer de l'argent." />
+              <PaymentStep icon="2" text={`Entrez ${WAVE_PHONE_DISPLAY} et ${formatFcfa(WAVE_PAYMENT_TOTAL)}.`} />
+              <PaymentStep icon="3" text={`Dans Note/Motif, collez le code ${paymentRequest.payment_code}.`} />
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/60 px-4 py-4 text-sm text-white/60">
           <div className="flex items-start gap-3">
             <Smartphone size={18} className="mt-0.5 text-primary" />
-            <p>Revenez ensuite dans votre tableau de board pour apercevoir votre rapport complet.</p>
+            <p>Revenez dans votre tableau de bord pour suivre l&apos;état de votre paiement.</p>
           </div>
         </div>
       </div>

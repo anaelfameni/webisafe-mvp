@@ -31,17 +31,17 @@ export default function Tarifs() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center px-4 mb-8"
+        className="text-center px-4 mb-0"
       >
-        <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4">
+        <h1 className="text-4xl lg:text-5xl font-bold text-white mb-2">
           Tarifs <span className="shiny-text">transparents</span>
         </h1>
         <p className="text-text-secondary text-lg max-w-2xl mx-auto">
-          Des prix penses pour les PME africaines. Pas d'abonnement cache, pas de surprise.
+          Des prix adaptés à l'Afrique. Pas d'abonnement caché. Des tarifs pensés pour les PME.
         </p>
       </motion.div>
 
-      <PricingSection onScan={() => navigate('/', { state: { scrollToTop: true } })} />
+      <PricingSection onScan={() => navigate('/', { state: { scrollToTop: true } })} hideHeader={true} />
 
       <PartnerCTA />
 

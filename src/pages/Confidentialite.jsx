@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { SUPPORT_EMAIL } from '../config/brand';
 
 export default function Confidentialite() {
   useEffect(() => { window.scrollTo(0, 0); }, []);
@@ -22,7 +23,7 @@ export default function Confidentialite() {
             <h2 className="text-lg font-semibold text-white mb-3">Responsable du traitement</h2>
             <p>
               Anael FAMENI — Abidjan, Côte d'Ivoire<br />
-              Contact : <a href="mailto:webisafe@gmail.com" className="text-primary hover:underline">contact@webisafe.tech</a>
+              Contact : <a href="mailto:contact@webisafe.tech" className="text-primary hover:underline">contact@webisafe.tech</a>
             </p>
           </section>
 
@@ -65,8 +66,8 @@ export default function Confidentialite() {
             </p>
             <p className="mt-2">
               Pour exercer ces droits, contactez-nous à :{' '}
-              <a href="mailto:webisafe@gmail.com" className="text-primary hover:underline">
-                webisafe@gmail.com
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">
+                {SUPPORT_EMAIL}
               </a>
             </p>
           </section>

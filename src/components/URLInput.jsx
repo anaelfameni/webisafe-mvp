@@ -161,7 +161,7 @@ export default function URLInput({ onScan, loading, user }) {
 
       {/* Trust badges */}
       <p className="text-success text-xs text-center mt-3 font-medium">
-        ✓ Gratuit · ✓ Sans inscription · ✓ Résultats en quelques minutes
+        Gratuit · Sans inscription · Résultats en quelques minutes
       </p>
     </motion.form>
   );
