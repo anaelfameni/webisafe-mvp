@@ -92,7 +92,7 @@ export function escapeHtml(value) {
 }
 
 // ── Admin Auth ────────────────────────────────────────────────────────────────
-export async function requireAdmin(req, res) {
+export async function requireAdmin(req, res, client = null) {
   const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
@@ -101,7 +101,7 @@ export async function requireAdmin(req, res) {
     return null;
   }
 
-  const supabase = getSupabaseAdminClient();
+  const supabase = client || getSupabaseAdminClient();
 
   if (!supabase) {
     json(res, 500, { error: 'Configuration serveur manquante' });

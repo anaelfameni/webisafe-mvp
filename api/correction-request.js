@@ -78,7 +78,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const adminUser = await requireAdmin(req, res);
+    const adminUser = await requireAdmin(req, res, supabase);
     if (!adminUser) return;
 
     if (!supabase) return json(res, 503, { error: 'Service indisponible' });
