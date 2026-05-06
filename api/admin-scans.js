@@ -17,20 +17,24 @@ export default async function handler(req, res) {
   if (!supabase) return json(res, 500, { success: false, error: 'Configuration serveur manquante' });
 
   const limit = Math.min(Math.max(Number(req.query?.limit || 50), 1), 100);
-  const queries = [
-    (client) => client.from('scans').select('*').order('scanned_at', { ascending: false }).limit(limit),
-    (client) => client.from('scans').select('*').order('created_at', { ascending: false }).limit(limit),
-    (client) => client.from('scans').select('*').order('scan_date', { ascending: false }).limit(limit),
-    (client) => client.from('scans').select('*').limit(limit),
-  ];
 
-  let lastError = null;
-  for (const runQuery of queries) {
-    const { data, error } = await runQuery(supabase);
-    if (!error) return json(res, 200, { success: true, scans: data || [] });
-    lastError = error;
-  }
+  // Essayer avec created_at (colonne la plus courante)
+  const { data, error } = await supabase
+    .from('scans')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
 
-  console.error('[admin-scans] error:', lastError);
-  return json(res, 500, { success: false, error: 'Erreur chargement scans' });
+  if (!error) return json(res, 200, { success: true, scans: data || [] });
+
+  // Fallback sans tri si la colonne n'existe pas
+  const { data: data2, error: error2 } = await supabase
+    .from('scans')
+    .select('*')
+    .limit(limit);
+
+  if (!error2) return json(res, 200, { success: true, scans: data2 || [] });
+
+  console.error('[admin-scans] Supabase error:', error2);
+  return json(res, 500, { success: false, error: 'Erreur chargement scans: ' + (error2?.message || 'inconnue') });
 }

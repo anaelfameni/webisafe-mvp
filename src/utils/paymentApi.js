@@ -76,7 +76,13 @@ export async function fetchPaymentRequests(limit = 20) {
     });
 
     if (!response.ok) {
-      throw new Error('Chargement paiements impossible');
+      const text = await response.text();
+      try {
+        const err = JSON.parse(text);
+        throw new Error(err.error || `Erreur ${response.status}`);
+      } catch {
+        throw new Error(text || `Erreur ${response.status}`);
+      }
     }
 
     const data = await response.json();
@@ -154,7 +160,13 @@ export async function fetchScans(limit = 50) {
   });
 
   if (!response.ok) {
-    throw new Error('Chargement scans impossible');
+    const text = await response.text();
+    try {
+      const err = JSON.parse(text);
+      throw new Error(err.error || `Erreur ${response.status}`);
+    } catch {
+      throw new Error(text || `Erreur ${response.status}`);
+    }
   }
 
   const data = await response.json();
