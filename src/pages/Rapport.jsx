@@ -41,14 +41,19 @@ import { runFullAnalysis, filterWebisafeOnlyChecks } from '../utils/api';
 import { trackClarityEvent } from '../lib/clarity';
 
 // ── Helpers UI ────────────────────────────────────────────────────────────────
-function MetricRow({ label, value, status }) {
+function MetricRow({ label, value, status, hint }) {
   const statusLabel = status === 'pass' ? 'Conforme' : status === 'warn' ? 'Attention' : status === 'unknown' ? 'Non mesuré' : 'Non conforme';
 
   return (
-    <div className="flex items-center justify-between py-3 border-b border-border-color last:border-0">
-      <span className="text-text-secondary text-sm">{label}</span>
-      <div className="flex items-center gap-2">
-        <span className="text-text-primary text-sm font-medium">{value ?? 'N/A'}</span>
+    <div className="flex items-start justify-between py-3 border-b border-border-color last:border-0 gap-4">
+      <div className="min-w-0 flex-1">
+        <span className="text-text-secondary text-sm">{label}</span>
+        {hint && (
+          <p className="text-white/40 text-xs mt-1 italic leading-snug">{hint}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-text-primary text-sm font-medium text-right">{value ?? 'N/A'}</span>
         {status && (
           <span role="status" aria-label={statusLabel}>
             <span aria-hidden="true">{status === 'pass' ? '✅' : status === 'warn' ? '⚠️' : status === 'unknown' ? '—' : '❌'}</span>
@@ -57,6 +62,54 @@ function MetricRow({ label, value, status }) {
       </div>
     </div>
   );
+}
+
+// Renvoie une explication brève pour les checks de sécurité avancée
+// selon le nom du check et son statut (pourquoi c'est Indisponible / fail / pass)
+function getCheckHint(checkName, status, check) {
+  if (!check) return null;
+  const isError = status === 'error' || status === null;
+
+  // Hints spécifiques par check
+  const hints = {
+    waf: {
+      pass: 'Un pare-feu applicatif filtre déjà le trafic malveillant entrant.',
+      fail: 'Sans WAF, le site est plus exposé aux attaques automatisées (bots, injections).',
+      error: 'Le serveur n\'a pas répondu à la sonde WAF dans le délai imparti.',
+    },
+    subdomains: {
+      pass: 'Aucun sous-domaine sensible détecté via les certificats SSL publics.',
+      fail: 'Des sous-domaines administratifs sont exposés publiquement (risque d\'intrusion).',
+      error: 'L\'API publique crt.sh n\'a pas répondu (limite atteinte ou timeout).',
+    },
+    security_txt: {
+      pass: 'Les chercheurs en sécurité savent comment vous joindre en cas de faille.',
+      fail: 'Aucun fichier /.well-known/security.txt — les chercheurs ne peuvent pas signaler de faille.',
+      error: 'Vérification du fichier security.txt impossible (timeout réseau).',
+    },
+    cors: {
+      pass: 'La politique CORS empêche les sites tiers de lire vos données utilisateurs.',
+      fail: 'Configuration CORS trop permissive : risque de vol de données depuis un site malveillant.',
+      error: 'Test CORS impossible (le serveur a refusé la requête de test).',
+    },
+    supply_chain: {
+      pass: 'Peu ou pas de scripts tiers : surface d\'attaque limitée.',
+      fail: 'Trop de ressources externes : si l\'une est compromise, votre site l\'est aussi.',
+      error: 'Analyse du HTML impossible (page protégée ou inaccessible).',
+    },
+    email_advanced: {
+      pass: 'SPF + DMARC + DKIM configurés : impossible d\'usurper votre domaine en email.',
+      fail: 'Sans SPF/DMARC/DKIM, des cybercriminels peuvent envoyer des emails frauduleux depuis votre domaine.',
+      error: 'Lookup DNS impossible (résolveur DoH indisponible).',
+    },
+  };
+
+  const hint = hints[checkName];
+  if (!hint) return null;
+
+  if (isError) return hint.error;
+  if (status === 'pass') return hint.pass;
+  return hint.fail;
 }
 
 function SeverityPill({ severity }) {
@@ -900,6 +953,10 @@ export default function Rapport() {
                 if (c.status === 'error') return 'warn';
                 return 'fail';
               })()}
+              hint={(() => {
+                const c = norm?.extendedChecks?.find(c => c.check_name === 'waf');
+                return getCheckHint('waf', c?.status, c);
+              })()}
             />
             <MetricRow
               label="Sous-domaines découverts"
@@ -915,6 +972,10 @@ export default function Rapport() {
                 if (c.status === 'pass') return 'pass';
                 if (c.status === 'error') return 'warn';
                 return 'warn';
+              })()}
+              hint={(() => {
+                const c = norm?.extendedChecks?.find(c => c.check_name === 'subdomains');
+                return getCheckHint('subdomains', c?.status, c);
               })()}
             />
             <MetricRow
@@ -932,6 +993,10 @@ export default function Rapport() {
                 if (c.status === 'error') return 'warn';
                 return 'fail';
               })()}
+              hint={(() => {
+                const c = norm?.extendedChecks?.find(c => c.check_name === 'security_txt');
+                return getCheckHint('security_txt', c?.status, c);
+              })()}
             />
             <MetricRow
               label="CORS"
@@ -947,6 +1012,10 @@ export default function Rapport() {
                 if (c.status === 'pass') return 'pass';
                 if (c.status === 'error') return 'warn';
                 return 'fail';
+              })()}
+              hint={(() => {
+                const c = norm?.extendedChecks?.find(c => c.check_name === 'cors');
+                return getCheckHint('cors', c?.status, c);
               })()}
             />
             <MetricRow
@@ -964,6 +1033,10 @@ export default function Rapport() {
                 if (c.status === 'error') return 'warn';
                 return 'warn';
               })()}
+              hint={(() => {
+                const c = norm?.extendedChecks?.find(c => c.check_name === 'supply_chain');
+                return getCheckHint('supply_chain', c?.status, c);
+              })()}
             />
             <MetricRow
               label="Email avancé (SPF/DMARC/DKIM)"
@@ -979,6 +1052,10 @@ export default function Rapport() {
                 if (c.status === 'pass') return 'pass';
                 if (c.status === 'error') return 'warn';
                 return 'fail';
+              })()}
+              hint={(() => {
+                const c = norm?.extendedChecks?.find(c => c.check_name === 'email_advanced');
+                return getCheckHint('email_advanced', c?.status, c);
               })()}
             />
 

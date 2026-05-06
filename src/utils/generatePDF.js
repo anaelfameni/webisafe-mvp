@@ -3,21 +3,58 @@ import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer
 
 const e = React.createElement;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHARTE WEBISAFE OFFICIELLE (depuis tailwind.config.js)
+// ═══════════════════════════════════════════════════════════════════════════════
 const COLORS = {
-  bg: '#0A0F1E',
-  panel: '#111827',
-  panelSoft: '#142033',
-  panelDeep: '#0B172A',
-  line: '#263449',
-  cyan: '#00D4FF',
-  text: '#F8FAFC',
-  muted: '#CBD5E1',
-  quiet: '#94A3B8',
-  dim: '#64748B',
-  red: '#EF4444',
-  orange: '#F59E0B',
-  green: '#22C55E',
-  blue: '#38BDF8',
+  // Identité de marque
+  primary: '#1566F0',          // Bleu marque Webisafe
+  primaryHover: '#1255CC',     // Survol CTA
+  primaryDeep: '#0B47B0',      // Ombre/profondeur
+  primaryLight: '#3B82F6',     // Highlight
+
+  // Fonds (thème sombre)
+  pageBg: '#0A0F1E',           // Fond page PDF (entre dark-navy et noir pur)
+  darkNavy: '#0F172A',         // dark-navy officiel
+  cardBg: '#1E293B',           // card-bg officiel
+  cardHover: '#263548',        // card-hover officiel
+  cardDeep: '#0B1424',         // Surface la plus sombre (hero/inputs)
+  panelLight: '#253649',       // Surface premium
+
+  // Bordures
+  border: '#334155',           // border-color officiel
+  borderLight: '#475569',
+  borderDim: '#1F2A3D',
+
+  // Texte
+  textPrimary: '#F8FAFC',      // text-primary officiel
+  textSecondary: '#94A3B8',    // text-secondary officiel
+  textMuted: '#64748B',
+  textDim: '#475569',
+
+  // Statuts (charte officielle)
+  success: '#22C55E',          // success officiel
+  successSoft: '#14532D',
+  successBg: '#052E1A',
+  warning: '#F97316',          // warning officiel
+  warningSoft: '#92400E',
+  warningBg: '#3A2507',
+  danger: '#EF4444',           // danger officiel
+  dangerSoft: '#991B1B',
+  dangerBg: '#3B0A12',
+  info: '#38BDF8',
+  infoSoft: '#0369A1',
+  infoBg: '#0B2A3A',
+
+  // Échelle criticité (Critical/High/Medium/Low/Info)
+  critical: '#EF4444',
+  high: '#F97316',
+  medium: '#F59E0B',
+  low: '#3B82F6',
+  informational: '#94A3B8',
+
+  // Spéciaux
+  white: '#FFFFFF',
   black: '#020617',
 };
 
@@ -94,11 +131,11 @@ function scoreDisplay(value) {
 
 function scoreColor(value) {
   const score = scoreValue(value);
-  if (score === null) return COLORS.dim;
-  if (score < SCORE_LIMITS.critical) return COLORS.red;
-  if (score < SCORE_LIMITS.warning) return COLORS.orange;
-  if (score < SCORE_LIMITS.good) return COLORS.green;
-  return COLORS.blue;
+  if (score === null) return COLORS.textMuted;
+  if (score < SCORE_LIMITS.critical) return COLORS.danger;     // Rouge = critique
+  if (score < SCORE_LIMITS.warning) return COLORS.warning;     // Orange = attention
+  if (score < SCORE_LIMITS.good) return COLORS.success;        // Vert = bon
+  return COLORS.primary;                                        // Bleu marque = excellent
 }
 
 function scoreLabel(value) {
@@ -129,10 +166,10 @@ function normalizeStatus(value) {
 
 function statusPalette(value) {
   const status = normalizeStatus(value);
-  if (status === 'OK') return { bg: '#052E1A', border: '#14532D', text: '#86EFAC' };
-  if (status === 'Avertissement') return { bg: '#3A2507', border: '#92400E', text: '#FCD34D' };
-  if (status === 'Critique') return { bg: '#3B0A12', border: '#991B1B', text: '#FCA5A5' };
-  return { bg: COLORS.panel, border: COLORS.line, text: COLORS.quiet };
+  if (status === 'OK') return { bg: COLORS.successBg, border: COLORS.successSoft, text: '#86EFAC', solid: COLORS.success };
+  if (status === 'Avertissement') return { bg: COLORS.warningBg, border: COLORS.warningSoft, text: '#FCD34D', solid: COLORS.warning };
+  if (status === 'Critique') return { bg: COLORS.dangerBg, border: COLORS.dangerSoft, text: '#FCA5A5', solid: COLORS.danger };
+  return { bg: COLORS.cardBg, border: COLORS.border, text: COLORS.textSecondary, solid: COLORS.textMuted };
 }
 
 function yesNo(value, yes = 'Oui', no = 'Non') {
@@ -438,136 +475,953 @@ export function buildPdfAuditModel(reportData = {}) {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// STYLES PREMIUM — Rapport d'agence de cybersécurité internationale
+// ═══════════════════════════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
-  page: { backgroundColor: COLORS.bg, color: COLORS.text, fontFamily: 'Helvetica', paddingTop: 64, paddingBottom: 54, paddingHorizontal: 34 },
-  header: { position: 'absolute', top: 24, left: 34, right: 34, height: 22, borderBottomWidth: 1, borderBottomColor: COLORS.line, flexDirection: 'row', justifyContent: 'space-between' },
-  brand: { color: COLORS.cyan, fontSize: 11, fontWeight: 700, letterSpacing: 0.5 },
-  headerDomain: { color: COLORS.quiet, fontSize: 8 },
-  footerText: { position: 'absolute', left: 34, bottom: 25, color: COLORS.dim, fontSize: 7.5 },
-  pageNumber: { position: 'absolute', right: 34, bottom: 25, color: COLORS.quiet, fontSize: 7.5 },
-  eyebrow: { color: COLORS.cyan, fontSize: 8, fontWeight: 700, letterSpacing: 1.1, marginBottom: 8, textTransform: 'uppercase' },
-  title: { color: COLORS.text, fontSize: 28, lineHeight: 1.08, fontWeight: 700, marginBottom: 8 },
-  subtitle: { color: COLORS.muted, fontSize: 10.5, lineHeight: 1.45, marginBottom: 18 },
-  hero: { minHeight: 190, borderRadius: 22, borderWidth: 1, borderColor: '#164E63', backgroundColor: COLORS.panelDeep, padding: 22, marginBottom: 18 },
-  heroTitle: { color: COLORS.text, fontSize: 34, lineHeight: 1.05, fontWeight: 700, marginBottom: 10 },
-  heroDomain: { color: COLORS.cyan, fontSize: 16, fontWeight: 700, marginBottom: 12 },
-  p: { color: COLORS.muted, fontSize: 9.2, lineHeight: 1.45, marginBottom: 7 },
-  panel: { backgroundColor: COLORS.panel, borderColor: COLORS.line, borderWidth: 1, borderRadius: 15, padding: 14, marginBottom: 13 },
-  panelTitle: { color: COLORS.text, fontSize: 12, fontWeight: 700, marginBottom: 9 },
-  scoreBox: { backgroundColor: '#0C1626', borderColor: COLORS.line, borderWidth: 1, borderRadius: 16, padding: 15, marginBottom: 14 },
-  scoreTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
-  scoreSmall: { color: COLORS.quiet, fontSize: 8, marginBottom: 4, textTransform: 'uppercase' },
-  scoreBig: { fontSize: 30, fontWeight: 700 },
-  scoreCaption: { color: COLORS.muted, fontSize: 9, lineHeight: 1.35, textAlign: 'right', width: 145 },
-  track: { height: 12, borderRadius: 999, backgroundColor: COLORS.black, borderColor: '#1E293B', borderWidth: 1, overflow: 'hidden' },
-  fill: { height: 10, borderRadius: 999 },
-  ticks: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
-  tick: { color: COLORS.dim, fontSize: 6.5 },
+  // ─── FONDATION PAGE ────────────────────────────────────────────────────────
+  page: {
+    backgroundColor: COLORS.pageBg,
+    color: COLORS.textPrimary,
+    fontFamily: 'Helvetica',
+    paddingTop: 62,
+    paddingBottom: 52,
+    paddingHorizontal: 38,
+  },
+  coverPage: {
+    backgroundColor: COLORS.pageBg,
+    color: COLORS.textPrimary,
+    fontFamily: 'Helvetica',
+    padding: 40,
+  },
+
+  // ─── HEADER & FOOTER (fixed) ───────────────────────────────────────────────
+  header: {
+    position: 'absolute',
+    top: 22,
+    left: 38,
+    right: 38,
+    paddingBottom: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.border,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  brandMark: {
+    width: 9,
+    height: 9,
+    backgroundColor: COLORS.primary,
+    borderRadius: 2,
+    marginRight: 6,
+  },
+  brandWrap: { flexDirection: 'row', alignItems: 'center' },
+  brand: {
+    color: COLORS.textPrimary,
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: 1.2,
+  },
+  headerDomain: {
+    color: COLORS.textSecondary,
+    fontSize: 7.5,
+    letterSpacing: 0.3,
+  },
+  footerBar: {
+    position: 'absolute',
+    bottom: 22,
+    left: 38,
+    right: 38,
+    paddingTop: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: COLORS.borderDim,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  footerText: {
+    color: COLORS.textMuted,
+    fontSize: 7,
+    letterSpacing: 0.3,
+  },
+  pageNumber: {
+    color: COLORS.textSecondary,
+    fontSize: 7.5,
+    fontWeight: 700,
+    letterSpacing: 0.6,
+  },
+
+  // ─── HIÉRARCHIE TYPOGRAPHIQUE ──────────────────────────────────────────────
+  eyebrow: {
+    color: COLORS.primary,
+    fontSize: 8,
+    fontWeight: 700,
+    letterSpacing: 1.8,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  title: {
+    color: COLORS.textPrimary,
+    fontSize: 26,
+    lineHeight: 1.1,
+    fontWeight: 700,
+    marginBottom: 8,
+  },
+  subtitle: {
+    color: COLORS.textSecondary,
+    fontSize: 10,
+    lineHeight: 1.55,
+    marginBottom: 20,
+    maxWidth: 480,
+  },
+  p: {
+    color: COLORS.textSecondary,
+    fontSize: 9.2,
+    lineHeight: 1.55,
+    marginBottom: 6,
+  },
+  smallCaps: {
+    color: COLORS.textMuted,
+    fontSize: 7,
+    fontWeight: 700,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+
+  // ─── HERO (couverture / blocs d'intro) ──────────────────────────────────────
+  hero: {
+    backgroundColor: COLORS.cardDeep,
+    borderColor: COLORS.primary,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 22,
+    marginBottom: 18,
+  },
+  heroTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 30,
+    lineHeight: 1.05,
+    fontWeight: 700,
+    marginBottom: 12,
+  },
+  heroDomain: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: 700,
+    letterSpacing: 0.4,
+    marginBottom: 14,
+  },
+
+  // ─── PANELS ────────────────────────────────────────────────────────────────
+  panel: {
+    backgroundColor: COLORS.cardBg,
+    borderColor: COLORS.border,
+    borderWidth: 0.75,
+    borderRadius: 13,
+    padding: 14,
+    marginBottom: 12,
+  },
+  panelAccent: {
+    backgroundColor: COLORS.cardBg,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+    borderTopWidth: 0.5,
+    borderRightWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderTopColor: COLORS.border,
+    borderRightColor: COLORS.border,
+    borderBottomColor: COLORS.border,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+  },
+  panelTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.3,
+    marginBottom: 10,
+  },
+
+  // ─── SCORE / JAUGE ─────────────────────────────────────────────────────────
+  scoreBox: {
+    backgroundColor: COLORS.cardDeep,
+    borderColor: COLORS.border,
+    borderWidth: 0.75,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+  },
+  scoreTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 10,
+  },
+  scoreSmall: {
+    color: COLORS.textMuted,
+    fontSize: 7.5,
+    fontWeight: 700,
+    letterSpacing: 1.2,
+    marginBottom: 5,
+    textTransform: 'uppercase',
+  },
+  scoreBig: {
+    fontSize: 32,
+    fontWeight: 700,
+    lineHeight: 1,
+  },
+  scoreCaption: {
+    color: COLORS.textSecondary,
+    fontSize: 8.5,
+    lineHeight: 1.4,
+    textAlign: 'right',
+    width: 155,
+  },
+
+  // ─── JAUGE CIRCULAIRE (couverture) ─────────────────────────────────────────
+  gaugeRing: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gaugeNumber: {
+    fontSize: 48,
+    fontWeight: 700,
+    lineHeight: 1,
+  },
+  gaugeLabel: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+  },
+
+  // ─── PROGRESS BARS ─────────────────────────────────────────────────────────
+  track: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.borderDim,
+    borderWidth: 0.5,
+    overflow: 'hidden',
+  },
+  fill: {
+    height: 7,
+    borderRadius: 999,
+  },
+  ticks: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  tick: {
+    color: COLORS.textDim,
+    fontSize: 6.5,
+    letterSpacing: 0.4,
+  },
+
+  // ─── GRILLES ───────────────────────────────────────────────────────────────
   cols: { flexDirection: 'row', justifyContent: 'space-between' },
   half: { width: '48.5%' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 6 },
-  metric: { width: '48.5%', backgroundColor: '#0C1626', borderColor: COLORS.line, borderWidth: 1, borderRadius: 13, padding: 11, marginBottom: 10 },
-  metricLabel: { color: COLORS.quiet, fontSize: 7.5, marginBottom: 5 },
-  metricValue: { color: COLORS.text, fontSize: 13, fontWeight: 700, marginBottom: 7 },
-  metricNote: { color: COLORS.dim, fontSize: 6.7, lineHeight: 1.3, marginTop: 6 },
-  badge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 8 },
-  badgeText: { fontSize: 6.7, fontWeight: 700 },
-  table: { borderWidth: 1, borderColor: COLORS.line, borderRadius: 12, overflow: 'hidden', marginBottom: 8 },
-  tableHead: { backgroundColor: '#0E1A2B', borderBottomWidth: 1, borderBottomColor: COLORS.line, flexDirection: 'row' },
-  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1D2A3D' },
-  th: { color: COLORS.cyan, fontSize: 7.4, fontWeight: 700, paddingVertical: 7, paddingHorizontal: 8, lineHeight: 1.25 },
-  td: { color: COLORS.muted, fontSize: 7.2, paddingVertical: 7, paddingHorizontal: 8, lineHeight: 1.35 },
-  empty: { color: COLORS.quiet, fontSize: 8.5, lineHeight: 1.4 },
-  action: { backgroundColor: '#0C1626', borderColor: COLORS.line, borderWidth: 1, borderRadius: 14, padding: 11, marginBottom: 9 },
-  actionTitle: { color: COLORS.text, fontSize: 10, fontWeight: 700, lineHeight: 1.25, marginBottom: 5 },
-  actionMeta: { color: COLORS.cyan, fontSize: 7, fontWeight: 700, marginBottom: 5 },
-  cta: { backgroundColor: '#062A3A', borderColor: '#0E7490', borderWidth: 1, borderRadius: 18, padding: 17, marginTop: 8 },
-  ctaTitle: { color: COLORS.cyan, fontSize: 15, fontWeight: 700, marginBottom: 8 },
+  third: { width: '31.5%' },
+
+  // ─── STAT CARDS (métriques) ────────────────────────────────────────────────
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  metric: {
+    width: '48.5%',
+    backgroundColor: COLORS.cardBg,
+    borderColor: COLORS.border,
+    borderWidth: 0.75,
+    borderRadius: 11,
+    padding: 12,
+    marginBottom: 10,
+  },
+  metricLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 7.5,
+    fontWeight: 700,
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  metricValue: {
+    color: COLORS.textPrimary,
+    fontSize: 14,
+    fontWeight: 700,
+    marginBottom: 7,
+    letterSpacing: 0.2,
+  },
+  metricNote: {
+    color: COLORS.textMuted,
+    fontSize: 7,
+    lineHeight: 1.4,
+    marginTop: 6,
+  },
+
+  // ─── PILLS / BADGES ────────────────────────────────────────────────────────
+  badge: {
+    alignSelf: 'flex-start',
+    borderWidth: 0.75,
+    borderRadius: 999,
+    paddingVertical: 2.5,
+    paddingHorizontal: 8,
+  },
+  badgeText: {
+    fontSize: 6.8,
+    fontWeight: 700,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  severityPill: {
+    alignSelf: 'flex-start',
+    borderWidth: 0.75,
+    borderRadius: 4,
+    paddingVertical: 2.5,
+    paddingHorizontal: 7,
+  },
+  severityPillText: {
+    fontSize: 6.8,
+    fontWeight: 700,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+
+  // ─── TABLEAUX ──────────────────────────────────────────────────────────────
+  table: {
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  tableHead: {
+    backgroundColor: COLORS.cardDeep,
+    borderBottomWidth: 0.75,
+    borderBottomColor: COLORS.border,
+    flexDirection: 'row',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.borderDim,
+    backgroundColor: COLORS.cardBg,
+  },
+  tableRowAlt: {
+    backgroundColor: COLORS.darkNavy,
+  },
+  th: {
+    color: COLORS.primary,
+    fontSize: 7.2,
+    fontWeight: 700,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    lineHeight: 1.25,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  td: {
+    color: COLORS.textSecondary,
+    fontSize: 7.5,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    lineHeight: 1.4,
+  },
+  empty: {
+    color: COLORS.textMuted,
+    fontSize: 8.5,
+    lineHeight: 1.4,
+    fontStyle: 'italic',
+  },
+
+  // ─── ACTION CARDS ──────────────────────────────────────────────────────────
+  action: {
+    backgroundColor: COLORS.cardBg,
+    borderLeftWidth: 3,
+    borderTopWidth: 0.5,
+    borderRightWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderTopColor: COLORS.border,
+    borderRightColor: COLORS.border,
+    borderBottomColor: COLORS.border,
+    borderRadius: 10,
+    padding: 13,
+    marginBottom: 10,
+  },
+  actionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  actionTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 10.5,
+    fontWeight: 700,
+    lineHeight: 1.3,
+    marginBottom: 5,
+  },
+  actionMeta: {
+    color: COLORS.textMuted,
+    fontSize: 6.8,
+    fontWeight: 700,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  actionFooter: {
+    flexDirection: 'row',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: COLORS.borderDim,
+  },
+  actionChip: {
+    color: COLORS.textMuted,
+    fontSize: 7,
+    fontWeight: 700,
+    marginRight: 12,
+    letterSpacing: 0.3,
+  },
+
+  // ─── CTA / CONTACT (page de clôture) ───────────────────────────────────────
+  cta: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+  },
+  ctaTitle: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: 700,
+    marginBottom: 8,
+  },
+  ctaBody: {
+    color: COLORS.white,
+    fontSize: 9.5,
+    lineHeight: 1.55,
+    marginBottom: 10,
+    opacity: 0.95,
+  },
+  whatsapp: {
+    backgroundColor: COLORS.successBg,
+    borderColor: COLORS.success,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+  },
+  whatsappTitle: {
+    color: '#86EFAC',
+    fontSize: 12,
+    fontWeight: 700,
+    marginBottom: 6,
+  },
+  whatsappNumber: {
+    color: COLORS.success,
+    fontSize: 14,
+    fontWeight: 700,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+
+  // ─── ALERTES CRITIQUES (bannière rouge/orange) ─────────────────────────────
+  alertBanner: {
+    backgroundColor: COLORS.dangerBg,
+    borderColor: COLORS.danger,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+  },
+  alertTitle: {
+    color: '#FCA5A5',
+    fontSize: 10,
+    fontWeight: 700,
+    marginBottom: 4,
+  },
+  alertBody: {
+    color: '#FEE2E2',
+    fontSize: 8.5,
+    lineHeight: 1.5,
+  },
 });
 
-function PageShell({ model, title, children }) {
-  return e(Page, { size: 'A4', style: styles.page, wrap: false },
-    e(View, { fixed: true, style: styles.header }, e(Text, { style: styles.brand }, 'Webisafe'), e(Text, { style: styles.headerDomain }, `${title} - ${model.domain}`)),
-    e(View, null, children),
-    e(Text, { fixed: true, style: styles.footerText }, 'Rapport confidentiel — webisafe.ci'),
-    e(Text, { fixed: true, style: styles.pageNumber, render: ({ pageNumber, totalPages }) => `${pageNumber}/${totalPages}` }),
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPOSANTS FONDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Marque Webisafe (petit carré bleu + texte) — utilisée dans header/footer
+function BrandLockup({ size = 10, textSize = 10, muted = false }) {
+  return e(View, { style: styles.brandWrap, wrap: false },
+    e(View, { style: [styles.brandMark, { width: size, height: size }] }),
+    e(Text, {
+      style: [styles.brand, {
+        fontSize: textSize,
+        color: muted ? COLORS.textSecondary : COLORS.textPrimary,
+      }],
+    }, 'WEBISAFE'),
   );
 }
 
-function SectionHeading({ eyebrow, title, subtitle }) {
-  return e(View, { wrap: false }, e(Text, { style: styles.eyebrow }, eyebrow), e(Text, { style: styles.title }, title), e(Text, { style: styles.subtitle }, subtitle));
+// Page principale (pages intérieures) avec header + footer premium
+function PageShell({ model, title, children }) {
+  return e(Page, { size: 'A4', style: styles.page, wrap: false },
+    // Header : Brandmark + (Section — Domaine)
+    e(View, { fixed: true, style: styles.header },
+      e(BrandLockup, { size: 9, textSize: 9 }),
+      e(Text, { style: styles.headerDomain }, `${title.toUpperCase()} · ${model.domain}`),
+    ),
+    e(View, null, children),
+    // Footer : Confidentiel + page number
+    e(View, { fixed: true, style: styles.footerBar },
+      e(Text, { style: styles.footerText }, `Confidentiel · webisafe.ci · ${model.scanDateLabel}`),
+      e(Text, {
+        style: styles.pageNumber,
+        render: ({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`,
+      }),
+    ),
+  );
 }
 
+// Section heading (eyebrow + title + subtitle)
+function SectionHeading({ eyebrow, title, subtitle }) {
+  return e(View, { wrap: false, style: { marginBottom: 14 } },
+    e(Text, { style: styles.eyebrow }, eyebrow),
+    e(Text, { style: styles.title }, title),
+    subtitle ? e(Text, { style: styles.subtitle }, subtitle) : null,
+  );
+}
+
+// Badge de statut (OK / Avertissement / Critique / Non mesuré)
 function Badge({ value }) {
   const palette = statusPalette(value);
-  return e(View, { style: [styles.badge, { backgroundColor: palette.bg, borderColor: palette.border }], wrap: false }, e(Text, { style: [styles.badgeText, { color: palette.text }] }, normalizeStatus(value)));
+  return e(View, {
+    style: [styles.badge, { backgroundColor: palette.bg, borderColor: palette.border }],
+    wrap: false,
+  },
+    e(Text, { style: [styles.badgeText, { color: palette.text }] }, normalizeStatus(value)),
+  );
 }
 
+// Severity pill pour les recommandations (CRITIQUE / IMPORTANT / AMÉLIORATION)
+function SeverityPill({ rank }) {
+  const config = {
+    1: { label: 'CRITIQUE', bg: COLORS.dangerBg, border: COLORS.danger, text: '#FCA5A5' },
+    2: { label: 'IMPORTANT', bg: COLORS.warningBg, border: COLORS.warning, text: '#FCD34D' },
+    3: { label: 'AMÉLIORATION', bg: '#0B1F3A', border: COLORS.primary, text: '#93C5FD' },
+  };
+  const c = config[rank] || config[3];
+  return e(View, {
+    style: [styles.severityPill, { backgroundColor: c.bg, borderColor: c.border }],
+    wrap: false,
+  },
+    e(Text, { style: [styles.severityPillText, { color: c.text }] }, c.label),
+  );
+}
+
+// Bannière d'alerte critique (rouge)
+function AlertBanner({ title, message, severity = 'Critique' }) {
+  const palette = statusPalette(severity);
+  return e(View, {
+    style: [styles.alertBanner, {
+      backgroundColor: palette.bg,
+      borderColor: palette.solid,
+      borderLeftColor: palette.solid,
+    }],
+    wrap: false,
+  },
+    e(Text, { style: [styles.alertTitle, { color: palette.text }] }, title),
+    message ? e(Text, { style: [styles.alertBody, { color: palette.text, opacity: 0.9 }] }, message) : null,
+  );
+}
+
+// Jauge horizontale : barre de score avec label, chiffre et statut (utilisée sur chaque page)
 function Gauge({ label, value, caption }) {
   const score = scoreValue(value);
+  const color = scoreColor(value);
   return e(View, { style: styles.scoreBox, wrap: false },
     e(View, { style: styles.scoreTop },
       e(View, null,
         e(Text, { style: styles.scoreSmall }, label),
-        e(Text, { style: [styles.scoreBig, { color: scoreColor(value) }] }, score === null ? '—' : `${score}`),
-        e(Text, { style: { color: COLORS.quiet, fontSize: 8, marginTop: 2 } }, score === null ? 'Non mesuré' : `${scoreLabel(score)} / 100`),
+        e(View, { style: { flexDirection: 'row', alignItems: 'flex-end' } },
+          e(Text, { style: [styles.scoreBig, { color }] }, score === null ? '—' : `${score}`),
+          e(Text, { style: { color: COLORS.textMuted, fontSize: 12, fontWeight: 700, marginLeft: 4, marginBottom: 4 } }, '/100'),
+        ),
+        e(Text, { style: { color: COLORS.textSecondary, fontSize: 8.5, marginTop: 4, letterSpacing: 0.4, fontWeight: 700 } },
+          score === null ? 'Non mesuré' : scoreLabel(score).toUpperCase()),
       ),
-      e(Text, { style: styles.scoreCaption }, caption),
+      caption ? e(Text, { style: styles.scoreCaption }, caption) : null,
     ),
-    e(View, { style: styles.track }, e(View, { style: [styles.fill, { width: `${score === null ? 0 : score}%`, backgroundColor: scoreColor(value) }] })),
-    e(View, { style: styles.ticks }, e(Text, { style: styles.tick }, '0 critique'), e(Text, { style: styles.tick }, '40'), e(Text, { style: styles.tick }, '65'), e(Text, { style: styles.tick }, '85'), e(Text, { style: styles.tick }, '100 excellent')),
+    e(View, { style: styles.track },
+      e(View, { style: [styles.fill, { width: `${score === null ? 0 : score}%`, backgroundColor: color }] }),
+    ),
+    e(View, { style: styles.ticks },
+      e(Text, { style: styles.tick }, '0'),
+      e(Text, { style: styles.tick }, '40  Critique'),
+      e(Text, { style: styles.tick }, '65  À corriger'),
+      e(Text, { style: styles.tick }, '85  Bon'),
+      e(Text, { style: styles.tick }, '100'),
+    ),
   );
 }
 
+// Jauge circulaire (pour la couverture uniquement) - cercle avec score au centre
+function CircularGauge({ value, size = 160, ringWidth = 14 }) {
+  const score = scoreValue(value);
+  const color = scoreColor(value);
+  return e(View, {
+    style: [styles.gaugeRing, {
+      width: size, height: size,
+      borderRadius: size / 2,
+      borderWidth: ringWidth,
+      borderColor: color,
+      backgroundColor: COLORS.cardDeep,
+    }],
+    wrap: false,
+  },
+    e(Text, { style: [styles.gaugeNumber, { color }] }, score === null ? '—' : `${score}`),
+    e(Text, { style: styles.gaugeLabel }, '/100'),
+  );
+}
+
+// Mini-score (barre horizontale) pour une liste de catégories
 function MiniScore({ item }) {
   const value = scoreValue(item.score);
-  return e(View, { style: { marginBottom: 9 }, wrap: false },
-    e(View, { style: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 } }, e(Text, { style: { color: COLORS.muted, fontSize: 8.5 } }, item.label), e(Text, { style: { color: scoreColor(value), fontSize: 8.5, fontWeight: 700 } }, scoreDisplay(value))),
-    e(View, { style: [styles.track, { height: 8 }] }, e(View, { style: [styles.fill, { height: 6, width: `${value === null ? 0 : value}%`, backgroundColor: scoreColor(value) }] })),
+  const color = scoreColor(value);
+  return e(View, { style: { marginBottom: 10 }, wrap: false },
+    e(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 } },
+      e(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+        e(View, { style: { width: 6, height: 6, borderRadius: 3, backgroundColor: color, marginRight: 6 } }),
+        e(Text, { style: { color: COLORS.textPrimary, fontSize: 9, fontWeight: 700 } }, item.label),
+      ),
+      e(Text, { style: { color, fontSize: 9.5, fontWeight: 700 } }, scoreDisplay(value)),
+    ),
+    e(View, { style: [styles.track, { height: 6 }] },
+      e(View, { style: [styles.fill, { height: 5, width: `${value === null ? 0 : value}%`, backgroundColor: color }] }),
+    ),
   );
 }
 
-function Panel({ title, children }) {
-  return e(View, { style: styles.panel, wrap: false }, e(Text, { style: styles.panelTitle }, title), children);
+// Panel (section encadrée)
+function Panel({ title, accent, children }) {
+  return e(View, { style: accent ? styles.panelAccent : styles.panel, wrap: false },
+    title ? e(Text, { style: styles.panelTitle }, title) : null,
+    children,
+  );
 }
 
+// Carte d'une métrique (LCP, FCP, etc.)
 function MetricCard({ item }) {
-  return e(View, { style: styles.metric, wrap: false }, e(Text, { style: styles.metricLabel }, item.label), e(Text, { style: styles.metricValue }, item.value), e(Badge, { value: item.status }), item.note ? e(Text, { style: styles.metricNote }, item.note) : null);
+  return e(View, { style: styles.metric, wrap: false },
+    e(Text, { style: styles.metricLabel }, item.label),
+    e(Text, { style: styles.metricValue }, item.value),
+    e(Badge, { value: item.status }),
+    item.note ? e(Text, { style: styles.metricNote }, item.note) : null,
+  );
 }
 
+// Grille 2 colonnes de MetricCard
 function MetricGrid({ metrics }) {
-  return e(View, { style: styles.grid }, ...metrics.map((item, index) => e(MetricCard, { key: `${item.label}-${index}`, item })));
+  return e(View, { style: styles.grid },
+    ...metrics.map((item, index) => e(MetricCard, { key: `${item.label}-${index}`, item })),
+  );
 }
 
-function DataTable({ columns, rows, widths, maxRows = 7, statusColumn = 2 }) {
-  const visibleRows = asArray(rows).filter((item) => Array.isArray(item) && item.some((cell) => pdfText(cell, '') !== '')).slice(0, maxRows);
-  if (!visibleRows.length) return e(Text, { style: styles.empty }, 'Aucune donnée détaillée disponible.');
+// Tableau de données avec zebra-stripe et coloration du statut
+function DataTable({ columns, rows, widths, maxRows = 7, statusColumn = 2, emptyText = 'Aucune donnée détaillée disponible.' }) {
+  const visibleRows = asArray(rows)
+    .filter((item) => Array.isArray(item) && item.some((cell) => pdfText(cell, '') !== ''))
+    .slice(0, maxRows);
+  if (!visibleRows.length) return e(Text, { style: styles.empty }, emptyText);
   return e(View, { style: styles.table, wrap: false },
-    e(View, { style: styles.tableHead }, ...columns.map((column, index) => e(Text, { key: column, style: [styles.th, { width: widths[index] }] }, column))),
-    ...visibleRows.map((line, rowIndex) => e(View, { key: rowIndex, style: styles.tableRow, wrap: false },
-      ...line.map((cell, cellIndex) => e(Text, { key: `${rowIndex}-${cellIndex}`, style: [styles.td, { width: widths[cellIndex] }, cellIndex === statusColumn ? { color: statusPalette(cell).text, fontWeight: 700 } : null] }, pdfText(cell))),
+    e(View, { style: styles.tableHead },
+      ...columns.map((col, i) => e(Text, { key: col, style: [styles.th, { width: widths[i] }] }, col)),
+    ),
+    ...visibleRows.map((line, rowIndex) => e(View, {
+      key: rowIndex,
+      style: [styles.tableRow, rowIndex % 2 === 1 ? styles.tableRowAlt : null],
+      wrap: false,
+    },
+      ...line.map((cell, cellIndex) => {
+        const isStatus = cellIndex === statusColumn;
+        const palette = isStatus ? statusPalette(cell) : null;
+        return e(Text, {
+          key: `${rowIndex}-${cellIndex}`,
+          style: [
+            styles.td,
+            { width: widths[cellIndex] },
+            isStatus ? { color: palette.text, fontWeight: 700 } : null,
+          ],
+        }, pdfText(cell));
+      }),
     )),
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE 1 — COUVERTURE (pleine page, sans header/footer standard)
+// ═══════════════════════════════════════════════════════════════════════════════
 function CoverPage({ model }) {
-  return e(PageShell, { model, title: 'Rapport premium' },
-    e(View, { style: styles.hero, wrap: false },
-      e(Text, { style: styles.eyebrow }, 'Rapport d’audit premium'),
-      e(Text, { style: styles.heroTitle }, 'Audit Webisafe'),
-      e(Text, { style: styles.heroDomain }, model.domain),
-      e(Text, { style: styles.p }, `Analyse générée le ${model.scanDateLabel}. Ce document synthétise les risques, la performance, le SEO, l’expérience mobile et les priorités de correction.`),
-      e(Text, { style: styles.p }, 'Document conçu pour une présentation client : pages dédiées, hiérarchie claire, fond sombre uniforme et statuts exploitables.'),
+  const score = scoreValue(model.scores.global);
+  const color = scoreColor(model.scores.global);
+
+  return e(Page, { size: 'A4', style: styles.coverPage, wrap: false },
+    // Bande supérieure : brandmark + mention confidentiel
+    e(View, {
+      style: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingBottom: 16,
+        borderBottomWidth: 0.5,
+        borderBottomColor: COLORS.border,
+        marginBottom: 28,
+      },
+    },
+      e(BrandLockup, { size: 14, textSize: 13 }),
+      e(Text, {
+        style: {
+          color: COLORS.textSecondary,
+          fontSize: 8,
+          fontWeight: 700,
+          letterSpacing: 1.4,
+          textTransform: 'uppercase',
+        },
+      }, 'Rapport d\'audit · Confidentiel'),
     ),
-    e(Gauge, { label: 'Score global', value: model.scores.global, caption: 'Indice consolidé Webisafe basé sur les dimensions mesurées.' }),
-    e(View, { style: styles.cols },
-      e(View, { style: styles.half }, e(Panel, { title: 'Scores par catégorie' }, ...model.cover.categoryScores.map((item, index) => e(MiniScore, { key: index, item })))),
-      e(View, { style: styles.half }, e(Panel, { title: 'Résumé exécutif' }, ...model.narrative.paragraphs.map((item, index) => e(Text, { key: index, style: styles.p }, item)))),
+
+    // Hero central
+    e(View, { style: { alignItems: 'center', marginTop: 8, marginBottom: 24 } },
+      e(Text, {
+        style: {
+          color: COLORS.primary,
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: 2.4,
+          textTransform: 'uppercase',
+          marginBottom: 14,
+        },
+      }, 'Audit Webisafe Premium'),
+      e(Text, {
+        style: {
+          color: COLORS.textPrimary,
+          fontSize: 32,
+          lineHeight: 1.1,
+          fontWeight: 700,
+          textAlign: 'center',
+          marginBottom: 12,
+          maxWidth: 400,
+        },
+      }, 'Analyse complète de votre site'),
+      e(Text, {
+        style: {
+          color: COLORS.primary,
+          fontSize: 16,
+          fontWeight: 700,
+          letterSpacing: 0.4,
+        },
+      }, model.domain),
+      e(Text, {
+        style: {
+          color: COLORS.textMuted,
+          fontSize: 9,
+          marginTop: 4,
+          letterSpacing: 0.4,
+        },
+      }, model.scanDateLabel),
     ),
-    e(Panel, { title: 'Métadonnées du scan' }, e(DataTable, { columns: ['Élément', 'Valeur'], rows: model.cover.metadata, widths: ['34%', '66%'], maxRows: 6, statusColumn: -1 })),
+
+    // Jauge circulaire centrale + label
+    e(View, { style: { alignItems: 'center', marginBottom: 24 } },
+      e(CircularGauge, { value: model.scores.global, size: 160, ringWidth: 14 }),
+      e(Text, {
+        style: {
+          color: COLORS.textPrimary,
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 1.4,
+          textTransform: 'uppercase',
+          marginTop: 14,
+        },
+      }, 'Score Global'),
+      e(View, {
+        style: {
+          marginTop: 8,
+          paddingHorizontal: 14,
+          paddingVertical: 5,
+          borderRadius: 999,
+          borderWidth: 0.75,
+          borderColor: color,
+          backgroundColor: color + '15',
+        },
+      },
+        e(Text, {
+          style: {
+            color,
+            fontSize: 8.5,
+            fontWeight: 700,
+            letterSpacing: 1.4,
+            textTransform: 'uppercase',
+          },
+        }, score === null ? 'Non mesuré' : scoreLabel(score)),
+      ),
+    ),
+
+    // Mini scores 4-up (Performance / Sécurité / SEO / UX)
+    e(View, {
+      style: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 18,
+        marginBottom: 30,
+      },
+    },
+      ...model.cover.categoryScores.slice(0, 4).map((item, i) => {
+        const v = scoreValue(item.score);
+        const c = scoreColor(item.score);
+        return e(View, {
+          key: i,
+          style: {
+            flex: 1,
+            marginHorizontal: 4,
+            alignItems: 'center',
+            backgroundColor: COLORS.cardBg,
+            borderColor: COLORS.border,
+            borderWidth: 0.75,
+            borderRadius: 10,
+            padding: 12,
+          },
+        },
+          e(Text, { style: { fontSize: 22, fontWeight: 700, color: c, lineHeight: 1 } },
+            v === null ? '—' : `${v}`),
+          e(Text, {
+            style: {
+              color: COLORS.textSecondary,
+              fontSize: 7,
+              fontWeight: 700,
+              letterSpacing: 0.8,
+              textTransform: 'uppercase',
+              marginTop: 6,
+              textAlign: 'center',
+            },
+          }, item.label),
+        );
+      }),
+    ),
+
+    // Bande métadonnées (domaine, date, origine)
+    e(View, {
+      style: {
+        backgroundColor: COLORS.cardDeep,
+        borderColor: COLORS.border,
+        borderWidth: 0.75,
+        borderRadius: 12,
+        padding: 18,
+        marginBottom: 14,
+      },
+    },
+      e(Text, {
+        style: {
+          color: COLORS.primary,
+          fontSize: 8,
+          fontWeight: 700,
+          letterSpacing: 1.6,
+          textTransform: 'uppercase',
+          marginBottom: 10,
+        },
+      }, 'Métadonnées du scan'),
+      ...model.cover.metadata.map(([label, value], i) => e(View, {
+        key: i,
+        style: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          paddingVertical: 4,
+          borderBottomWidth: i < model.cover.metadata.length - 1 ? 0.5 : 0,
+          borderBottomColor: COLORS.borderDim,
+        },
+      },
+        e(Text, { style: { color: COLORS.textMuted, fontSize: 8.5, width: '35%' } }, pdfText(label)),
+        e(Text, { style: { color: COLORS.textPrimary, fontSize: 8.5, fontWeight: 700, width: '65%', textAlign: 'right' } }, pdfText(value)),
+      )),
+    ),
+
+    // Footer de couverture
+    e(View, {
+      style: {
+        position: 'absolute',
+        bottom: 36,
+        left: 40,
+        right: 40,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 12,
+        borderTopWidth: 0.5,
+        borderTopColor: COLORS.border,
+      },
+    },
+      e(Text, { style: { color: COLORS.textMuted, fontSize: 7.5, letterSpacing: 0.4 } },
+        'Document confidentiel — Usage interne uniquement'),
+      e(Text, { style: { color: COLORS.primary, fontSize: 8, fontWeight: 700, letterSpacing: 0.8 } },
+        'webisafe.ci'),
+    ),
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE 2 — RÉSUMÉ EXÉCUTIF (vue d'ensemble + alertes + mini scores)
+// ═══════════════════════════════════════════════════════════════════════════════
+function ExecutiveSummaryPage({ model }) {
+  const hasAlerts = model.criticalAlerts.length > 0;
+  return e(PageShell, { model, title: 'Résumé exécutif' },
+    e(SectionHeading, {
+      eyebrow: 'Vue d\'ensemble',
+      title: 'Résumé exécutif',
+      subtitle: 'Synthèse des risques, de la performance, du SEO et de l\'expérience mobile de votre site.',
+    }),
+
+    // Gauge globale + scores par catégorie
+    e(Gauge, {
+      label: 'Score global consolidé',
+      value: model.scores.global,
+      caption: 'Indice Webisafe basé sur les dimensions mesurées durant l\'audit.',
+    }),
+
+    e(View, { style: styles.cols },
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Scores par catégorie', accent: true },
+          ...model.cover.categoryScores.map((item, index) => e(MiniScore, { key: index, item })),
+        ),
+      ),
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Synthèse' },
+          ...model.narrative.paragraphs.map((item, index) => e(Text, { key: index, style: styles.p }, item)),
+        ),
+      ),
+    ),
+
+    // Alertes critiques si présentes
+    hasAlerts ? e(View, { wrap: false },
+      e(Text, { style: [styles.panelTitle, { marginTop: 10, marginBottom: 8 }] }, 'Alertes à traiter en priorité'),
+      ...model.criticalAlerts.slice(0, 3).map((alert, i) =>
+        e(AlertBanner, {
+          key: i,
+          title: alert.title,
+          message: alert.message || alert.recommendation,
+          severity: alert.severity,
+        }),
+      ),
+    ) : null,
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE 3 — PERFORMANCE
+// ═══════════════════════════════════════════════════════════════════════════════
 function PerformancePage({ model }) {
   const section = model.sections.performance;
   const serverRows = compact([
@@ -579,33 +1433,108 @@ function PerformancePage({ model }) {
     section.serverLocation.recommendation ? ['Recommandation', section.serverLocation.recommendation] : null,
   ]);
   return e(PageShell, { model, title: 'Performance' },
-    e(SectionHeading, { eyebrow: 'Section 01', title: 'Performance', subtitle: 'Vitesse perçue, stabilité visuelle, poids de page et opportunités d’optimisation.' }),
-    e(Gauge, { label: 'Score performance', value: section.score, caption: 'Une vitesse faible pénalise directement la conversion, surtout sur mobile.' }),
+    e(SectionHeading, {
+      eyebrow: 'Section 01 · Core Web Vitals',
+      title: 'Performance',
+      subtitle: 'Vitesse perçue, stabilité visuelle, poids de page et opportunités d\'optimisation.',
+    }),
+    e(Gauge, {
+      label: 'Score performance',
+      value: section.score,
+      caption: 'Une vitesse faible pénalise directement la conversion, surtout sur mobile.',
+    }),
     e(MetricGrid, { metrics: section.metrics }),
     e(View, { style: styles.cols },
-      e(View, { style: styles.half }, e(Panel, { title: 'Localisation serveur' }, e(DataTable, { columns: ['Signal', 'Valeur'], rows: serverRows, widths: ['36%', '64%'], maxRows: 6, statusColumn: -1 }))),
-      e(View, { style: styles.half }, e(Panel, { title: 'Optimisations prioritaires' }, e(DataTable, { columns: ['Optimisation', 'Détail', 'Gain'], rows: section.opportunities.map((item) => [item.title, item.description, item.savings]), widths: ['34%', '48%', '18%'], maxRows: 5, statusColumn: -1 }))),
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Localisation serveur' },
+          e(DataTable, {
+            columns: ['Signal', 'Valeur'],
+            rows: serverRows,
+            widths: ['36%', '64%'],
+            maxRows: 6,
+            statusColumn: -1,
+          }),
+        ),
+      ),
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Optimisations prioritaires' },
+          e(DataTable, {
+            columns: ['Optimisation', 'Détail', 'Gain'],
+            rows: section.opportunities.map((item) => [item.title, item.description, item.savings]),
+            widths: ['34%', '48%', '18%'],
+            maxRows: 5,
+            statusColumn: -1,
+          }),
+        ),
+      ),
     ),
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE 4 — SÉCURITÉ (HTTPS, SSL, Malware, Headers, Fichiers sensibles)
+// ═══════════════════════════════════════════════════════════════════════════════
 function SecurityPage({ model }) {
   const section = model.sections.security;
   const sensitiveRows = compact([
-    section.sensitiveFiles.alert_message ? ['Alerte', section.sensitiveFiles.alert_message, section.sensitiveFiles.critical ? 'Critique' : 'Avertissement'] : null,
+    section.sensitiveFiles.alert_message
+      ? ['Alerte', section.sensitiveFiles.alert_message, section.sensitiveFiles.critical ? 'Critique' : 'Avertissement']
+      : null,
     ...section.sensitiveFiles.exposed_files.map((file) => ['Fichier exposé', file, 'Critique']),
   ]);
   return e(PageShell, { model, title: 'Sécurité' },
-    e(SectionHeading, { eyebrow: 'Section 02', title: 'Sécurité', subtitle: 'HTTPS, SSL, malware, headers, cookies et fichiers sensibles accessibles.' }),
-    e(Gauge, { label: 'Score sécurité', value: section.score, caption: 'Les signaux critiques sont priorisés pour réduire le risque client.' }),
+    e(SectionHeading, {
+      eyebrow: 'Section 02 · Conformité OWASP',
+      title: 'Sécurité',
+      subtitle: 'HTTPS, certificat SSL, malware, headers de sécurité, cookies et fichiers sensibles.',
+    }),
+    e(Gauge, {
+      label: 'Score sécurité',
+      value: section.score,
+      caption: 'Les signaux critiques sont priorisés pour réduire le risque utilisateur.',
+    }),
+
+    // Alerte si fichiers sensibles exposés (critique)
+    section.sensitiveFiles.critical ? e(AlertBanner, {
+      title: `Fichiers sensibles exposés · ${section.sensitiveFiles.exposed_files.length} fichier(s)`,
+      message: section.sensitiveFiles.alert_message || 'Des fichiers confidentiels sont accessibles publiquement sur votre serveur. Action immédiate requise.',
+      severity: 'Critique',
+    }) : null,
+
     e(MetricGrid, { metrics: section.metrics }),
     e(View, { style: styles.cols },
-      e(View, { style: styles.half }, e(Panel, { title: 'Headers manquants' }, e(DataTable, { columns: ['Header', 'Message', 'Statut'], rows: section.missingHeaders.map((item) => [item.header, item.message, item.severity]), widths: ['30%', '50%', '20%'], maxRows: 6 }))),
-      e(View, { style: styles.half }, e(Panel, { title: 'Cookies et fichiers sensibles' }, e(DataTable, { columns: ['Élément', 'Détail', 'Statut'], rows: [...section.cookieIssues.map((item) => ['Cookie', item, 'Avertissement']), ...sensitiveRows], widths: ['28%', '52%', '20%'], maxRows: 7 }))),
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Headers de sécurité manquants' },
+          e(DataTable, {
+            columns: ['Header', 'Détail', 'Statut'],
+            rows: section.missingHeaders.map((item) => [item.header, item.message, item.severity]),
+            widths: ['32%', '48%', '20%'],
+            maxRows: 7,
+            emptyText: 'Tous les headers recommandés sont présents.',
+          }),
+        ),
+      ),
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Cookies & fichiers sensibles' },
+          e(DataTable, {
+            columns: ['Élément', 'Détail', 'Statut'],
+            rows: [
+              ...section.cookieIssues.map((item) => ['Cookie', item, 'Avertissement']),
+              ...sensitiveRows,
+            ],
+            widths: ['28%', '52%', '20%'],
+            maxRows: 7,
+            emptyText: 'Aucun cookie à risque ni fichier sensible exposé.',
+          }),
+        ),
+      ),
     ),
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE 5 — SÉCURITÉ AVANCÉE (WAF, sous-domaines, supply chain, email, etc.)
+// ═══════════════════════════════════════════════════════════════════════════════
 function AdvancedSecurityPage({ model }) {
   const section = model.sections.advancedSecurity;
   const emailRows = compact([
@@ -615,113 +1544,318 @@ function AdvancedSecurityPage({ model }) {
     section.email.missing.length ? ['Manquants', section.email.missing.join(', '), 'Avertissement'] : null,
   ]);
   return e(PageShell, { model, title: 'Sécurité avancée' },
-    e(SectionHeading, { eyebrow: 'Section 03', title: 'Sécurité avancée', subtitle: 'WAF, sous-domaines, takeover, supply chain, email, typosquatting et contrôles étendus.' }),
+    e(SectionHeading, {
+      eyebrow: 'Section 03 · Contrôles étendus',
+      title: 'Sécurité avancée',
+      subtitle: 'WAF, sous-domaines, takeover, supply chain, sécurité email SPF/DMARC/DKIM et typosquatting.',
+    }),
     section.score !== null
-      ? e(Gauge, { label: 'Score sécurité avancée', value: section.score, caption: 'Ce score agrège uniquement les checks avancés disponibles.' })
-      : e(Panel, { title: 'Score sécurité avancée' }, e(Text, { style: styles.empty }, 'Score global non mesuré : certains checks avancés peuvent être indisponibles, sans que cela signifie une faille critique.')),
+      ? e(Gauge, {
+          label: 'Score sécurité avancée',
+          value: section.score,
+          caption: 'Agrégation des checks avancés disponibles (WAF, CORS, email, etc.).',
+        })
+      : e(Panel, { title: 'Score sécurité avancée' },
+          e(Text, { style: styles.empty },
+            'Score global non mesuré : certains checks avancés peuvent être indisponibles, sans que cela signifie une faille critique.'),
+        ),
     e(View, { style: styles.cols },
-      e(View, { style: styles.half }, e(Panel, { title: 'Checks principaux' }, e(DataTable, { columns: ['Check', 'Résultat', 'Statut'], rows: section.summaryRows, widths: ['35%', '45%', '20%'], maxRows: 6 }))),
-      e(View, { style: styles.half }, e(Panel, { title: 'Sécurité email' }, e(DataTable, { columns: ['Élément', 'Résultat', 'Statut'], rows: emailRows, widths: ['30%', '50%', '20%'], maxRows: 5 }))),
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Checks principaux' },
+          e(DataTable, {
+            columns: ['Check', 'Résultat', 'Statut'],
+            rows: section.summaryRows,
+            widths: ['35%', '45%', '20%'],
+            maxRows: 6,
+          }),
+        ),
+      ),
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Sécurité email (SPF/DMARC/DKIM)' },
+          e(DataTable, {
+            columns: ['Élément', 'Résultat', 'Statut'],
+            rows: emailRows,
+            widths: ['30%', '50%', '20%'],
+            maxRows: 5,
+          }),
+        ),
+      ),
     ),
-    e(Panel, { title: 'Détail des checks étendus' }, e(DataTable, { columns: ['Check', 'Détail', 'Statut'], rows: section.checks.map((item) => [item.name, item.detail, item.status]), widths: ['30%', '50%', '20%'], maxRows: 7 })),
+    e(Panel, { title: 'Détail des vérifications' },
+      e(DataTable, {
+        columns: ['Check', 'Détail', 'Statut'],
+        rows: section.checks.map((item) => [item.name, item.detail, item.status]),
+        widths: ['30%', '50%', '20%'],
+        maxRows: 7,
+      }),
+    ),
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE 6 — SEO
+// ═══════════════════════════════════════════════════════════════════════════════
 function SeoPage({ model }) {
   const section = model.sections.seo;
   return e(PageShell, { model, title: 'SEO' },
-    e(SectionHeading, { eyebrow: 'Section 04', title: 'SEO', subtitle: 'Structure de page, indexabilité, métadonnées et signaux de partage.' }),
-    e(Gauge, { label: 'Score SEO', value: section.score, caption: 'Un SEO technique propre améliore la visibilité et la qualité du trafic organique.' }),
+    e(SectionHeading, {
+      eyebrow: 'Section 04 · Référencement',
+      title: 'SEO Technique',
+      subtitle: 'Structure de page, indexabilité, métadonnées et signaux de partage social.',
+    }),
+    e(Gauge, {
+      label: 'Score SEO',
+      value: section.score,
+      caption: 'Un SEO technique propre améliore la visibilité et la qualité du trafic organique.',
+    }),
     e(MetricGrid, { metrics: section.metrics }),
     e(View, { style: styles.cols },
-      e(View, { style: styles.half }, e(Panel, { title: 'Signaux complémentaires' }, e(DataTable, { columns: ['Critère', 'Valeur', 'Statut'], rows: section.extraRows, widths: ['34%', '44%', '22%'], maxRows: 5 }))),
-      e(View, { style: styles.half }, e(Panel, { title: 'Lecture SEO' }, e(Text, { style: styles.p }, 'Les absences critiques doivent être corrigées avant les optimisations éditoriales. La priorité est de rendre les pages lisibles, indexables et correctement présentées dans les moteurs.'))),
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Signaux complémentaires' },
+          e(DataTable, {
+            columns: ['Critère', 'Valeur', 'Statut'],
+            rows: section.extraRows,
+            widths: ['34%', '44%', '22%'],
+            maxRows: 5,
+          }),
+        ),
+      ),
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Lecture SEO' },
+          e(Text, { style: styles.p },
+            'Les absences critiques (title, meta description, H1, viewport) doivent être corrigées avant toute optimisation éditoriale.'),
+          e(Text, { style: styles.p },
+            'La priorité est de rendre les pages lisibles, indexables et correctement présentées dans les moteurs de recherche et sur les réseaux sociaux.'),
+        ),
+      ),
     ),
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE 7 — UX MOBILE
+// ═══════════════════════════════════════════════════════════════════════════════
 function UxPage({ model }) {
   const section = model.sections.ux;
   return e(PageShell, { model, title: 'UX Mobile' },
-    e(SectionHeading, { eyebrow: 'Section 05', title: 'UX Mobile', subtitle: 'Accessibilité, confort tactile, zoom mobile, médias et obstacles à la conversion.' }),
-    e(Gauge, { label: 'Score UX mobile', value: section.score, caption: 'La qualité mobile influence la confiance, le taux de rebond et les demandes entrantes.' }),
+    e(SectionHeading, {
+      eyebrow: 'Section 05 · Expérience utilisateur',
+      title: 'UX Mobile',
+      subtitle: 'Accessibilité, confort tactile, zoom mobile, médias et obstacles à la conversion.',
+    }),
+    e(Gauge, {
+      label: 'Score UX Mobile',
+      value: section.score,
+      caption: 'La qualité mobile influence la confiance, le taux de rebond et les demandes entrantes.',
+    }),
     e(MetricGrid, { metrics: [...section.metrics, section.tapTargets] }),
-    e(Panel, { title: 'Problèmes UX détectés' }, e(DataTable, { columns: ['Problème', 'Impact', 'Statut'], rows: section.issues.map((item) => [item.message, item.impact || item.type, item.severity]), widths: ['42%', '40%', '18%'], maxRows: 8 })),
+    e(Panel, { title: 'Problèmes UX détectés' },
+      e(DataTable, {
+        columns: ['Problème', 'Impact', 'Statut'],
+        rows: section.issues.map((item) => [item.message, item.impact || item.type, item.severity]),
+        widths: ['42%', '40%', '18%'],
+        maxRows: 8,
+        emptyText: 'Aucun problème UX majeur détecté.',
+      }),
+    ),
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE 8 — PLAN D'ACTION (recommandations priorisées)
+// ═══════════════════════════════════════════════════════════════════════════════
 function ActionCard({ item }) {
-  const color = item.rank === 1 ? COLORS.red : item.rank === 2 ? COLORS.orange : COLORS.cyan;
-  return e(View, { style: [styles.action, { borderColor: color }], wrap: false },
-    e(Text, { style: [styles.actionMeta, { color }] }, `${item.priority} — ${item.category}`),
+  const borderColor = item.rank === 1 ? COLORS.danger : item.rank === 2 ? COLORS.warning : COLORS.primary;
+  return e(View, {
+    style: [styles.action, { borderLeftColor: borderColor }],
+    wrap: false,
+  },
+    e(View, { style: styles.actionHead },
+      e(SeverityPill, { rank: item.rank }),
+      e(Text, { style: [styles.actionMeta, { marginLeft: 8 }] }, `· ${item.category}`),
+    ),
     e(Text, { style: styles.actionTitle }, item.title),
     item.description ? e(Text, { style: styles.p }, item.description) : null,
-    item.action ? e(Text, { style: styles.p }, `Action : ${item.action}`) : null,
+    item.action ? e(Text, { style: [styles.p, { color: COLORS.primary, fontWeight: 700 }] }, `→ ${item.action}`) : null,
     item.impactBusiness ? e(Text, { style: styles.p }, `Impact business : ${item.impactBusiness}`) : null,
-    item.time || item.difficulty ? e(Text, { style: [styles.p, { color: COLORS.quiet }] }, compact([item.difficulty, item.time]).join(' • ')) : null,
+    (item.time || item.difficulty) ? e(View, { style: styles.actionFooter },
+      item.difficulty ? e(Text, { style: styles.actionChip }, `Difficulté : ${item.difficulty}`) : null,
+      item.time ? e(Text, { style: styles.actionChip }, `Temps : ${item.time}`) : null,
+    ) : null,
   );
 }
 
-function ActionGroup({ title, items }) {
+function ActionGroup({ title, items, color }) {
   return e(View, { style: styles.half, wrap: false },
-    e(Text, { style: styles.panelTitle }, title),
-    items.slice(0, 2).length ? items.slice(0, 2).map((item, index) => e(ActionCard, { key: index, item })) : e(View, { style: styles.panel }, e(Text, { style: styles.empty }, 'Aucune action dans cette catégorie.')),
+    e(Text, { style: [styles.panelTitle, { color: color || COLORS.textPrimary }] }, title),
+    items.slice(0, 2).length
+      ? items.slice(0, 2).map((item, index) => e(ActionCard, { key: index, item }))
+      : e(View, { style: styles.panel },
+          e(Text, { style: styles.empty }, 'Aucune action dans cette catégorie.'),
+        ),
   );
 }
 
-function Actions({ model }) {
+function ActionPlanPage({ model }) {
   const g = model.recommendationsByPriority;
-  return e(PageShell, { model, title: 'Plan d’action' },
-    e(SectionHeading, { eyebrow: 'Section 06', title: 'Plan d’action', subtitle: 'Priorités de correction classées pour transformer le rapport en feuille de route.' }),
-    e(Panel, { title: 'Alertes à surveiller' }, e(DataTable, { columns: ['Alerte', 'Détail', 'Statut'], rows: model.criticalAlerts.map((item) => [item.title, item.message || item.recommendation, item.severity]), widths: ['32%', '48%', '20%'], maxRows: 3 })),
-    e(View, { style: styles.cols }, e(ActionGroup, { title: 'Urgentes', items: g.urgent }), e(ActionGroup, { title: 'Importantes', items: g.important })),
+  return e(PageShell, { model, title: 'Plan d\'action' },
+    e(SectionHeading, {
+      eyebrow: 'Section 06 · Feuille de route',
+      title: 'Plan d\'action priorisé',
+      subtitle: 'Priorités de correction classées pour transformer ce rapport en feuille de route exploitable.',
+    }),
+    model.criticalAlerts.length > 0 ? e(Panel, { title: 'Alertes à surveiller', accent: true },
+      e(DataTable, {
+        columns: ['Alerte', 'Détail', 'Statut'],
+        rows: model.criticalAlerts.map((item) => [item.title, item.message || item.recommendation, item.severity]),
+        widths: ['32%', '48%', '20%'],
+        maxRows: 3,
+      }),
+    ) : null,
     e(View, { style: styles.cols },
-      e(ActionGroup, { title: 'Améliorations', items: g.improvement }),
-      e(View, { style: styles.half }, e(Panel, { title: 'Méthode de correction' }, e(Text, { style: styles.p }, 'Traiter d’abord les risques critiques, puis les freins business importants, avant les améliorations de confort et de visibilité.'))),
+      e(ActionGroup, { title: 'URGENT · À traiter immédiatement', items: g.urgent, color: COLORS.danger }),
+      e(ActionGroup, { title: 'IMPORTANT · À planifier', items: g.important, color: COLORS.warning }),
+    ),
+    e(View, { style: styles.cols },
+      e(ActionGroup, { title: 'AMÉLIORATIONS · Optimisations', items: g.improvement, color: COLORS.primary }),
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Méthode de correction recommandée' },
+          e(Text, { style: styles.p },
+            '1. Commencer par les risques critiques (sécurité, fichiers exposés, HTTPS).'),
+          e(Text, { style: styles.p },
+            '2. Poursuivre avec les freins business importants (performance, SEO).'),
+          e(Text, { style: styles.p },
+            '3. Finir avec les améliorations de confort (UX, accessibilité).'),
+        ),
+      ),
     ),
   );
 }
 
-function Cta({ model }) {
-  return e(PageShell, { model, title: 'CTA' },
-    e(SectionHeading, { eyebrow: 'Section 07', title: 'Prochaine étape', subtitle: 'Transformer ce rapport en corrections concrètes, priorisées et mesurables.' }),
-    e(View, { style: [styles.hero, { minHeight: 220 }], wrap: false },
-      e(Text, { style: styles.eyebrow }, 'Accompagnement Webisafe'),
-      e(Text, { style: styles.heroTitle }, 'Corriger les points critiques'),
-      e(Text, { style: styles.heroDomain }, model.domain),
-      e(Text, { style: styles.p }, 'Ce rapport identifie les risques et les opportunités. L’étape suivante consiste à corriger les problèmes qui impactent directement la confiance, la sécurité, la vitesse et la conversion.'),
-      e(Text, { style: styles.p }, 'Webisafe peut vous accompagner sur les corrections techniques, la sécurisation, l’optimisation mobile, le SEO technique et le suivi post-correction.'),
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE 9 — CLÔTURE (CTA WhatsApp + branding)
+// ═══════════════════════════════════════════════════════════════════════════════
+const WHATSAPP_NUMBER = '+225 05 75 96 20 20';
+
+function ClosingPage({ model }) {
+  return e(PageShell, { model, title: 'Prochaine étape' },
+    e(SectionHeading, {
+      eyebrow: 'Section 07 · Passez à l\'action',
+      title: 'Transformez ce rapport en résultats',
+      subtitle: 'Nos experts peuvent corriger pour vous tous les points identifiés dans ce rapport.',
+    }),
+
+    // Hero CTA principal
+    e(View, { style: styles.cta, wrap: false },
+      e(Text, {
+        style: {
+          color: COLORS.white,
+          fontSize: 8.5,
+          fontWeight: 700,
+          letterSpacing: 1.8,
+          textTransform: 'uppercase',
+          marginBottom: 10,
+          opacity: 0.9,
+        },
+      }, 'Accompagnement Webisafe'),
+      e(Text, { style: styles.ctaTitle }, 'Corrigez les points critiques avec nous'),
+      e(Text, { style: styles.ctaBody },
+        'Sécurité, performance, SEO, UX mobile : nos experts prennent en charge toutes les corrections et vous livrent un site optimisé, sécurisé et conforme.'),
+      e(Text, { style: [styles.ctaBody, { fontWeight: 700, opacity: 1, fontSize: 10.5 }] }, model.domain),
     ),
+
+    // Deux colonnes : Ce qu'on corrige + Contact WhatsApp
     e(View, { style: styles.cols },
       e(View, { style: styles.half },
-        e(Panel, { title: 'Ce que nous pouvons corriger' },
-          e(DataTable, { columns: ['Priorité', 'Objectif', 'Statut'], rows: [['Sécurité', 'Réduire les failles et expositions', 'Critique'], ['Performance', 'Accélérer le chargement mobile', 'Avertissement'], ['SEO', 'Améliorer les signaux techniques', 'Avertissement'], ['UX Mobile', 'Réduire les freins de conversion', 'Avertissement']], widths: ['30%', '50%', '20%'], maxRows: 4 }),
+        e(Panel, { title: 'Ce que nous corrigeons pour vous', accent: true },
+          e(DataTable, {
+            columns: ['Domaine', 'Objectif', 'Priorité'],
+            rows: [
+              ['Sécurité', 'Réduire failles et expositions', 'Critique'],
+              ['Performance', 'Accélérer le chargement mobile', 'Avertissement'],
+              ['SEO', 'Améliorer les signaux techniques', 'Avertissement'],
+              ['UX Mobile', 'Réduire les freins de conversion', 'Avertissement'],
+            ],
+            widths: ['28%', '52%', '20%'],
+            maxRows: 4,
+          }),
         ),
       ),
       e(View, { style: styles.half },
-        e(View, { style: styles.cta, wrap: false },
-          e(Text, { style: styles.ctaTitle }, 'Voir les packs de correction'),
-          e(Text, { style: styles.p }, 'Consultez les packs Webisafe pour choisir le niveau d’intervention adapté à votre site.'),
-          e(Text, { style: [styles.p, { color: COLORS.cyan, fontWeight: 700 }] }, 'webisafe.ci'),
+        // Carte contact WhatsApp
+        e(View, { style: styles.whatsapp, wrap: false },
+          e(Text, {
+            style: {
+              color: '#86EFAC',
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 1.8,
+              textTransform: 'uppercase',
+              marginBottom: 8,
+            },
+          }, 'Contact rapide'),
+          e(Text, { style: styles.whatsappTitle }, 'Parlons de votre site'),
+          e(Text, { style: styles.whatsappNumber }, `WhatsApp · ${WHATSAPP_NUMBER}`),
+          e(Text, { style: { color: '#BBF7D0', fontSize: 9, lineHeight: 1.5 } },
+            'Envoyez-nous votre rapport par WhatsApp. Nous vous répondons sous 2h avec un devis personnalisé et un plan de correction.'),
         ),
         e(Panel, { title: 'Livrable attendu' },
-          e(Text, { style: styles.p }, 'Après correction : risques réduits, priorités traitées et rapport exploitable pour mesurer les progrès.'),
+          e(Text, { style: styles.p },
+            'Après correction : risques réduits, priorités traitées et rapport exploitable pour mesurer les progrès.'),
+          e(Text, { style: [styles.p, { color: COLORS.primary, fontWeight: 700 }] },
+            '→ webisafe.ci'),
         ),
       ),
+    ),
+
+    // Footer branding de clôture
+    e(View, {
+      style: {
+        marginTop: 8,
+        paddingTop: 14,
+        borderTopWidth: 0.5,
+        borderTopColor: COLORS.border,
+        alignItems: 'center',
+      },
+      wrap: false,
+    },
+      e(BrandLockup, { size: 14, textSize: 12 }),
+      e(Text, {
+        style: {
+          color: COLORS.textMuted,
+          fontSize: 8,
+          letterSpacing: 0.6,
+          marginTop: 6,
+        },
+      }, 'Audits de sites web pour PME africaines'),
     ),
   );
 }
 
+// Alias historique pour compatibilité
+const Cta = ClosingPage;
+const Actions = ActionPlanPage;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DOCUMENT PDF PRINCIPAL
+// ═══════════════════════════════════════════════════════════════════════════════
 function PdfReport({ model }) {
-  return e(Document, { title: `Rapport Webisafe - ${model.domain}`, author: 'Webisafe', creator: 'Webisafe' },
+  return e(Document, {
+    title: `Rapport Webisafe - ${model.domain}`,
+    author: 'Webisafe',
+    creator: 'Webisafe',
+    subject: `Audit de sécurité, performance et SEO pour ${model.domain}`,
+    keywords: 'audit, sécurité, performance, SEO, UX, Webisafe',
+  },
     e(CoverPage, { model }),
+    e(ExecutiveSummaryPage, { model }),
     e(PerformancePage, { model }),
     e(SecurityPage, { model }),
     e(AdvancedSecurityPage, { model }),
     e(SeoPage, { model }),
     e(UxPage, { model }),
-    e(Actions, { model }),
-    e(Cta, { model }),
+    e(ActionPlanPage, { model }),
+    e(ClosingPage, { model }),
   );
 }
 

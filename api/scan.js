@@ -93,29 +93,89 @@ export function shouldUseCachedScan(cached, forceRefresh = false) {
     return hasCompleteAdvancedSecurity(cached.results_json);
 }
 
+// Calcule un score à partir des données CrUX (Chrome User Experience Report)
+// = vraies données des utilisateurs Chrome, pas du lab simulé
+export function computeFieldScore(loadingExperience) {
+    if (!loadingExperience?.metrics) return null;
+    const m = loadingExperience.metrics;
+    const lcpCat = m.LARGEST_CONTENTFUL_PAINT_MS?.category;
+    const fcpCat = m.FIRST_CONTENTFUL_PAINT_MS?.category;
+    const clsCat = m.CUMULATIVE_LAYOUT_SHIFT_SCORE?.category;
+    const inpCat = m.INTERACTION_TO_NEXT_PAINT?.category || m.FIRST_INPUT_DELAY_MS?.category;
+
+    // FAST = utilisateur satisfait, AVERAGE = acceptable, SLOW = problématique
+    const cat2score = (c) => c === 'FAST' ? 95 : c === 'AVERAGE' ? 78 : c === 'SLOW' ? 50 : null;
+
+    const lcpScore = cat2score(lcpCat);
+    const fcpScore = cat2score(fcpCat);
+    const clsScore = cat2score(clsCat);
+    const inpScore = cat2score(inpCat);
+
+    // Pondération : LCP et INP impactent le plus l'expérience réelle
+    const items = [
+        { score: lcpScore, weight: 0.35 },
+        { score: inpScore, weight: 0.30 },
+        { score: clsScore, weight: 0.20 },
+        { score: fcpScore, weight: 0.15 },
+    ].filter(x => x.score != null);
+
+    if (items.length === 0) return null;
+    const totalWeight = items.reduce((a, x) => a + x.weight, 0);
+    const weightedSum = items.reduce((a, x) => a + x.score * x.weight, 0);
+    return Math.round(weightedSum / totalWeight);
+}
+
 export function calibratePerformanceResult(perf) {
     if (!perf || typeof perf !== 'object') return perf;
     const score = Number.isFinite(Number(perf.score)) ? Number(perf.score) : null;
     const lcp = Number(perf.lcp);
     const fcp = Number(perf.fcp);
+    const cls = Number(perf.cls);
+    const tbt = Number(perf.tbt);
+
+    // Si on a des données de terrain CrUX, on a confiance dans le score (vrais utilisateurs)
+    if (perf.field_score != null) {
+        return { ...perf, measurement_confidence: 'high' };
+    }
+
+    // Outlier extrême : LCP > 30s ou FCP > 10s + score < 30 = mesure cassée
     const isExtremeLabOutlier =
         score != null &&
         score < 30 &&
         ((Number.isFinite(lcp) && lcp > 30000) || (Number.isFinite(fcp) && fcp > 10000));
 
-    if (!isExtremeLabOutlier) {
+    if (isExtremeLabOutlier) {
         return {
             ...perf,
-            measurement_confidence: perf.measurement_confidence ?? 'high',
+            score: Math.max(score, 35),
+            partial: true,
+            partial_reason: 'pagespeed_extreme_lab_outlier',
+            measurement_confidence: 'low',
+        };
+    }
+
+    // Outlier modéré : LCP/FCP élevés MAIS CLS et TBT bons = artefact de mesure lab
+    // (typique des grands sites comme Apple, Samsung mesurés en réseau lent simulé)
+    const isModerateLabOutlier =
+        score != null && score < 65 &&
+        Number.isFinite(cls) && cls < 0.1 &&
+        Number.isFinite(tbt) && tbt < 400 &&
+        ((Number.isFinite(lcp) && lcp > 6000) || (Number.isFinite(fcp) && fcp > 3500));
+
+    if (isModerateLabOutlier) {
+        // Site avec LCP élevé mais autres métriques excellentes → réel-utilisateurs probablement OK
+        return {
+            ...perf,
+            score: Math.max(score, 70),
+            partial: true,
+            partial_reason: 'pagespeed_lab_simulation_artifact',
+            measurement_confidence: 'medium',
         };
     }
 
     return {
         ...perf,
-        score: Math.max(score, 35),
-        partial: true,
-        partial_reason: 'pagespeed_extreme_lab_outlier',
-        measurement_confidence: 'medium',
+        measurement_confidence: perf.measurement_confidence ?? 'high',
     };
 }
 
@@ -320,7 +380,7 @@ async function scanPerformance(url, apiKey) {
         const lr = data.lighthouseResult;
         if (!lr) throw new Error('lighthouseResult absent');
 
-        const rawScore = Math.round((lr.categories?.performance?.score ?? 0) * 100);
+        const labScore = Math.round((lr.categories?.performance?.score ?? 0) * 100);
 
         const lcp = lr.audits?.['largest-contentful-paint']?.numericValue ?? null;
         const cls = lr.audits?.['cumulative-layout-shift']?.numericValue ?? null;
@@ -330,6 +390,13 @@ async function scanPerformance(url, apiKey) {
             ? Math.round((lr.audits['total-byte-weight'].numericValue / 1_048_576) * 100) / 100
             : null;
         const requestCount = lr.audits?.['network-requests']?.details?.items?.length ?? null;
+
+        // ── Données CrUX (vraies données des utilisateurs Chrome) ──────────
+        // Pour les grands sites comme Apple/Google/Samsung, les vraies données utilisateurs
+        // sont bien meilleures que la simulation lab (CDN, cache, optimisations progressives).
+        const fieldData = data.loadingExperience;
+        const fieldScore = computeFieldScore(fieldData);
+        const hasFieldData = fieldScore != null && fieldData?.metrics && Object.keys(fieldData.metrics).length > 0;
 
         const failedChecks = [];
         if (lcp > 4000) failedChecks.push('lcp_poor');
@@ -355,9 +422,23 @@ async function scanPerformance(url, apiKey) {
             .sort((a, b) => (b.savings_ms ?? 0) - (a.savings_ms ?? 0))
             .slice(0, 5);
 
+        const cappedLabScore = applyScoreCap(labScore, failedChecks);
+
+        // Stratégie de scoring :
+        // 1. Si données CrUX disponibles (sites populaires) : prendre le max(field, lab)
+        //    Les vrais utilisateurs ne devraient pas être pénalisés par une simulation lab.
+        // 2. Sinon : utiliser le score lab avec calibration des outliers
+        const finalScore = hasFieldData
+            ? Math.max(fieldScore, cappedLabScore)
+            : cappedLabScore;
+
         return calibratePerformanceResult({
-            score: applyScoreCap(rawScore, failedChecks),
-            raw_score: rawScore,
+            score: finalScore,
+            raw_score: labScore,
+            lab_score: cappedLabScore,
+            field_score: fieldScore,
+            has_field_data: hasFieldData,
+            field_overall_category: fieldData?.overall_category ?? null,
             lcp, cls, fcp, tbt,
             page_weight_mb: pageWeightMb,
             nb_requetes: requestCount,
