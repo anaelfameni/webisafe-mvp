@@ -37,9 +37,9 @@ function combineSecurityScores({ legacyScore, advancedScore, extendedScore, http
   let score = Math.max(base, blended);
   // Minimum garanti pour les sites HTTPS sains :
   // HTTPS = chiffrement = pas de risque MITM. Pas de malware = pas de menace active.
-  // Un tel site mérite au minimum 70 (acceptable), même sans tous les headers best practice.
-  if (https && malwareDetected !== true) score = Math.max(score, 70);
-  return Math.min(score, 97);
+  // Un tel site mérite au minimum 82 (bon), même sans tous les headers best practice.
+  if (https && malwareDetected !== true) score = Math.max(score, 82);
+  return Math.min(score, 98);
 }
 
 function toGradeValue(score) {
@@ -394,6 +394,7 @@ export async function handleScan(req, res) {
           issues_count: ux.issues_count ?? 0,
           critical_count: ux.critical_count ?? 0,
           grade: ux.grade ?? null,
+          grade_interpretation: ux.grade_interpretation ?? null,
           partial: ux.partial ?? false,
           partial_reason: ux.partial_reason ?? null,
           protection_detected: ux.protection_detected ?? null,

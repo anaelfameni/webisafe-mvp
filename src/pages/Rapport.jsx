@@ -1071,7 +1071,16 @@ export default function Rapport() {
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">📱 UX Mobile</h2>
 
             <MetricRow label="Score UX" value={`${norm?.scores?.ux ?? 'N/A'}/100`} />
-            <MetricRow label="Grade UX" value={uxM?.grade ?? 'N/A'} />
+            <MetricRow
+              label="Grade UX"
+              value={uxM?.grade ? `${uxM.grade}${uxM.grade_interpretation ? ` — ${uxM.grade_interpretation}` : ''}` : 'N/A'}
+              status={
+                uxM?.grade === 'A+' || uxM?.grade === 'A' ? 'pass'
+                  : uxM?.grade === 'B+' || uxM?.grade === 'B' ? 'pass'
+                    : uxM?.grade === 'C' ? 'warn'
+                      : uxM?.grade ? 'fail' : null
+              }
+            />
             <MetricRow
               label="Responsive (Viewport)"
               value={uxM?.issues?.find(i => i.message?.includes('viewport')) ? 'Absent' : 'OK'}

@@ -141,6 +141,11 @@ function getSecurityMetrics(scanData) {
   const sec = scanData?.security ?? {};
   const summary = scanData?.summary ?? {};
 
+  const headersCount = sec.headers_manquants?.length ?? 0;
+  const realFailles = sec.sensitive_files?.critical
+    ? (sec.sensitive_files.exposed_files?.length ?? 1)
+    : 0;
+
   return [
     {
       label: 'HTTPS',
@@ -149,10 +154,10 @@ function getSecurityMetrics(scanData) {
     },
     {
       label: 'Headers sécurité',
-      value: (sec.headers_manquants?.length ?? 0) === 0
+      value: headersCount === 0
         ? 'Tous présents'
-        : `${sec.headers_manquants.length} manquant(s)`,
-      status: (sec.headers_manquants?.length ?? 0) === 0 ? 'pass' : 'warn',
+        : `${headersCount} manquant(s)`,
+      status: headersCount === 0 ? 'pass' : 'warn',
     },
     {
       label: 'Malware',
@@ -160,11 +165,11 @@ function getSecurityMetrics(scanData) {
       status: sec.malware ? 'fail' : 'pass',
     },
     {
-      label: 'Failles OWASP',
-      value: (sec.failles_owasp_count ?? 0) === 0
-        ? 'Aucune'
-        : `${sec.failles_owasp_count} détectée(s)`,
-      status: (sec.failles_owasp_count ?? 0) === 0 ? 'pass' : 'fail',
+      label: 'Fichiers sensibles',
+      value: realFailles === 0
+        ? 'Aucun exposé'
+        : `${realFailles} exposé(s)`,
+      status: realFailles === 0 ? 'pass' : 'fail',
     },
   ];
 }
@@ -203,16 +208,19 @@ function getSeoMetrics(scanData) {
 
 function getUxMetrics(scanData) {
   const ux = scanData?.ux ?? {};
+  const grade = ux.grade ?? null;
+  const gradeInterp = ux.grade_interpretation ?? null;
+  const issues = ux.issues ?? [];
   return [
     {
-      label: 'Responsive',
-      value: ux.responsive === true ? 'Oui' : ux.responsive === false ? 'Non' : 'Non mesuré',
-      status: ux.responsive === true ? 'pass' : ux.responsive === false ? 'fail' : 'unknown',
+      label: 'Grade UX',
+      value: grade ? `${grade}${gradeInterp ? ` — ${gradeInterp}` : ''}` : 'N/A',
+      status: grade === 'A+' || grade === 'A' || grade === 'B+' ? 'pass' : grade === 'B' ? 'pass' : grade === 'C' ? 'warn' : grade ? 'fail' : 'unknown',
     },
     {
-      label: 'Taille Texte',
-      value: ux.taille_texte_px != null ? `${ux.taille_texte_px}px` : 'N/A',
-      status: ux.taille_texte_px == null ? 'unknown' : ux.taille_texte_px >= 12 ? 'pass' : 'fail',
+      label: 'Responsive (Viewport)',
+      value: ux.responsive === true ? 'Oui' : ux.responsive === false ? 'Non' : 'Non mesuré',
+      status: ux.responsive === true ? 'pass' : ux.responsive === false ? 'fail' : 'unknown',
     },
     {
       label: 'Éléments Tactiles',

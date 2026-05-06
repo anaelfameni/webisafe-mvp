@@ -57,6 +57,7 @@ export async function scanUXMobile(url, _psKey) {
       medium_count: analysis.medium_count,
       low_count: analysis.low_count,
       grade: analysis.grade,
+      grade_interpretation: analysis.grade_interpretation,
       partial: false,
       protection_detected: null,
     };
@@ -246,7 +247,9 @@ export function deepUXAnalysis($, html, headers) {
   }
 
   // ── Calcul du score ──────────────────────────────────────────────────────
-  const uxScore = computeUXScore(issues);
+  const bonuses = computePositiveBonuses($, html, headers);
+  const uxScore = computeUXScore(issues, bonuses);
+  const gradeInfo = deriveUXGrade(uxScore);
 
   return {
     score: uxScore,
@@ -255,21 +258,61 @@ export function deepUXAnalysis($, html, headers) {
     critical_count: issues.filter(i => i.severity === 'high').length,
     medium_count: issues.filter(i => i.severity === 'medium').length,
     low_count: issues.filter(i => i.severity === 'low').length,
-    grade:
-      uxScore >= 90 ? 'A' :
-        uxScore >= 75 ? 'B' :
-          uxScore >= 55 ? 'C' :
-            uxScore >= 35 ? 'D' : 'F',
+    grade: gradeInfo.grade,
+    grade_interpretation: gradeInfo.interpretation,
   };
 }
 
-function computeUXScore(issues) {
-  if (issues.length === 0) return 100;
+function computePositiveBonuses($, html, headers) {
+  let bonus = 0;
+
+  // Viewport correctement configuré
+  const viewport = $('meta[name="viewport"]').attr('content') || '';
+  if (viewport && viewport.includes('width=device-width')) bonus += 5;
+
+  // Compression active
+  const encoding = headers.get ? headers.get('content-encoding') : headers['content-encoding'];
+  if (encoding && (encoding.includes('br') || encoding.includes('gzip'))) bonus += 5;
+
+  // Structure sémantique (main + nav + header)
+  const hasMain = $('main, [role="main"]').length > 0;
+  const hasNav = $('nav, [role="navigation"]').length > 0;
+  const hasHeader = $('header, [role="banner"]').length > 0;
+  if (hasMain && hasNav && hasHeader) bonus += 5;
+
+  // Media queries (responsive design)
+  if (/(@media[^{]*max-width|@media[^{]*min-width)/i.test(html)) bonus += 3;
+
+  // Images modernes (webp/avif)
+  if ($('img[src$=".webp"], img[src$=".avif"], picture source[type="image/webp"], picture source[type="image/avif"]').length > 0) bonus += 3;
+
+  // Pas de mixed content
+  const mixedContent = $('img[src^="http://"]').length + $('script[src^="http://"]').length;
+  if (mixedContent === 0) bonus += 2;
+
+  // HTTPS
+  if ($('link[rel="canonical"][href^="https"]').length > 0 || $('meta[property="og:url"][content^="https"]').length > 0) bonus += 2;
+
+  return Math.min(25, bonus);
+}
+
+function computeUXScore(issues, bonuses = 0) {
+  if (issues.length === 0) return Math.min(100, 100 + bonuses);
 
   const totalPenalty = issues.reduce((acc, issue) => {
     const weight = SEVERITY_WEIGHT[issue.severity] ?? 1;
-    return acc + (weight * 5);
+    return acc + (weight * 3);
   }, 0);
 
-  return Math.max(0, Math.min(100, 100 - totalPenalty));
+  return Math.max(0, Math.min(100, 100 - totalPenalty + bonuses));
+}
+
+function deriveUXGrade(score) {
+  if (score >= 95) return { grade: 'A+', interpretation: 'Excellent — expérience mobile exemplaire, top 5%' };
+  if (score >= 88) return { grade: 'A', interpretation: 'Très bon — expérience mobile fluide et professionnelle' };
+  if (score >= 78) return { grade: 'B+', interpretation: 'Bon — expérience mobile solide, quelques ajustements mineurs possibles' };
+  if (score >= 68) return { grade: 'B', interpretation: 'Correct — fonctionnel mais perfectible sur certains points' };
+  if (score >= 55) return { grade: 'C', interpretation: 'Moyen — améliorations recommandées pour le confort mobile' };
+  if (score >= 40) return { grade: 'D', interpretation: 'Insuffisant — problèmes significatifs affectant l\'expérience mobile' };
+  return { grade: 'F', interpretation: 'Critique — expérience mobile très dégradée, refonte nécessaire' };
 }

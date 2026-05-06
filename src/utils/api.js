@@ -1015,6 +1015,7 @@ export async function runFullAnalysis(url, onProgress, email) {
         headers_manquants: normalizeMissingHeaders(sec.headers_manquants),
         malware: sec.malware_detected ?? false,
         failles_owasp_count: sec.failles_owasp_count ?? 0,
+        headers_missing_count: sec.headers_missing_count ?? sec.headers_manquants?.length ?? 0,
         sensitive_files: sec.sensitive_files ?? null,
         advanced_checks: Array.isArray(sec.advanced_checks) ? sec.advanced_checks : [],
         extended_checks: Array.isArray(sec.extended_checks) ? sec.extended_checks : Array.isArray(sec.advanced_checks) ? sec.advanced_checks : [],
@@ -1042,6 +1043,7 @@ export async function runFullAnalysis(url, onProgress, email) {
         protection_detected: ux.protection_detected ?? null,
         issues: ux.issues ?? [],
         grade: ux.grade ?? null,
+        grade_interpretation: ux.grade_interpretation ?? null,
       },
 
       summary: {

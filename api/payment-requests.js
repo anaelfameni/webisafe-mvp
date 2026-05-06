@@ -1,13 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-import { checkRateLimit, json, requireAdmin, setCorsHeaders } from '../api_shared/_utils.js';
-
-const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
-  ? createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY,
-      { auth: { persistSession: false } }
-    )
-  : null;
+import { checkRateLimit, getSupabaseAdminClient, json, requireAdmin, setCorsHeaders } from '../api_shared/_utils.js';
 
 export default async function handler(req, res) {
   setCorsHeaders(req, res);
@@ -19,9 +10,10 @@ export default async function handler(req, res) {
     return json(res, 429, { success: false, error: `Trop de requêtes. Réessayez dans ${rateLimit.retryAfter}s.` });
   }
 
-  const admin = await requireAdmin(req, res, supabase);
+  const admin = await requireAdmin(req, res);
   if (!admin) return;
 
+  const supabase = getSupabaseAdminClient();
   if (!supabase) return json(res, 500, { success: false, error: 'Configuration serveur manquante' });
 
   const limit = Math.min(Math.max(Number(req.query?.limit || 50), 1), 100);

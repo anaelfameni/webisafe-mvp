@@ -447,7 +447,8 @@ export async function scanSecurity(url, vtApiKey) {
     security_grade: headersData.grade,
     ssl_details: sslData,
     sensitive_files: sensitiveData,
-    failles_owasp_count: (headersData.headers_manquants?.length ?? 0) + (sensitiveData.exposed_files?.length ?? 0),
+    headers_missing_count: headersData.headers_manquants?.length ?? 0,
+    failles_owasp_count: sensitiveData.exposed_files?.length ?? 0,
     partial: observatoryScore === null && headersData.header_score === null,
   };
 }

@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
 
-  const admin = await requireAdmin(req, res, supabase);
+  const admin = await requireAdmin(req, res);
   if (!admin) return;
 
   if (!supabase) return json(res, 503, { error: 'Service indisponible' });
