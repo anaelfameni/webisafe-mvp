@@ -1,4 +1,4 @@
-import { checkRateLimit, getSupabaseAdminClient, json, requireAdmin, setCorsHeaders } from './_utils.js';
+import { checkRateLimit, getSupabaseAdminClient, json, requireAdmin, setCorsHeaders } from '../api_shared/_utils.js';
 
 export default async function handler(req, res) {
   setCorsHeaders(req, res);
