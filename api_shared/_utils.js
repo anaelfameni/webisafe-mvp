@@ -72,8 +72,8 @@ export function checkRateLimit(req, maxRequests = 10, windowMs = RATE_LIMIT_WIND
 }
 
 export function getSupabaseAdminClient() {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     return null;
@@ -92,7 +92,7 @@ export function escapeHtml(value) {
 }
 
 // ── Admin Auth ────────────────────────────────────────────────────────────────
-export async function requireAdmin(req, res, client = null) {
+export async function requireAdmin(req, res) {
   const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
@@ -101,7 +101,7 @@ export async function requireAdmin(req, res, client = null) {
     return null;
   }
 
-  const supabase = client || getSupabaseAdminClient();
+  const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
     json(res, 500, { error: 'Configuration serveur manquante' });

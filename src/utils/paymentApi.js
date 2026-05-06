@@ -31,6 +31,18 @@ function upsertCachedPaymentRequest(row) {
   return row;
 }
 
+async function getApiErrorMessage(response, fallback) {
+  const text = await response.text();
+  if (!text) return fallback || `Erreur ${response.status}`;
+
+  try {
+    const err = JSON.parse(text);
+    return err.error || err.message || fallback || `Erreur ${response.status}`;
+  } catch {
+    return text;
+  }
+}
+
 export async function persistScanRecord(scan) {
   return scan || null;
 }
@@ -76,13 +88,7 @@ export async function fetchPaymentRequests(limit = 20) {
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      try {
-        const err = JSON.parse(text);
-        throw new Error(err.error || `Erreur ${response.status}`);
-      } catch {
-        throw new Error(text || `Erreur ${response.status}`);
-      }
+      throw new Error(await getApiErrorMessage(response, 'Chargement paiements impossible'));
     }
 
     const data = await response.json();
@@ -119,8 +125,7 @@ async function postApi(path, payload, options = {}) {
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || 'Erreur API');
+    throw new Error(await getApiErrorMessage(response, 'Erreur API'));
   }
 
   return response.json().catch(() => ({}));
@@ -160,13 +165,7 @@ export async function fetchScans(limit = 50) {
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    try {
-      const err = JSON.parse(text);
-      throw new Error(err.error || `Erreur ${response.status}`);
-    } catch {
-      throw new Error(text || `Erreur ${response.status}`);
-    }
+    throw new Error(await getApiErrorMessage(response, 'Chargement scans impossible'));
   }
 
   const data = await response.json();
