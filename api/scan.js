@@ -123,31 +123,30 @@ export function combineSecurityScores({ legacyScore, advancedScore, extendedScor
     const base = Number.isFinite(Number(legacyScore)) ? Number(legacyScore) : null;
     if (base == null) return null;
 
-    // Les scanners avancés/étendus pénalisent les best practices (CSP, HSTS, security.txt...).
-    // Pour ne pas écraser un site HTTPS sain qui manque juste de best practices,
-    // on plancher l'impact négatif et on pondère majoritairement le legacyScore.
+    // Les scanners avancés/étendus mesurent des best practices (CSP, HSTS, security.txt, CORS...)
+    // Ces points NE DOIVENT PAS écraser le score fondamental d'un site HTTPS sain.
+    // On garde le legacyScore comme référence et on l'ajuste légèrement (±3) avec advanced/extended.
     let blended = base;
     if (Number.isFinite(Number(advancedScore))) {
-        // Plancher 50 sur l'advancedScore : un site HTTPS sans malware ne peut pas
-        // être noté comme "critique" juste parce qu'il manque des headers de best practice.
         const flooredAdvanced = (https && malwareDetected !== true)
-            ? Math.max(Number(advancedScore), 50)
+            ? Math.max(Number(advancedScore), 60)
             : Number(advancedScore);
-        blended = Math.round(blended * 0.85 + flooredAdvanced * 0.15);
+        blended = Math.round(blended * 0.95 + flooredAdvanced * 0.05);
     }
     if (Number.isFinite(Number(extendedScore))) {
         const flooredExtended = (https && malwareDetected !== true)
-            ? Math.max(Number(extendedScore), 50)
+            ? Math.max(Number(extendedScore), 60)
             : Number(extendedScore);
-        blended = Math.round(blended * 0.90 + flooredExtended * 0.10);
+        blended = Math.round(blended * 0.95 + flooredExtended * 0.05);
     }
 
     let score = Math.max(base, blended);
-    // Minimum garanti pour les sites HTTPS sains :
-    // HTTPS = chiffrement = pas de risque MITM. Pas de malware = pas de menace active.
-    // Un tel site mérite au minimum 82 (bon), même sans tous les headers best practice.
-    if (https && malwareDetected !== true) score = Math.max(score, 82);
-    return Math.min(score, 98);
+    // Minimum garanti pour les sites HTTPS sans malware :
+    // HTTPS + chiffrement TLS + pas de menace active = niveau de sécurité fondamental atteint.
+    // Un tel site (Google, Amazon, cybastiontech, etc.) mérite au minimum 90 ("Très bon").
+    // Les headers manquants restent visibles dans les recommandations.
+    if (https && malwareDetected !== true) score = Math.max(score, 90);
+    return Math.min(score, 99);
 }
 
 function getScanConfidence({ perf, sec, seo, ux }) {
@@ -571,16 +570,26 @@ async function scanSecurity(url, vtApiKey) {
     // Un site HTTPS sans malware mais sans headers OAW devrait être ~80/100 (acceptable),
     // pas 35/100 (critique). Les headers manquants seront pénalisés une seule fois,
     // dans runAdvancedSecurityChecks (pas en double ici).
+    // ── Répartition réaliste ────────────────────────────────────────────────
+    // Fondamentaux (90 pts) : ce qui protège VRAIMENT les utilisateurs
+    //   - HTTPS  (chiffrement TLS) : +50 → Pas de MITM possible
+    //   - SSL valide                : +10 → Certificat fiable
+    //   - Pas de malware vérifié   : +30 → Pas de menace active
+    //   (malware non vérifié = +28, bénéfice du doute si HTTPS)
+    // Bonus best practices (10 pts) : Headers (HSTS, CSP, etc.)
+    //   = pas critiques pour l'utilisateur final, juste de l'hygiène pro.
     let rawScore = 0;
-    rawScore += isHttps ? 40 : 0;                    // HTTPS = chiffrement = fondamental
-    rawScore += isHttps ? 10 : 0;                    // SSL valide (implicite si HTTPS répond)
-    if (malwareDetected === false) rawScore += 35;   // Vérifié OK → max
-    else if (malwareDetected === null) rawScore += 30; // Non vérifié → quasi max (bénéfice du doute)
+    if (isHttps) {
+        rawScore += 50; // HTTPS = chiffrement = fondamental
+        rawScore += 10; // SSL valide (implicite si HTTPS répond)
+    }
+    if (malwareDetected === false) rawScore += 30;       // Vérifié OK → max
+    else if (malwareDetected === null) rawScore += 28;   // Non vérifié → bénéfice du doute
     // malwareDetected === true → 0 (le cap se fera plus bas)
 
     const headerPoints = headersPresent.reduce((acc, h) => acc + (SECURITY_HEADERS[h]?.points ?? 0), 0);
     const maxHeaderPoints = Object.values(SECURITY_HEADERS).reduce((a, c) => a + c.points, 0);
-    rawScore += Math.round((headerPoints / maxHeaderPoints) * 15); // bonus modeste
+    rawScore += Math.round((headerPoints / maxHeaderPoints) * 10); // bonus 10 pts max
 
     rawScore = clamp(rawScore, 0, 100);
 
