@@ -196,6 +196,11 @@ export default function Admin({ user }) {
     } finally { setActionId(null); }
   };
 
+  const openPremiumScan = (scan) => {
+    if (!scan?.paid || !scan?.id) return;
+    navigate(`/rapport/${encodeURIComponent(scan.id)}`, { state: { adminBypass: true } });
+  };
+
   if (!isAuthorized) return null;
 
   const PAGE_TITLES = { overview: 'Vue d\'ensemble', payments: 'Paiements', subscriptions: 'Abonnements Protect', scans: 'Scans', corrections: 'Demandes de correction', revenue: 'Revenus', alerts: 'Alertes Système', settings: 'Paramètres' };
@@ -426,9 +431,18 @@ export default function Admin({ user }) {
                           </tr></thead>
                           <tbody>
                             {scans.map(s => (
-                              <tr key={s.id} className="border-t border-white/5 text-white/70 hover:bg-white/5">
-                                <td className="px-4 py-3 font-mono text-primary text-xs max-w-[120px] truncate">{s.id}</td>
-                                <td className="px-4 py-3 text-xs max-w-[180px] truncate">{s.url}</td>
+                              <tr
+                                key={s.id}
+                                onClick={() => openPremiumScan(s)}
+                                className={`border-t border-white/5 text-white/70 hover:bg-white/5 ${s.paid ? 'cursor-pointer' : ''}`}
+                                title={s.paid ? 'Ouvrir le rapport premium' : undefined}
+                              >
+                                <td className="px-4 py-3 font-mono text-primary text-xs max-w-[120px] truncate">
+                                  {s.paid ? <button type="button" className="hover:underline">{s.id}</button> : s.id}
+                                </td>
+                                <td className="px-4 py-3 text-xs max-w-[180px] truncate">
+                                  {s.paid ? <button type="button" className="hover:text-primary hover:underline">{s.url}</button> : s.url}
+                                </td>
                                 <td className="px-4 py-3 text-xs">{s.user_email || '—'}</td>
                                 <td className="px-4 py-3 text-xs">
                                   <span className={`font-semibold ${s.score >= 70 ? 'text-success' : s.score >= 40 ? 'text-warning' : 'text-danger'}`}>
