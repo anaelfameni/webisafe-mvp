@@ -1,11 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
-import { escapeHtml, requireCronSecret, sendResendEmail } from './_utils.js'
+import { requireCronSecret } from './_utils.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// NOTE : Les alertes email temps réel sont gérées par UptimeRobot (plan gratuit, 5 min).
+// Ce cron journalier sert uniquement à :
+// 1. Logger les résultats dans uptime_logs (Dashboard)
+// 2. Créer / résoudre les incidents dans Supabase (historique)
+// Pas d'envoi d'email ici pour éviter les doublons avec UptimeRobot.
 export default async function handler(req, res) {
   // Sécuriser l'endpoint — seul le cron peut l'appeler
   if (!requireCronSecret(req, res)) return;
@@ -64,17 +69,8 @@ export default async function handler(req, res) {
             notified: true
           })
 
-          // Envoyer alerte email
-          await sendResendEmail({
-            to: client.user_email,
-            subject: `⚠️ ALERTE — ${String(client.name || siteUrl).replace(/[\r\n]+/g, ' ')} est HORS LIGNE`,
-            html: `
-              <h2>Votre site est inaccessible</h2>
-              <p><strong>${escapeHtml(siteUrl)}</strong> ne répond plus.</p>
-              <p>Détecté à : ${new Date().toLocaleString('fr-FR')}</p>
-              <p>Nous continuons à surveiller et vous notifierons dès le retour en ligne.</p>
-            `
-          })
+          // NOTE : L'alerte email temps réel est envoyée par UptimeRobot.
+          // WebiSafe ne duplique pas l'email pour éviter le spam.
         }
       } else {
         // Site UP → résoudre l'incident ouvert s'il existe
@@ -94,15 +90,8 @@ export default async function handler(req, res) {
             duration_minutes: durationMin
           }).eq('id', incident.id)
 
-          // Email de retour en ligne
-          await sendResendEmail({
-            to: client.user_email,
-            subject: `✅ ${String(client.name || siteUrl).replace(/[\r\n]+/g, ' ')} est de nouveau en ligne`,
-            html: `
-              <h2>Votre site est rétabli</h2>
-              <p>Durée de l'incident : <strong>${durationMin} minutes</strong></p>
-            `
-          })
+          // NOTE : L'email de retour en ligne est envoyé par UptimeRobot.
+          // WebiSafe résout juste l'incident dans Supabase pour le Dashboard.
         }
       }
 

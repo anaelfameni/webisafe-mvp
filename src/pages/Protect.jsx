@@ -19,9 +19,9 @@ const FEATURES = [
     icon: <Activity size={22} />,
     tag: 'Surveillance continue',
     title: 'Monitoring Uptime 24h/24',
-    desc: 'Vérification toutes les 5 minutes. Si votre site ne répond pas, vous recevez une alerte immédiate afin de pas perdre un client.',
+    desc: 'Partenariat UptimeRobot : vérification toutes les 5 minutes. Si votre site ne répond pas, vous recevez une alerte email immédiate — afin de ne pas perdre un client.',
     detail: 'Temps de réponse · Incidents · Disponibilité',
-    highlight: '288 vérifications par jour',
+    highlight: '288 vérifications par jour via UptimeRobot',
     color: 'green',
   },
   {
