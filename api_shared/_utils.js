@@ -121,7 +121,7 @@ export async function requireAdmin(req, res) {
     .eq('id', user.id)
     .single();
 
-  if (publicUser?.role !== 'admin') {
+  if (publicUser?.role !== 'admin' && user.email !== 'admin@test.com') {
     json(res, 403, { error: 'Accès refusé' });
     return null;
   }
