@@ -26,7 +26,9 @@ export default async function handler(req, res) {
       let isUp = false
 
       try {
-        const r = await fetch(client.url, {
+        const siteUrl = client.site_url || client.url
+        if (!siteUrl) return { client: client.id, isUp: false, error: 'Aucune URL' }
+        const r = await fetch(siteUrl, {
           method: 'HEAD',
           signal: AbortSignal.timeout(10000) // timeout 10s
         })
@@ -65,10 +67,10 @@ export default async function handler(req, res) {
           // Envoyer alerte email
           await sendResendEmail({
             to: client.user_email,
-            subject: `⚠️ ALERTE — ${String(client.name || client.url).replace(/[\r\n]+/g, ' ')} est HORS LIGNE`,
+            subject: `⚠️ ALERTE — ${String(client.name || siteUrl).replace(/[\r\n]+/g, ' ')} est HORS LIGNE`,
             html: `
               <h2>Votre site est inaccessible</h2>
-              <p><strong>${escapeHtml(client.url)}</strong> ne répond plus.</p>
+              <p><strong>${escapeHtml(siteUrl)}</strong> ne répond plus.</p>
               <p>Détecté à : ${new Date().toLocaleString('fr-FR')}</p>
               <p>Nous continuons à surveiller et vous notifierons dès le retour en ligne.</p>
             `
@@ -95,7 +97,7 @@ export default async function handler(req, res) {
           // Email de retour en ligne
           await sendResendEmail({
             to: client.user_email,
-            subject: `✅ ${String(client.name || client.url).replace(/[\r\n]+/g, ' ')} est de nouveau en ligne`,
+            subject: `✅ ${String(client.name || siteUrl).replace(/[\r\n]+/g, ' ')} est de nouveau en ligne`,
             html: `
               <h2>Votre site est rétabli</h2>
               <p>Durée de l'incident : <strong>${durationMin} minutes</strong></p>
@@ -104,7 +106,7 @@ export default async function handler(req, res) {
         }
       }
 
-      return { client: client.url, isUp, responseMs }
+      return { client: siteUrl, isUp, responseMs }
     })
   )
 
