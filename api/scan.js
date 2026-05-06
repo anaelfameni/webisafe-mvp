@@ -145,9 +145,9 @@ export function combineSecurityScores({ legacyScore, advancedScore, extendedScor
     let score = Math.max(base, blended);
     // Minimum garanti pour les sites HTTPS sains :
     // HTTPS = chiffrement = pas de risque MITM. Pas de malware = pas de menace active.
-    // Un tel site mérite au minimum 70 (acceptable), même sans tous les headers best practice.
-    if (https && malwareDetected !== true) score = Math.max(score, 70);
-    return Math.min(score, 97);
+    // Un tel site mérite au minimum 82 (bon), même sans tous les headers best practice.
+    if (https && malwareDetected !== true) score = Math.max(score, 82);
+    return Math.min(score, 98);
 }
 
 function getScanConfidence({ perf, sec, seo, ux }) {
@@ -612,7 +612,10 @@ async function scanSecurity(url, vtApiKey) {
         headers_presents: headersPresent,
         headers_manquants: headersMissing,
         failed_checks: failedChecks,
-        failles_owasp_count: headersMissing.length,
+        // Les headers manquants sont des best practices, PAS des failles OWASP.
+        // Seuls les fichiers sensibles exposés sont de vraies failles.
+        headers_missing_count: headersMissing.length,
+        failles_owasp_count: 0,
         sensitive_files: null,
         partial: false,
     };
@@ -844,9 +847,25 @@ async function scanUX(url) {
         });
     }
 
-    const SEVERITY_WEIGHT = { high: 15, medium: 8, low: 4 };
-    const penalty = issues.reduce((acc, i) => acc + (SEVERITY_WEIGHT[i.severity] ?? 4), 0);
-    const rawScore = clamp(100 - penalty, 0, 100);
+    // Pénalités modérées : un défaut UX n'est pas critique pour la sécurité.
+    // Réduction par rapport à l'ancienne version (high=15→10, medium=8→5, low=4→3).
+    const SEVERITY_WEIGHT = { high: 10, medium: 5, low: 3 };
+    const penalty = issues.reduce((acc, i) => acc + (SEVERITY_WEIGHT[i.severity] ?? 3), 0);
+
+    // Bonuses pour bonnes pratiques détectées (jusqu'à +20)
+    let bonus = 0;
+    if (viewport && !viewport.includes('user-scalable=no')) bonus += 5; // viewport correct
+    if (hasCompression) bonus += 5; // compression active
+    if (imagesWithoutAlt === 0 && $('img').length > 0) bonus += 3; // toutes images avec alt
+    if (emptyLinks === 0) bonus += 2; // tous liens textuels
+    // Structure sémantique
+    if ($('main, [role="main"]').length > 0) bonus += 2;
+    if ($('nav, [role="navigation"]').length > 0) bonus += 1;
+    if ($('header, [role="banner"]').length > 0) bonus += 1;
+    // Images modernes (lazy loading)
+    if ($('img[loading="lazy"]').length > 0) bonus += 1;
+
+    const rawScore = clamp(100 - penalty + bonus, 0, 100);
 
     const failedChecks = [];
     if (!viewport) failedChecks.push('no_viewport');
@@ -854,7 +873,18 @@ async function scanUX(url) {
     if (!hasCompression) failedChecks.push('no_compression');
     if (emptyLinks > 0) failedChecks.push('empty_links');
 
-    const finalScore = applyScoreCap(rawScore, failedChecks);
+    // Pas de double-pénalité : on ne ré-applique PAS applyScoreCap ici.
+    // Les pénalités ont déjà été appliquées via les issues. On cap juste à 98.
+    const finalScore = Math.min(rawScore, 98);
+
+    // Grade avec interprétation
+    const gradeInfo =
+        finalScore >= 90 ? { grade: 'A+', interpretation: 'Excellent — Top 10% des sites' }
+        : finalScore >= 80 ? { grade: 'A', interpretation: 'Très bon — Expérience mobile fluide' }
+        : finalScore >= 70 ? { grade: 'B', interpretation: 'Bon — Quelques optimisations possibles' }
+        : finalScore >= 60 ? { grade: 'C', interpretation: 'Moyen — Améliorations recommandées' }
+        : finalScore >= 50 ? { grade: 'D', interpretation: 'Insuffisant — Corrections nécessaires' }
+        : { grade: 'F', interpretation: 'Critique — Refonte mobile recommandée' };
 
     return {
         score: finalScore,
@@ -864,8 +894,11 @@ async function scanUX(url) {
         issues,
         issues_count: issues.length,
         critical_count: issues.filter(i => i.severity === 'high').length,
+        medium_count: issues.filter(i => i.severity === 'medium').length,
+        low_count: issues.filter(i => i.severity === 'low').length,
         failed_checks: failedChecks,
-        grade: finalScore >= 90 ? 'A' : finalScore >= 75 ? 'B' : finalScore >= 55 ? 'C' : finalScore >= 35 ? 'D' : 'F',
+        grade: gradeInfo.grade,
+        grade_interpretation: gradeInfo.interpretation,
         partial: false,
     };
 }
