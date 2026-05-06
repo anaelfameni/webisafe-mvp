@@ -3,9 +3,9 @@ import { randomUUID, createHash } from 'crypto';
 import { promises as dns } from 'dns';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
-import { runAdvancedSecurityChecks } from './scanners/security-checks.js';
-import { runExtendedSecurityChecks } from './scanners/extended-security-checks.js';
-import { setCorsHeaders, checkRateLimit } from './_utils.js';
+import { runAdvancedSecurityChecks } from '../scanners/security-checks.js';
+import { runExtendedSecurityChecks } from '../scanners/extended-security-checks.js';
+import { setCorsHeaders, checkRateLimit } from '../api_shared/_utils.js';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabaseUrl = process.env.SUPABASE_URL;

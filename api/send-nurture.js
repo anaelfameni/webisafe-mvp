@@ -1,4 +1,4 @@
-import { checkRateLimit, escapeHtml, json, readJsonBody, sendResendEmail, setCorsHeaders } from './_utils.js';
+import { checkRateLimit, escapeHtml, json, readJsonBody, sendResendEmail, setCorsHeaders } from '../api_shared/_utils.js';
 
 function resolveAppUrl() {
   if (process.env.VITE_APP_URL) return process.env.VITE_APP_URL;

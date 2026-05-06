@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { requireCronSecret } from './_utils.js'
+import { requireCronSecret } from '../api_shared/_utils.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,

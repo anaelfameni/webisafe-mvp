@@ -6,9 +6,7 @@
     "api/scan.js": {
       "memory": 1024,
       "maxDuration": 60,
-      "regions": [
-        "cpt1"
-      ]
+      "regions": ["cpt1"]
     },
     "api/subscribe.js": {
       "memory": 256,
@@ -22,30 +20,9 @@
       "memory": 256,
       "maxDuration": 15
     },
-    "api/badge/[site_url].js": {
-      "memory": 128,
-      "maxDuration": 5
-    },
     "api/subscriptions.js": {
       "memory": 128,
       "maxDuration": 10
-    },
-    "api/confirm-subscription.js": {
-      "memory": 128,
-      "maxDuration": 10
-    },
-    "api/reject-subscription.js": {
-      "memory": 128,
-      "maxDuration": 10
-    },
-    "api/cron/monthly-scan.js": {
-      "memory": 1024,
-      "maxDuration": 60,
-      "regions": ["cpt1"]
-    },
-    "api/cron/alert-followup.js": {
-      "memory": 256,
-      "maxDuration": 30
     },
     "api/monitor-check.js": {
       "memory": 512,
@@ -53,14 +30,6 @@
     }
   },
   "crons": [
-    {
-      "path": "/api/cron/monthly-scan",
-      "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/cron/alert-followup",
-      "schedule": "0 0 * * *"
-    },
     {
       "path": "/api/monitor-check",
       "schedule": "0 0 * * *"

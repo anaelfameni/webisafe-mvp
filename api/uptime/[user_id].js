@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { json, setCorsHeaders, requireAuthenticatedUser } from '../_utils.js';
+import { json, setCorsHeaders, requireAuthenticatedUser } from '../../api_shared/_utils.js';
 
 const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
   ? createClient(

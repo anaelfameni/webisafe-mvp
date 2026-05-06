@@ -1,4 +1,4 @@
-import { checkRateLimit, getSupabaseAdminClient, json, readJsonBody, sendResendEmail, setCorsHeaders } from './_utils.js';
+import { checkRateLimit, getSupabaseAdminClient, json, readJsonBody, sendResendEmail, setCorsHeaders } from '../api_shared/_utils.js';
 import {
   buildAdminPaymentNotificationEmail,
   formatPaymentTimestamp,

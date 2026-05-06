@@ -1,4 +1,4 @@
-import { checkRateLimit, escapeHtml, json, readJsonBody, sendResendEmail, setCorsHeaders } from './_utils.js';
+import { checkRateLimit, escapeHtml, json, readJsonBody, sendResendEmail, setCorsHeaders } from '../api_shared/_utils.js';
 
 export default async function handler(req, res) {
   setCorsHeaders(req, res);

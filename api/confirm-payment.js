@@ -1,4 +1,4 @@
-import { json, readJsonBody, sendResendEmail, setCorsHeaders, checkRateLimit, getSupabaseAdminClient, requireAdmin } from './_utils.js';
+import { json, readJsonBody, sendResendEmail, setCorsHeaders, checkRateLimit, getSupabaseAdminClient, requireAdmin } from '../api_shared/_utils.js';
 import { buildPaymentConfirmedEmail, resolveAppUrl } from '../src/utils/paymentEmails.js';
 
 export default async function handler(req, res) {
