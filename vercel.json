@@ -8,6 +8,10 @@
       "maxDuration": 60,
       "regions": ["cpt1"]
     },
+    "api/generate-pdf.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
     "api/subscribe.js": {
       "memory": 256,
       "maxDuration": 15
