@@ -32,20 +32,4 @@ create index if not exists idx_scan_analytics_scanned_at
 create index if not exists idx_scan_analytics_score_global
   on public.scan_analytics (score_global);
 
--- RLS : lecture publique pour les stats agrégées
 alter table public.scan_analytics enable row level security;
-
--- Politique : tout le monde peut lire les scans publics
--- (utile pour l'endpoint /api/stats qui fait des COUNT/AVG)
-create policy if not exists "Allow public read on scan_analytics"
-  on public.scan_analytics
-  for select
-  to anon, authenticated
-  using (is_public = true);
-
--- Politique : insertion seulement par service_role (backend)
-create policy if not exists "Allow service role insert on scan_analytics"
-  on public.scan_analytics
-  for insert
-  to service_role
-  with check (true);

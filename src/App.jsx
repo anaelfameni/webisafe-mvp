@@ -5,7 +5,6 @@ import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import Home from './pages/Home';
 import { useAuth } from './hooks/useAuth';
-import { supabase } from './lib/supabaseClient';
 
 const Analyse = lazy(() => import('./pages/Analyse'));
 const Rapport = lazy(() => import('./pages/Rapport'));
@@ -18,6 +17,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Partenaire = lazy(() => import('./pages/Partenaire'));
 const PartenaireConfirmation = lazy(() => import('./pages/PartenaireConfirmation'));
 const AffiliateDashboard = lazy(() => import('./pages/AffiliateDashboard'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const CGU = lazy(() => import('./pages/CGU'));
 const Confidentialite = lazy(() => import('./pages/Confidentialite'));
 const APropos = lazy(() => import('./pages/APropos'));
@@ -41,11 +41,10 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
   const navigate = useNavigate();
   const isFullscreenRoute = location.pathname === '/admin' || location.pathname === '/dashboard';
 
-  const handleAuthAndRedirect = (mode, data) => {
-    const result = handleAuth(mode, data);
-    if (result?.success && result?.redirectTo) {
+  const handleAuthAndRedirect = async (mode, data) => {
+    const result = await handleAuth(mode, data);
+    if (result?.success) {
       setShowAuth(false);
-      navigate(result.redirectTo, { replace: true });
     }
     return result;
   };
@@ -69,11 +68,14 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
     const ref = params.get('ref');
     if (ref) {
       localStorage.setItem('webisafe_ref', ref);
-      supabase.from('affiliate_clicks').insert({
-        ref_code: ref,
-        page: window.location.pathname,
-        created_at: new Date().toISOString()
-      }).then(() => {});
+      fetch('/api/affiliate-click', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ref_code: ref,
+          page: window.location.pathname,
+        }),
+      }).catch(() => {});
     }
   }, []);
 
@@ -116,6 +118,7 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
             <Route path="/partenaire" element={<Partenaire user={user} />} />
             <Route path="/partenaire/confirmation" element={<PartenaireConfirmation user={user} />} />
             <Route path="/affiliate/dashboard" element={<AffiliateDashboard />} />
+            <Route path="/reinitialiser-mot-de-passe" element={<ResetPassword />} />
             <Route path="/cgu" element={<CGU />} />
             <Route path="/confidentialite" element={<Confidentialite />} />
             <Route path="/a-propos" element={<APropos />} />
@@ -138,7 +141,7 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
             {[...Array(6)].map((_, i) => (
               <span key={i} className="mx-8 text-xs sm:text-sm font-medium text-primary/90 uppercase tracking-widest flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                Premier écosystème complet d'audit, correction et surveillance web conçu pour l'Afrique
+                Premier écosystème complet d'audit, correction et surveillance web conçu pour l'Afrique · Diagnostic gratuit en 60 secondes
               </span>
             ))}
           </div>
@@ -162,8 +165,8 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('login');
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     window.location.href = '/';
   };
 

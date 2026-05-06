@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, MousePointer, ShoppingCart, Percent, Wallet, ArrowLeft } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
 
 export default function AffiliateDashboard() {
   const [stats, setStats] = useState(null);
@@ -22,43 +21,16 @@ export default function AffiliateDashboard() {
 
     async function loadStats() {
       try {
-        const [clicksRes, conversionsRes, affiliateRes] = await Promise.all([
-          supabase.from('affiliate_clicks')
-            .select('*', { count: 'exact', head: true })
-            .eq('ref_code', refCode),
+        const response = await fetch(`/api/affiliate-stats?code=${encodeURIComponent(refCode)}`);
+        const payload = await response.json().catch(() => ({}));
 
-          supabase.from('affiliate_conversions')
-            .select('commission_fcfa, paid, created_at')
-            .eq('ref_code', refCode),
-
-          supabase.from('affiliates')
-            .select('name, created_at')
-            .eq('ref_code', refCode)
-            .single()
-        ]);
-
-        if (affiliateRes.error && affiliateRes.error.code !== 'PGRST116') {
+        if (!response.ok) {
           setError('Affilié introuvable ou problème de connexion.');
           setLoading(false);
           return;
         }
 
-        const conversions = conversionsRes.data || [];
-        const totalCommission = conversions.reduce((sum, c) => sum + (c.commission_fcfa || 0), 0);
-        const pendingPayout = conversions.filter(c => !c.paid).reduce((sum, c) => sum + (c.commission_fcfa || 0), 0);
-        const clicks = clicksRes.count || 0;
-        const conversionsCount = conversions.length;
-
-        setStats({
-          name: affiliateRes.data?.name || 'Affilié',
-          link: `https://webisafe.ci/?ref=${refCode}`,
-          clicks,
-          conversions: conversionsCount,
-          totalCommission,
-          pendingPayout,
-          conversionRate: clicks > 0 ? ((conversionsCount / clicks) * 100).toFixed(1) : 0,
-          since: affiliateRes.data?.created_at
-        });
+        setStats(payload.stats);
       } catch (err) {
         setError('Erreur lors du chargement des statistiques.');
       } finally {

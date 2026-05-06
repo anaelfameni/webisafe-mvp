@@ -358,15 +358,15 @@ export default function Protect() {
       <div className="max-w-4xl mx-auto mb-20">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-white mb-2">Webisafe surveille</h2>
-          <p className="text-white/50 text-sm">Données mises à jour en temps réel depuis nos serveurs de surveillance</p>
+          <p className="text-white/50 text-sm">Capacité de surveillance : 288 vérifications par jour et par site</p>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0 }}
-            className="col-span-3 bg-[#0C1627] border border-white/10 rounded-2xl p-6 text-center"
+            className="col-span-1 bg-[#0C1627] border border-white/10 rounded-2xl p-6 text-center"
           >
             <div className="flex items-center justify-center gap-3 sm:gap-6 flex-wrap">
               <div className="text-center">
@@ -375,46 +375,23 @@ export default function Protect() {
               </div>
               <p className="text-white/20 text-xl font-light">×</p>
               <div className="text-center">
-                <p className="text-2xl sm:text-3xl font-black text-primary">3</p>
-                <p className="text-white/40 text-[10px] uppercase tracking-wider">sites surveillés</p>
-              </div>
-              <p className="text-white/20 text-xl font-light">=</p>
-              <div className="text-center">
-                <p className="text-2xl sm:text-3xl font-black text-white">864</p>
-                <p className="text-white/40 text-[10px] uppercase tracking-wider">vérifications aujourd'hui</p>
+                <p className="text-2xl sm:text-3xl font-black text-primary">Votre site</p>
+                <p className="text-white/40 text-[10px] uppercase tracking-wider">dès souscription</p>
               </div>
             </div>
           </motion.div>
-
-          {[
-            { value: '14', label: 'alertes envoyées ce mois', color: 'text-warning' },
-            { value: '3h', label: 'Dernière alerte envoyée', color: 'text-primary' },
-          ].map((stat, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: (i + 1) * 0.1 }}
-              className="bg-[#0C1627] border border-white/10 rounded-2xl p-5 text-center"
-            >
-              <p className={`text-3xl font-black ${stat.color} mb-1`}>{stat.value}</p>
-              <p className="text-white/40 text-xs leading-tight">{stat.label}</p>
-            </motion.div>
-          ))}
         </div>
-        <p className="text-white/25 text-[11px] text-center mt-3">Données mises à jour toutes les 60 secondes depuis Supabase</p>
+        <p className="text-white/25 text-[11px] text-center mt-3">Surveillance active dès validation de votre abonnement</p>
       </div>
 
-      {/* ── Preuve sociale : fil d'activité anonymisé ── */}
+      {/* ── Exemples d'alertes que vous recevrez ── */}
       <div className="max-w-2xl mx-auto mb-20">
-        <h2 className="text-center text-lg font-bold text-white mb-6">Activité en temps réel</h2>
+        <h2 className="text-center text-lg font-bold text-white mb-6">Exemples d'alertes Protect</h2>
         <div className="bg-[#0C1627] border border-white/10 rounded-2xl p-5 space-y-4">
           {[
-            { time: 'il y a 23 min', event: 'Site down détecté', detail: 'Alerte envoyée en 4 min', color: '🔴' },
-            { time: 'il y a 2h', event: 'SSL expire dans 14 jours', detail: 'Rappel envoyé', color: '🟡' },
-            { time: 'il y a 3h', event: 'Scan mensuel complété', detail: 'Score 84/100', color: '🟢' },
-            { time: 'il y a 5h', event: 'Scan mensuel complété', detail: 'Score 71/100', color: '🟢' },
+            { time: 'Alerte type', event: 'Site down détecté', detail: 'Alerte envoyée en 4 min', color: '🔴' },
+            { time: 'Alerte type', event: 'SSL expire dans 14 jours', detail: 'Rappel envoyé', color: '🟡' },
+            { time: 'Alerte type', event: 'Scan mensuel complété', detail: 'Score 84/100', color: '🟢' },
           ].map((item, i) => (
             <div key={i} className="flex items-start gap-3 text-sm">
               <span className="text-xs mt-0.5">{item.color}</span>
@@ -427,20 +404,16 @@ export default function Protect() {
         </div>
       </div>
 
-      {/* ── Preuve sociale : template témoignage (prêt à remplir) ── */}
+      {/* ── Témoignages clients ── */}
       <div className="max-w-2xl mx-auto mb-20">
         <h2 className="text-center text-lg font-bold text-white mb-6">Ce que disent nos abonnés</h2>
-        <div className="bg-[#0C1627] border border-success/20 rounded-2xl p-6">
-          <p className="text-white/80 text-sm leading-relaxed italic mb-4">
-            "Mon site était down depuis 2h un dimanche soir. Webisafe m'a alerté avant mes clients. J'ai réglé le problème avant l'ouverture."
+        <div className="bg-[#0C1627] border border-white/10 rounded-2xl p-6 text-center">
+          <p className="text-white/50 text-sm">
+            Les premiers témoignages arrivent bientôt. Soyez parmi les premiers à partager votre expérience Protect.
           </p>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white font-semibold text-sm">Konan A.</p>
-              <p className="text-white/40 text-xs">Gérant · Boutique e-commerce · Abidjan</p>
-            </div>
-            <p className="text-warning text-sm tracking-widest">★★★★★</p>
-          </div>
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-block mt-4 text-primary text-sm font-semibold hover:underline">
+            Contactez-nous pour témoigner
+          </a>
         </div>
       </div>
 

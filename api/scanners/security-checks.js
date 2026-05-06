@@ -83,9 +83,9 @@ export async function checkSecurityHeaders(url) {
         } else {
             out.push({
                 check_name: 'header_csp',
-                status: 'fail',
-                score_impact: 15,
-                criticality: 'major',
+                status: 'warning',
+                score_impact: 6,
+                criticality: 'minor',
                 title: 'Content-Security-Policy manquant',
                 description: 'Sans CSP, votre site est plus vulnérable aux attaques XSS et à l\'injection de scripts tiers.',
                 recommendation: 'Ajouter Content-Security-Policy dans la configuration serveur ou via un meta tag HTML.',
@@ -129,11 +129,11 @@ export async function checkSecurityHeaders(url) {
         } else {
             out.push({
                 check_name: 'header_hsts',
-                status: 'fail',
-                score_impact: 12,
-                criticality: 'major',
+                status: 'warning',
+                score_impact: 5,
+                criticality: 'minor',
                 title: 'HSTS manquant',
-                description: 'Sans HSTS, un attaquant peut forcer vos visiteurs à utiliser HTTP non chiffré.',
+                description: 'Sans HSTS, un attaquant peut forcer vos visiteurs à utiliser HTTP non chiffré (downgrade attack rare en pratique avec HTTPS actif).',
                 recommendation: 'Ajouter : Strict-Transport-Security: max-age=31536000; includeSubDomains; preload',
                 technical_detail: 'Header absent',
                 difficulty: '⭐⭐ Intermédiaire',
@@ -159,9 +159,9 @@ export async function checkSecurityHeaders(url) {
         } else {
             out.push({
                 check_name: 'header_xframe',
-                status: 'fail',
-                score_impact: 10,
-                criticality: 'major',
+                status: 'warning',
+                score_impact: 4,
+                criticality: 'minor',
                 title: 'X-Frame-Options manquant ou permissif',
                 description: 'Sans ce header, votre site peut être inclus dans une iframe malveillante (clickjacking).',
                 recommendation: 'Ajouter X-Frame-Options: DENY pour bloquer le clickjacking.',
@@ -188,8 +188,8 @@ export async function checkSecurityHeaders(url) {
         } else {
             out.push({
                 check_name: 'header_xcontent',
-                status: 'fail',
-                score_impact: 8,
+                status: 'warning',
+                score_impact: 3,
                 criticality: 'minor',
                 title: 'X-Content-Type-Options manquant',
                 description: 'Le navigateur peut interpréter à tort certains fichiers comme du code exécutable.',
@@ -220,7 +220,7 @@ export async function checkSecurityHeaders(url) {
             out.push({
                 check_name: 'header_referrer',
                 status: 'warning',
-                score_impact: 5,
+                score_impact: 2,
                 criticality: 'minor',
                 title: 'Referrer-Policy absente ou permissive',
                 description: 'Les URLs internes (avec paramètres sensibles) peuvent fuiter vers les sites externes.',
@@ -249,7 +249,7 @@ export async function checkSecurityHeaders(url) {
             out.push({
                 check_name: 'header_permissions',
                 status: 'warning',
-                score_impact: 5,
+                score_impact: 2,
                 criticality: 'minor',
                 title: 'Permissions-Policy manquant',
                 description: 'Tout script tiers peut accéder à la caméra, micro, géolocalisation.',

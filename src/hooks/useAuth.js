@@ -1,17 +1,12 @@
 import { useEffect, useState } from 'react';
-import { buildAdminUser, isAdminCredentials } from '../utils/adminAuth.js';
+import { supabase } from '../lib/supabaseClient.js';
 
 const AUTH_KEY = 'webisafe_auth';
-const USERS_KEY = 'webisafe_users';
 const AUTH_EVENT = 'webisafe-auth-change';
 
-/**
- * État global partagé entre toutes les instances de useAuth().
- * Sans ça, chaque composant qui appelle useAuth() garde son propre user,
- * ce qui provoque le bug : compte créé mais autre composant encore "déconnecté".
- */
 let authUser = null;
 let authLoaded = false;
+let logoutInProgress = false;
 const listeners = new Set();
 
 function isBrowser() {
@@ -85,59 +80,109 @@ function setGlobalUser(user) {
   notifyAuthChanged();
 }
 
-const DEFAULT_USERS = [
-  {
-    id: 'client_user',
-    name: 'Client Test',
-    email: 'client@test.com',
-    password: '123client123',
-    createdAt: new Date().toISOString(),
-    plan: 'free',
-    scansToday: 0,
-    lastScanDate: null,
-  },
-];
-
-function seedDefaultUsers() {
+function clearBrowserAuthStorage() {
   if (!isBrowser()) return;
-  const users = getUsers();
-  let changed = false;
-  for (const defaultUser of DEFAULT_USERS) {
-    if (!users.some((u) => normalizeEmail(u.email) === normalizeEmail(defaultUser.email))) {
-      users.push(defaultUser);
-      changed = true;
+
+  localStorage.removeItem(AUTH_KEY);
+
+  for (const key of Object.keys(localStorage)) {
+    const lowerKey = key.toLowerCase();
+    if (
+      key.startsWith('sb-') ||
+      lowerKey.includes('supabase') ||
+      lowerKey.includes('gotrue')
+    ) {
+      localStorage.removeItem(key);
     }
   }
-  if (changed) saveUsers(users);
+
+  if (typeof sessionStorage !== 'undefined') {
+    for (const key of Object.keys(sessionStorage)) {
+      const lowerKey = key.toLowerCase();
+      if (
+        key.startsWith('sb-') ||
+        lowerKey.includes('supabase') ||
+        lowerKey.includes('gotrue')
+      ) {
+        sessionStorage.removeItem(key);
+      }
+    }
+  }
 }
 
-function getUsers() {
-  if (!isBrowser()) return [];
-  return safeParse(localStorage.getItem(USERS_KEY) || '[]', []);
-}
-
-function saveUsers(users) {
-  if (!isBrowser()) return;
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-function removePassword(user) {
+function buildSafeUserFromAuthUser(user, profile = null) {
   if (!user) return null;
-  const { password: _password, ...safeUser } = user;
+
+  const metadata = user.user_metadata || {};
+
+  return {
+    id: user.id,
+    name: profile?.name || metadata.name || metadata.full_name || user.email,
+    email: normalizeEmail(user.email),
+    phone: profile?.phone || metadata.phone || '',
+    phoneCountry: profile?.phone_country || metadata.phoneCountry || metadata.phone_country || '',
+    createdAt: user.created_at,
+    plan: profile?.plan || 'free',
+    scansToday: profile?.scans_today || 0,
+    lastScanDate: profile?.last_scan_date || null,
+    role: profile?.role || (normalizeEmail(user.email) === 'admin@test.com' ? 'admin' : 'user'),
+  };
+}
+
+async function getProfile(sessionToken = null) {
+  try {
+    let token = sessionToken;
+    if (!token) {
+      const { data } = await supabase.auth.getSession();
+      token = data?.session?.access_token;
+    }
+    const response = await fetch('/api/profile', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.profile || null;
+  } catch (error) {
+    console.error('[auth] profile fetch error:', error);
+    return null;
+  }
+}
+
+async function syncPublicUser(user, values = {}) {
+  try {
+    await getProfile();
+  } catch (error) {
+    console.error('[auth] public user sync error:', error);
+  }
+}
+
+async function loadSupabaseSession() {
+  const { data, error } = await supabase.auth.getSession();
+
+  if (logoutInProgress || error || !data?.session?.user) {
+    if (error) console.error('[auth] session error:', error);
+    setGlobalUser(null);
+    return null;
+  }
+
+  const profile = await getProfile(data?.session?.access_token);
+  const safeUser = buildSafeUserFromAuthUser(data.session.user, profile);
+  setGlobalUser(safeUser);
   return safeUser;
 }
 
 export function useAuth() {
-  seedDefaultUsers();
   ensureAuthLoaded();
 
   const [user, setUser] = useState(authUser);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!authLoaded);
 
   useEffect(() => {
     ensureAuthLoaded();
     setUser(authUser);
     setLoading(false);
+
+    loadSupabaseSession().finally(() => setLoading(false));
 
     const listener = (nextUser) => {
       setUser(nextUser);
@@ -158,6 +203,15 @@ export function useAuth() {
       }
     };
 
+    const { data: subscriptionData } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const profile = await getProfile(session.user.email);
+        setGlobalUser(buildSafeUserFromAuthUser(session.user, profile));
+      } else {
+        setGlobalUser(null);
+      }
+    });
+
     if (isBrowser()) {
       window.addEventListener(AUTH_EVENT, handleCustomAuthChange);
       window.addEventListener('storage', handleStorageChange);
@@ -165,6 +219,7 @@ export function useAuth() {
 
     return () => {
       listeners.delete(listener);
+      subscriptionData?.subscription?.unsubscribe();
 
       if (isBrowser()) {
         window.removeEventListener(AUTH_EVENT, handleCustomAuthChange);
@@ -173,7 +228,8 @@ export function useAuth() {
     };
   }, []);
 
-  const signup = (name, email, phone, password, phoneCountry) => {
+  const signup = async (name, email, phone, password, phoneCountry) => {
+    logoutInProgress = false;
     const cleanEmail = normalizeEmail(email);
 
     if (!name || !String(name).trim()) {
@@ -184,87 +240,139 @@ export function useAuth() {
       return { success: false, error: 'L’email est requis' };
     }
 
-    if (!password || String(password).length < 4) {
-      return { success: false, error: 'Le mot de passe doit contenir au moins 4 caractères' };
+    if (!password || String(password).length < 8) {
+      return { success: false, error: 'Le mot de passe doit contenir au moins 8 caractères' };
     }
 
-    const users = getUsers();
-
-    const emailAlreadyUsed = users.some(
-      (existingUser) => normalizeEmail(existingUser.email) === cleanEmail
-    );
-
-    if (emailAlreadyUsed) {
-      return { success: false, error: 'Cet email est déjà utilisé' };
-    }
-
-    const newUser = {
-      id: `user_${Date.now()}`,
-      name: String(name).trim(),
+    const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
-      phone,
-      phoneCountry,
       password,
-      createdAt: new Date().toISOString(),
+      options: {
+        data: {
+          name: String(name).trim(),
+          phone,
+          phoneCountry,
+          plan: 'free',
+        },
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message || 'Impossible de créer le compte.' };
+    }
+
+    const authUserData = data?.user;
+
+    if (!authUserData) {
+      return { success: false, error: 'Impossible de créer le compte.' };
+    }
+
+    await syncPublicUser(authUserData, { name: String(name).trim(), phone, phoneCountry });
+
+    const safeUser = buildSafeUserFromAuthUser(authUserData, {
+      name: String(name).trim(),
+      phone,
+      phone_country: phoneCountry,
       plan: 'free',
-      scansToday: 0,
-      lastScanDate: null,
-    };
+    });
 
-    users.push(newUser);
-    saveUsers(users);
-
-    const safeUser = removePassword(newUser);
-
-    /**
-     * Important :
-     * On connecte immédiatement l’utilisateur ET on synchronise toutes les instances du hook.
-     */
     setGlobalUser(safeUser);
 
     return { success: true, user: safeUser };
   };
 
-  const login = (email, password) => {
+  const login = async (email, password) => {
+    logoutInProgress = false;
     const cleanEmail = normalizeEmail(email);
 
-    if (isAdminCredentials(cleanEmail, password)) {
-      const adminUser = buildAdminUser();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    });
 
-      setGlobalUser(adminUser);
-
-      return {
-        success: true,
-        user: adminUser,
-        redirectTo: '/admin',
-      };
-    }
-
-    const users = getUsers();
-
-    const found = users.find(
-      (existingUser) =>
-        normalizeEmail(existingUser.email) === cleanEmail &&
-        existingUser.password === password
-    );
-
-    if (!found) {
+    if (error || !data?.user) {
       return { success: false, error: 'Email ou mot de passe incorrect' };
     }
 
-    const safeUser = removePassword(found);
-
-    /**
-     * Important :
-     * Connexion globale partagée dans toute l’application.
-     */
+    const profile = await getProfile(data?.session?.access_token);
+    const safeUser = buildSafeUserFromAuthUser(data.user, profile);
     setGlobalUser(safeUser);
 
-    return { success: true, user: safeUser };
+    return {
+      success: true,
+      user: safeUser,
+      redirectTo: safeUser.role === 'admin' ? '/admin' : '/dashboard',
+    };
   };
 
-  const logout = () => {
+  const logout = async () => {
+    logoutInProgress = true;
+    clearBrowserAuthStorage();
     setGlobalUser(null);
+
+    try {
+      void supabase.auth.signOut({ scope: 'local' }).catch(() => {}).finally(clearBrowserAuthStorage);
+    } catch {}
+  };
+
+  const changePassword = async (oldPassword, newPassword) => {
+    ensureAuthLoaded();
+
+    if (!authUser) {
+      return { success: false, error: 'Non connecté' };
+    }
+
+    if (!newPassword || String(newPassword).length < 8) {
+      return { success: false, error: 'Le nouveau mot de passe doit contenir au moins 8 caractères' };
+    }
+
+    if (!oldPassword) {
+      return { success: false, error: 'Ancien mot de passe requis' };
+    }
+
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: authUser.email,
+      password: oldPassword,
+    });
+
+    if (verifyError) {
+      return { success: false, error: 'Ancien mot de passe incorrect' };
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+    if (error) {
+      return { success: false, error: error.message || 'Erreur lors du changement de mot de passe.' };
+    }
+
+    return { success: true };
+  };
+
+  const resetPasswordByCode = async (code, newPassword) => {
+    if (!code) {
+      return { success: false, error: 'Lien de réinitialisation invalide ou expiré.' };
+    }
+
+    if (!newPassword || String(newPassword).length < 8) {
+      return { success: false, error: 'Le mot de passe doit contenir au moins 8 caractères' };
+    }
+
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (exchangeError) {
+      return { success: false, error: 'Lien invalide ou expiré.' };
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+
+    if (updateError) {
+      return { success: false, error: updateError.message || 'Erreur lors de la réinitialisation.' };
+    }
+
+    await supabase.auth.signOut();
+    setGlobalUser(null);
+
+    return { success: true };
   };
 
   const updateUser = (updates) => {
@@ -278,18 +386,6 @@ export function useAuth() {
     };
 
     setGlobalUser(updatedUser);
-
-    const users = getUsers();
-    const index = users.findIndex((existingUser) => existingUser.id === updatedUser.id);
-
-    if (index !== -1) {
-      users[index] = {
-        ...users[index],
-        ...updates,
-      };
-
-      saveUsers(users);
-    }
   };
 
   const canScan = () => {
@@ -327,6 +423,9 @@ export function useAuth() {
     login,
     logout,
     updateUser,
+    changePassword,
+    resetPasswordByCode,
+    resetPasswordByToken: resetPasswordByCode,
     canScan,
     recordScan,
     isAuthenticated: !!user,

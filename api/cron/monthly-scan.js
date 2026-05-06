@@ -1,16 +1,13 @@
 // Vercel Serverless Function — Scan mensuel Protect
 // Schedule: 0 0 1 * * (1er du mois à minuit)
 
+import { requireCronSecret } from '../_utils.js';
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const CRON_SECRET = process.env.CRON_SECRET;
 
 export default async function handler(req, res) {
-  // Sécurité : vérifier le secret ou la méthode GET depuis Vercel Cron
-  const secret = req.headers['x-cron-secret'] || req.query.secret;
-  if (secret !== CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (!requireCronSecret(req, res)) return;
 
   try {
     // Récupérer les abonnements actifs depuis Supabase
@@ -27,16 +24,19 @@ export default async function handler(req, res) {
     const results = [];
 
     for (const sub of subscriptions) {
-      if (!sub.url) continue;
+      const siteUrl = sub.site_url || sub.url;
+      const userEmail = sub.user_email || sub.email;
+      if (!siteUrl) continue;
       try {
-        const scanRes = await fetch(`${process.env.VERCEL_URL || 'https://webisafe.vercel.app'}/api/scan`, {
+        const appUrl = process.env.PUBLIC_APP_URL || process.env.VITE_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://webisafe.vercel.app');
+        const scanRes = await fetch(`${appUrl}/api/scan`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: sub.url, email: sub.email, source: 'cron_monthly' }),
+          body: JSON.stringify({ url: siteUrl, email: userEmail, source: 'cron_monthly' }),
         });
-        results.push({ url: sub.url, ok: scanRes.ok });
+        results.push({ url: siteUrl, ok: scanRes.ok });
       } catch (e) {
-        results.push({ url: sub.url, ok: false, error: e.message });
+        results.push({ url: siteUrl, ok: false, error: e.message });
       }
     }
 

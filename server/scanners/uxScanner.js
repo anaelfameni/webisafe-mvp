@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { detectProtectionPage } from '../utils/protectionDetection.js';
 
 const TIMEOUT_MS = 10_000;
 const SEVERITY_WEIGHT = { high: 3, medium: 2, low: 1 };
@@ -17,6 +18,30 @@ export async function scanUXMobile(url, _psKey) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const html = await response.text();
+    const protection = detectProtectionPage({
+      url,
+      finalUrl: response.url || url,
+      html,
+      headers: response.headers,
+    });
+
+    if (protection.detected) {
+      return {
+        score: null,
+        accessibility_score: null,
+        tap_targets_ok: null,
+        issues: [],
+        issues_count: 0,
+        critical_count: 0,
+        medium_count: 0,
+        low_count: 0,
+        grade: null,
+        partial: true,
+        partial_reason: 'protection_detected',
+        protection_detected: protection,
+      };
+    }
+
     const $ = cheerio.load(html);
 
     const analysis = deepUXAnalysis($, html, response.headers);
@@ -33,6 +58,7 @@ export async function scanUXMobile(url, _psKey) {
       low_count: analysis.low_count,
       grade: analysis.grade,
       partial: false,
+      protection_detected: null,
     };
   } catch (err) {
     console.error('[UX] scanUXMobile failed:', err.message);

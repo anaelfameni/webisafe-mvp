@@ -1,5 +1,6 @@
 // api/scan.js
 import { randomUUID, createHash } from 'crypto';
+import { promises as dns } from 'dns';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import { runAdvancedSecurityChecks } from './scanners/security-checks.js';
@@ -74,6 +75,89 @@ function applyScoreCap(score, failedChecks = []) {
     return Math.min(score, cap);
 }
 
+const REQUIRED_ADVANCED_CHECKS = ['waf', 'subdomains', 'security_txt', 'cors', 'supply_chain', 'email_advanced'];
+
+export function hasCompleteAdvancedSecurity(results) {
+    const sec = results?.metrics?.security ?? {};
+    const checks = [
+        ...(Array.isArray(sec.extended_checks) ? sec.extended_checks : []),
+        ...(Array.isArray(sec.advanced_checks) ? sec.advanced_checks : []),
+    ];
+    const names = new Set(checks.map(c => c?.check_name).filter(Boolean));
+    return REQUIRED_ADVANCED_CHECKS.every(name => names.has(name));
+}
+
+export function shouldUseCachedScan(cached, forceRefresh = false) {
+    if (forceRefresh) return false;
+    if (!cached?.results_json) return false;
+    return hasCompleteAdvancedSecurity(cached.results_json);
+}
+
+export function calibratePerformanceResult(perf) {
+    if (!perf || typeof perf !== 'object') return perf;
+    const score = Number.isFinite(Number(perf.score)) ? Number(perf.score) : null;
+    const lcp = Number(perf.lcp);
+    const fcp = Number(perf.fcp);
+    const isExtremeLabOutlier =
+        score != null &&
+        score < 30 &&
+        ((Number.isFinite(lcp) && lcp > 30000) || (Number.isFinite(fcp) && fcp > 10000));
+
+    if (!isExtremeLabOutlier) {
+        return {
+            ...perf,
+            measurement_confidence: perf.measurement_confidence ?? 'high',
+        };
+    }
+
+    return {
+        ...perf,
+        score: Math.max(score, 35),
+        partial: true,
+        partial_reason: 'pagespeed_extreme_lab_outlier',
+        measurement_confidence: 'medium',
+    };
+}
+
+export function combineSecurityScores({ legacyScore, advancedScore, extendedScore, https, malwareDetected }) {
+    const base = Number.isFinite(Number(legacyScore)) ? Number(legacyScore) : null;
+    if (base == null) return null;
+
+    // Les scanners avancés/étendus pénalisent les best practices (CSP, HSTS, security.txt...).
+    // Pour ne pas écraser un site HTTPS sain qui manque juste de best practices,
+    // on plancher l'impact négatif et on pondère majoritairement le legacyScore.
+    let blended = base;
+    if (Number.isFinite(Number(advancedScore))) {
+        // Plancher 50 sur l'advancedScore : un site HTTPS sans malware ne peut pas
+        // être noté comme "critique" juste parce qu'il manque des headers de best practice.
+        const flooredAdvanced = (https && malwareDetected !== true)
+            ? Math.max(Number(advancedScore), 50)
+            : Number(advancedScore);
+        blended = Math.round(blended * 0.85 + flooredAdvanced * 0.15);
+    }
+    if (Number.isFinite(Number(extendedScore))) {
+        const flooredExtended = (https && malwareDetected !== true)
+            ? Math.max(Number(extendedScore), 50)
+            : Number(extendedScore);
+        blended = Math.round(blended * 0.90 + flooredExtended * 0.10);
+    }
+
+    let score = Math.max(base, blended);
+    // Minimum garanti pour les sites HTTPS sains :
+    // HTTPS = chiffrement = pas de risque MITM. Pas de malware = pas de menace active.
+    // Un tel site mérite au minimum 70 (acceptable), même sans tous les headers best practice.
+    if (https && malwareDetected !== true) score = Math.max(score, 70);
+    return Math.min(score, 97);
+}
+
+function getScanConfidence({ perf, sec, seo, ux }) {
+    const partialCount = [perf, sec, seo, ux].filter(x => x?.partial).length;
+    if (perf?.partial_reason === 'pagespeed_extreme_lab_outlier') return 'medium';
+    if (partialCount >= 2) return 'low';
+    if (partialCount === 1) return 'medium';
+    return 'high';
+}
+
 const PRIVATE_IP_PATTERNS = [
   /^127\./,
   /^10\./,
@@ -84,6 +168,30 @@ const PRIVATE_IP_PATTERNS = [
   /^fc00:/i,
   /^fe80:/i,
 ];
+
+function isPrivateAddress(address) {
+    const value = String(address || '').toLowerCase();
+    return PRIVATE_IP_PATTERNS.some((re) => re.test(value));
+}
+
+async function assertPublicHostname(url) {
+    const hostname = new URL(url).hostname;
+
+    if (isPrivateAddress(hostname)) {
+        return { valid: false, error: 'Les adresses IP privées ne sont pas autorisées.' };
+    }
+
+    try {
+        const records = await dns.lookup(hostname, { all: true, verbatim: true });
+        if (records.some((record) => isPrivateAddress(record.address))) {
+            return { valid: false, error: 'Ce domaine pointe vers une adresse privée non autorisée.' };
+        }
+    } catch {
+        return { valid: false, error: 'Impossible de résoudre le domaine.' };
+    }
+
+    return { valid: true };
+}
 
 function validateUrl(input) {
     if (!input || typeof input !== 'string') {
@@ -100,10 +208,60 @@ function validateUrl(input) {
     if (hostname === 'localhost' || hostname.endsWith('.local')) {
         return { valid: false, error: 'Les URLs locales ne sont pas autorisées.' };
     }
-    if (PRIVATE_IP_PATTERNS.some((re) => re.test(hostname))) {
+    if (isPrivateAddress(hostname)) {
         return { valid: false, error: 'Les adresses IP privées ne sont pas autorisées.' };
     }
     return { valid: true, url: parsed.href };
+}
+
+export function buildAccessibilityProbeUrls(url) {
+    const urls = [];
+    try {
+        const parsed = new URL(url);
+        urls.push(parsed.href);
+        if (!parsed.hostname.startsWith('www.')) {
+            const wwwUrl = new URL(parsed.href);
+            wwwUrl.hostname = `www.${parsed.hostname}`;
+            urls.push(wwwUrl.href);
+        }
+    } catch {
+        urls.push(url);
+    }
+    return Array.from(new Set(urls));
+}
+
+async function probeUrlAccessible(url) {
+    const attempts = [
+        { method: 'HEAD', headers: BROWSER_HEADERS },
+        { method: 'GET', headers: BROWSER_HEADERS },
+    ];
+
+    let lastStatus = null;
+    for (const probeUrl of buildAccessibilityProbeUrls(url)) {
+        for (const attempt of attempts) {
+            try {
+                const response = await fetch(probeUrl, {
+                    ...attempt,
+                    signal: AbortSignal.timeout(8_000),
+                    redirect: 'follow',
+                });
+                lastStatus = response.status;
+                if (response.status < 500) {
+                    const finalUrl = response.url || probeUrl;
+                    const finalValidation = await assertPublicHostname(finalUrl);
+                    if (!finalValidation.valid) return { accessible: false, error: finalValidation.error };
+                    return { accessible: true, url: probeUrl, final_url: finalUrl };
+                }
+            } catch {
+            }
+        }
+    }
+
+    if (lastStatus >= 500) {
+        return { accessible: false, error: 'Site inaccessible (erreur serveur)' };
+    }
+
+    return { accessible: false, error: "Impossible de joindre le site. Vérifiez l'URL." };
 }
 
 // ── Cache Supabase ────────────────────────────────────────────────────────────
@@ -198,7 +356,7 @@ async function scanPerformance(url, apiKey) {
             .sort((a, b) => (b.savings_ms ?? 0) - (a.savings_ms ?? 0))
             .slice(0, 5);
 
-        return {
+        return calibratePerformanceResult({
             score: applyScoreCap(rawScore, failedChecks),
             raw_score: rawScore,
             lcp, cls, fcp, tbt,
@@ -207,7 +365,7 @@ async function scanPerformance(url, apiKey) {
             failed_checks: failedChecks,
             opportunities,
             partial: false,
-        };
+        });
     } catch (err) {
         console.warn('[PERF] PageSpeed échoué:', err.message);
         try {
@@ -406,18 +564,31 @@ async function scanSecurity(url, vtApiKey) {
         } catch (e) { console.warn('[SEC] VirusTotal:', e.message); }
     }
 
+    // ── Scoring rééquilibré ────────────────────────────────────────────────
+    // Fondamentaux (85 pts) : HTTPS + SSL + Malware = vraie sécurité utilisateur
+    // Bonus headers (15 pts) : best practice, pas critique
+    //
+    // Un site HTTPS sans malware mais sans headers OAW devrait être ~80/100 (acceptable),
+    // pas 35/100 (critique). Les headers manquants seront pénalisés une seule fois,
+    // dans runAdvancedSecurityChecks (pas en double ici).
     let rawScore = 0;
-    rawScore += isHttps ? 35 : 0;
-    rawScore += malwareDetected === false ? 35 : malwareDetected === null ? 20 : 0;
+    rawScore += isHttps ? 40 : 0;                    // HTTPS = chiffrement = fondamental
+    rawScore += isHttps ? 10 : 0;                    // SSL valide (implicite si HTTPS répond)
+    if (malwareDetected === false) rawScore += 35;   // Vérifié OK → max
+    else if (malwareDetected === null) rawScore += 30; // Non vérifié → quasi max (bénéfice du doute)
+    // malwareDetected === true → 0 (le cap se fera plus bas)
+
     const headerPoints = headersPresent.reduce((acc, h) => acc + (SECURITY_HEADERS[h]?.points ?? 0), 0);
     const maxHeaderPoints = Object.values(SECURITY_HEADERS).reduce((a, c) => a + c.points, 0);
-    rawScore += Math.round((headerPoints / maxHeaderPoints) * 30);
+    rawScore += Math.round((headerPoints / maxHeaderPoints) * 15); // bonus modeste
+
     rawScore = clamp(rawScore, 0, 100);
 
     const failedChecks = [];
     if (!isHttps) failedChecks.push('no_https');
     if (malwareDetected === true) failedChecks.push('malware_detected');
-    if (malwareDetected === null) failedChecks.push('malware_unknown');
+    if (malwareDetected === null && vtApiKey) failedChecks.push('malware_unknown');
+
     headersMissing.forEach(h => failedChecks.push(`missing_header_${h.header}`));
 
     // Pour le cap, on ne double-pénalise pas les headers manquants / malware_unknown
@@ -426,8 +597,13 @@ async function scanSecurity(url, vtApiKey) {
         f => f !== 'malware_unknown' && !f.startsWith('missing_header_')
     );
 
+    let cappedScore = applyScoreCap(rawScore, capFails);
+
+    // Faille critique réelle : malware avéré → score sévère
+    if (malwareDetected === true) cappedScore = Math.min(cappedScore, 25);
+
     return {
-        score: applyScoreCap(rawScore, capFails),
+        score: cappedScore,
         raw_score: rawScore,
         malware_detected: malwareDetected,
         https: isHttps,
@@ -786,7 +962,6 @@ function buildCriticalAlerts(sec, ux, perf) {
     }
     return alerts;
 }
-
 // ── Handler principal ─────────────────────────────────────────────────────────
 
 
@@ -797,7 +972,7 @@ export default async function handler(req, res) {
     if (req.method !== 'POST')
         return res.status(405).json({ success: false, error: 'Method Not Allowed' });
 
-    const rateLimit = checkRateLimit(req, 5, 60000);
+    const rateLimit = checkRateLimit(req, 10, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
         return res.status(429).json({ success: false, error: `Trop de scans. Réessayez dans ${rateLimit.retryAfter}s.`, type: 'RATE_LIMITED' });
     }
@@ -806,7 +981,6 @@ export default async function handler(req, res) {
     try { body = await readJsonBody(req); }
     catch { return res.status(400).json({ success: false, error: 'Corps de requête invalide' }); }
 
-    // Email optionnel — utilisé pour notifications et leads
     const email = body?.email && typeof body.email === 'string' && body.email.includes('@') && body.email.includes('.')
         ? body.email
         : null;
@@ -816,28 +990,24 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: validation.error, type: 'INVALID_URL' });
 
     const normalizedUrl = validation.url;
+    const forceRefresh = body?.force_refresh === true;
 
-    // ── Vérification accessibilité du site cible ──────────────────────────────
-    try {
-        const check = await fetch(normalizedUrl, {
-            method: 'HEAD',
-            signal: AbortSignal.timeout(8_000),
-            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
-            redirect: 'follow',
-        });
-        if (check.status >= 500)
-            return res.status(422).json({ success: false, error: 'Site inaccessible (erreur serveur)', type: 'SITE_UNREACHABLE' });
-    } catch {
-        return res.status(422).json({ success: false, error: "Impossible de joindre le site. Vérifiez l'URL.", type: 'SITE_UNREACHABLE' });
+    const dnsValidation = await assertPublicHostname(normalizedUrl);
+    if (!dnsValidation.valid) {
+        return res.status(400).json({ success: false, error: dnsValidation.error, type: 'INVALID_URL' });
     }
 
-    // ── Cache (désactivé) ─────────────────────────────────────────────────────
-    const cached = await readCache(normalizedUrl);
-    if (cached?.results_json) {
+    const accessibility = await probeUrlAccessible(normalizedUrl);
+    if (!accessibility.accessible) {
+        return res.status(422).json({ success: false, error: accessibility.error, type: 'SITE_UNREACHABLE' });
+    }
+
+    const scanUrl = accessibility.final_url || accessibility.url || normalizedUrl;
+    const cached = await readCache(scanUrl);
+    if (shouldUseCachedScan(cached, forceRefresh)) {
         return res.json({ ...cached.results_json, success: true, cached: true, scan_id: cached.id });
     }
 
-    // ── Clés API ──────────────────────────────────────────────────────────────
     const psKey = process.env.GOOGLE_PAGESPEED_KEY;
     const vtKey = process.env.VIRUSTOTAL_API_KEY ?? null;
 
@@ -846,20 +1016,19 @@ export default async function handler(req, res) {
 
     const scanId = randomUUID();
     const startMs = Date.now();
-    const domain = new URL(normalizedUrl).hostname;
+    const domain = new URL(scanUrl).hostname;
 
-    console.log(`[SCAN] Démarrage id=${scanId} url=${normalizedUrl}`);
+    console.log(`[SCAN] Démarrage id=${scanId} url=${scanUrl}`);
 
-    // ── Scan principal ────────────────────────────────────────────────────────
     try {
         const [perfResult, secResult, seoResult, uxResult, geoResult, advancedSecResult, extendedSecResult] = await Promise.allSettled([
-            scanPerformance(normalizedUrl, psKey),
-            scanSecurity(normalizedUrl, vtKey),
-            scanSEO(normalizedUrl),
-            scanUX(normalizedUrl),
+            scanPerformance(scanUrl, psKey),
+            scanSecurity(scanUrl, vtKey),
+            scanSEO(scanUrl),
+            scanUX(scanUrl),
             getServerLocation(domain),
-            runAdvancedSecurityChecks(normalizedUrl),
-            runExtendedSecurityChecks(normalizedUrl),
+            runAdvancedSecurityChecks(scanUrl),
+            runExtendedSecurityChecks(scanUrl),
         ]);
 
         const perf = perfResult.status === 'fulfilled' ? perfResult.value : null;
@@ -872,36 +1041,22 @@ export default async function handler(req, res) {
 
         if (perf) perf.server_location = geo;
 
-        // ── Fusion des checks avancés dans la sécurité ───────────────────────
         if (sec && advancedSec) {
+            sec.legacy_score = sec.legacy_score ?? sec.score;
             sec.advanced_checks = advancedSec.checks;
             sec.advanced_security_score = advancedSec.advanced_security_score;
             sec.advanced_counts = advancedSec.counts;
 
-            // Combine le score de sécurité existant avec le score avancé
-            // (moyenne pondérée : 60% legacy, 40% checks avancés)
-            if (typeof sec.score === 'number' && typeof advancedSec.advanced_security_score === 'number') {
-                const combined = Math.round(sec.score * 0.6 + advancedSec.advanced_security_score * 0.4);
-                sec.legacy_score = sec.score;
-                sec.score = Math.min(combined, 97);
-            }
-
-            // Ajoute les fails avancés à la liste failed_checks pour cohérence
             const advFails = advancedSec.checks
                 .filter((c) => c.status === 'fail' || c.status === 'warning')
                 .map((c) => c.check_name);
             sec.failed_checks = [...(sec.failed_checks || []), ...advFails];
         }
 
-        // ── Fusion des checks étendus dans la sécurité ───────────────────────
         if (sec && extendedSec) {
+            sec.legacy_score = sec.legacy_score ?? sec.score;
             sec.extended_checks = extendedSec.checks;
             sec.extended_security_score = extendedSec.score;
-
-            if (typeof sec.score === 'number' && typeof extendedSec.score === 'number') {
-                const combined = Math.round(sec.score * 0.8 + extendedSec.score * 0.2);
-                sec.score = Math.min(combined, 97);
-            }
 
             const extFails = extendedSec.checks
                 .filter((c) => c.status === 'fail' || c.status === 'warning')
@@ -909,9 +1064,14 @@ export default async function handler(req, res) {
             sec.failed_checks = [...(sec.failed_checks || []), ...extFails];
         }
 
-        // Floor sécurité : un site HTTPS sans malware ne devrait pas être sous 50
-        if (sec && sec.https && sec.malware_detected !== true) {
-            sec.score = Math.max(50, sec.score);
+        if (sec) {
+            sec.score = combineSecurityScores({
+                legacyScore: sec.legacy_score ?? sec.score,
+                advancedScore: sec.advanced_security_score,
+                extendedScore: sec.extended_security_score,
+                https: sec.https,
+                malwareDetected: sec.malware_detected,
+            }) ?? sec.score;
         }
 
         const scores = {
@@ -923,17 +1083,22 @@ export default async function handler(req, res) {
 
         const globalScore = calculateGlobalScore(scores.performance, scores.security, scores.seo, scores.ux);
         const scanDurationMs = Date.now() - startMs;
+        const scanConfidence = getScanConfidence({ perf, sec, seo, ux });
 
         console.log(`[SCAN] Scores: perf=${scores.performance} sec=${scores.security} seo=${scores.seo} ux=${scores.ux} global=${globalScore}`);
+
+        const tech = detectTechnology(seo?.html_snippet || '');
 
         const results = {
             success: true,
             scan_id: scanId,
-            url: normalizedUrl,
+            url: scanUrl,
+            requested_url: normalizedUrl,
             scanned_at: new Date().toISOString(),
             global_score: globalScore,
             grade: getGrade(globalScore),
             scores,
+            scan_confidence: scanConfidence,
             metrics: {
                 performance: perf ?? null,
                 security: sec ?? null,
@@ -949,23 +1114,24 @@ export default async function handler(req, res) {
                 extended: extendedSecResult.status === 'rejected' ? extendedSecResult.reason?.message : null,
             },
             scan_duration_ms: scanDurationMs,
-            // Résumé UI rapide
             summary: {
-                https_enabled: sec?.https ?? String(normalizedUrl || '').startsWith('https'),
+                https_enabled: sec?.https ?? String(scanUrl || '').startsWith('https'),
+            },
+            detected_technology: {
+                cms: tech.cms,
+                technologies: tech.technologies,
+                hosting_country: geo?.country || null,
+                hosting_isp: geo?.isp || null,
+                is_local_africa: geo?.is_local_africa ?? null,
             },
         };
 
         console.log(`[SCAN] security final_url=${sec?.final_url ?? 'N/A'} https=${sec?.https ?? 'N/A'}`);
 
-        // Log scan event for live stats (fire-and-forget)
-        logScanEvent(normalizedUrl, globalScore);
+        logScanEvent(scanUrl, globalScore);
+        await saveToDb(scanId, scanUrl, globalScore, results, email || null);
 
-        // ✅ FIX : userId passé en null (non déclaré dans ce handler)
-        await saveToDb(scanId, normalizedUrl, globalScore, results, email || null);
-
-        // ── MOAT : détection technologie + dataset analytics (fire-and-forget) ──
-        const tech = detectTechnology(seo?.html_snippet || '');
-        const geoInfo = await getServerLocation(domain);
+        const geoInfo = geo || await getServerLocation(domain);
         saveScanAnalytics(
             domain,
             geoInfo?.country_code || 'CI',
@@ -975,15 +1141,6 @@ export default async function handler(req, res) {
             sec?.https ?? null,
             perf?.lcp ?? null
         );
-
-        // Injecte la technologie détectée dans la réponse pour le frontend
-        results.detected_technology = {
-            cms: tech.cms,
-            technologies: tech.technologies,
-            hosting_country: geoInfo?.country || null,
-            hosting_isp: geoInfo?.isp || null,
-            is_local_africa: geoInfo?.is_local_africa ?? null,
-        };
 
         return res.json(results);
 

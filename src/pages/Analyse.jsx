@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ArrowLeft, Lock, MapPin, Wrench, X } from 'lucide-react';
+
 import LargeSiteDisclaimer from '../components/LargeSiteDisclaimer';
 
 import CriticalAlertsBanner from '../components/CriticalAlertsBanner';
@@ -13,15 +14,16 @@ import FreemiumGate from '../components/FreemiumGate';
 import HighlightedTechText from '../components/HighlightedTechText';
 import WaveCheckoutModal from '../components/WaveCheckoutModal';
 import AuthModal from '../components/AuthModal';
+import ScanInsightCards from '../components/ScanInsightCards';
 
 import { runFullAnalysis, filterWebisafeOnlyChecks } from '../utils/api';
+import { shouldForceFreshScan, stripFreshScanMarker } from '../utils/scanNavigation';
 import { useScans } from '../hooks/useScans';
 import { useAuth } from '../hooks/useAuth';
 import { normalizeURL, extractDomain } from '../utils/validators';
 import { sendNurtureEmail } from '../utils/emailApi';
 import { SUPPORT_PHONE } from '../config/brand';
 import { trackClarityEvent } from '../lib/clarity';
-import { supabase } from '../lib/supabaseClient';
 
 // ── Badge latence / CDN ───────────────────────────────────────────────────────
 const LatencyWarningBadge = ({ serverLocation }) => {
@@ -52,7 +54,7 @@ const LatencyWarningBadge = ({ serverLocation }) => {
 };
 
 // ── Composant erreur ──────────────────────────────────────────────────────────
-const ErrorState = ({ error }) => {
+const ErrorState = ({ error, onRetry }) => {
   const navigate = useNavigate();
 
   const ERROR_CONFIG = {
@@ -82,7 +84,7 @@ const ErrorState = ({ error }) => {
             ← Retour
           </button>
           <button
-            onClick={() => window.location.reload()}
+            onClick={onRetry}
             className="px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors"
           >
             {config.action}
@@ -178,13 +180,13 @@ function getSeoMetrics(scanData) {
     },
     {
       label: 'Sitemap',
-      value: seo.sitemap_present ? 'Trouvée' : 'Absente',
-      status: seo.sitemap_present ? 'pass' : 'fail',
+      value: seo.sitemap_present === true ? 'Trouvée' : seo.sitemap_present === false ? 'Absente' : 'Non vérifié',
+      status: seo.sitemap_present === true ? 'pass' : seo.sitemap_present === false ? 'fail' : 'unknown',
     },
     {
       label: 'Meta Tags',
-      value: seo.meta_tags_ok ? 'OK' : 'Incomplets',
-      status: seo.meta_tags_ok ? 'pass' : 'fail',
+      value: seo.meta_tags_ok === true ? 'OK' : seo.meta_tags_ok === false ? 'Incomplets' : 'Non vérifié',
+      status: seo.meta_tags_ok === true ? 'pass' : seo.meta_tags_ok === false ? 'fail' : 'unknown',
     },
     {
       label: 'H1',
@@ -193,8 +195,8 @@ function getSeoMetrics(scanData) {
     },
     {
       label: 'Open Graph',
-      value: seo.open_graph ? 'Présent' : 'Absent',
-      status: seo.open_graph ? 'pass' : 'fail',
+      value: seo.open_graph === true ? 'Présent' : seo.open_graph === false ? 'Absent' : 'Non vérifié',
+      status: seo.open_graph === true ? 'pass' : seo.open_graph === false ? 'fail' : 'unknown',
     },
   ];
 }
@@ -204,39 +206,36 @@ function getUxMetrics(scanData) {
   return [
     {
       label: 'Responsive',
-      value: ux.responsive ? 'Oui' : 'Non',
-      status: ux.responsive ? 'pass' : 'fail',
+      value: ux.responsive === true ? 'Oui' : ux.responsive === false ? 'Non' : 'Non mesuré',
+      status: ux.responsive === true ? 'pass' : ux.responsive === false ? 'fail' : 'unknown',
     },
     {
       label: 'Taille Texte',
       value: ux.taille_texte_px != null ? `${ux.taille_texte_px}px` : 'N/A',
-      status: ux.taille_texte_px >= 12 ? 'pass' : 'fail',
+      status: ux.taille_texte_px == null ? 'unknown' : ux.taille_texte_px >= 12 ? 'pass' : 'fail',
     },
     {
       label: 'Éléments Tactiles',
-      value: ux.elements_tactiles_ok ? 'Optimisés' : 'À améliorer',
-      status: ux.elements_tactiles_ok ? 'pass' : 'warn',
+      value: ux.elements_tactiles_ok === true ? 'Optimisés' : ux.elements_tactiles_ok === false ? 'À améliorer' : 'Non mesuré',
+      status: ux.elements_tactiles_ok === true ? 'pass' : ux.elements_tactiles_ok === false ? 'warn' : 'unknown',
     },
     {
       label: 'Score Vitesse Mobile',
       value: ux.vitesse_mobile != null ? `${ux.vitesse_mobile}/100` : 'N/A',
-      status: ux.vitesse_mobile >= 80 ? 'pass' : 'warn', 
+      status: ux.vitesse_mobile == null ? 'unknown' : ux.vitesse_mobile >= 80 ? 'pass' : 'warn',
     },
   ];
 }
 
 function buildImprovementSentence(recommendations) {
-  const improvements = (recommendations ?? [])
-    .map((rec) => rec?.action || rec?.title || rec?.titre)
-    .filter(Boolean)
-    .slice(0, 4);
+  const improvementCount = recommendations?.length ?? 0;
 
-  if (improvements.length === 0) return null;
+  if (improvementCount === 0) return null;
 
-  return `Améliorations à faire détectées : ${improvements.join(' ; ')} ; une fois appliquées, elles peuvent renforcer la confiance des visiteurs, améliorer la visibilité Google et augmenter les conversions.`;
+  return `${improvementCount} amélioration${improvementCount > 1 ? 's' : ''} à faire ${improvementCount > 1 ? 'ont' : 'a'} été détectée${improvementCount > 1 ? 's' : ''} par le scan ; une fois appliquée${improvementCount > 1 ? 's' : ''}, ${improvementCount > 1 ? 'elles peuvent' : 'elle peut'} renforcer la confiance des visiteurs, améliorer la visibilité Google et augmenter les conversions.`;
 }
 
-function buildFreeScanNarrative(globalScore, perfScore, secScore, seoScore, uxScore, criticalAlerts, recommendations) {
+function buildFreeScanNarrative(globalScore, perfScore, secScore, seoScore, uxScore, criticalAlerts, recommendations, scanConfidence, protectionDetected) {
   const g = globalScore ?? 0;
   const perf = perfScore ?? 0;
   const sec = secScore ?? 0;
@@ -248,7 +247,18 @@ function buildFreeScanNarrative(globalScore, perfScore, secScore, seoScore, uxSc
   const totalRecs = recommendations?.length ?? 0;
   const lines = [];
 
-  if (g >= 80) {
+  const partialCategories = [];
+  if (seoScore === null) partialCategories.push('SEO');
+  if (uxScore === null) partialCategories.push('expérience mobile');
+
+  if (globalScore === null || scanConfidence !== 'high') {
+    const partialNote = partialCategories.length > 0
+      ? ` Les mesures ${partialCategories.join(' et ')} n'ont pas pu être évaluées.`
+      : '';
+    lines.push(
+      `Ce scan est partiel car une protection anti-bot a été détectée sur le site.${partialNote} Les résultats disponibles ci-dessous doivent être interprétés avec prudence.`
+    );
+  } else if (g >= 80) {
     lines.push(
       `Avec un score global de ${g}/100, votre site présente une excellente base technique. Quelques optimisations ciblées permettraient d'atteindre l'excellence.`
     );
@@ -267,10 +277,10 @@ function buildFreeScanNarrative(globalScore, perfScore, secScore, seoScore, uxSc
   }
 
   const weakAreas = [];
-  if (perf > 0 && perf < 60) weakAreas.push(`performance ${perf}/100`);
-  if (sec > 0 && sec < 60) weakAreas.push(`sécurité ${sec}/100`);
-  if (seo > 0 && seo < 60) weakAreas.push(`SEO ${seo}/100`);
-  if (ux > 0 && ux < 60) weakAreas.push(`expérience mobile ${ux}/100`);
+  if (perfScore != null && perf > 0 && perf < 60) weakAreas.push(`performance ${perf}/100`);
+  if (secScore != null && sec > 0 && sec < 60) weakAreas.push(`sécurité ${sec}/100`);
+  if (seoScore != null && seo > 0 && seo < 60) weakAreas.push(`SEO ${seo}/100`);
+  if (uxScore != null && ux > 0 && ux < 60) weakAreas.push(`expérience mobile ${ux}/100`);
 
   if (weakAreas.length > 0) {
     const suffix =
@@ -278,7 +288,7 @@ function buildFreeScanNarrative(globalScore, perfScore, secScore, seoScore, uxSc
         ? ` ${totalRecs} correction${totalRecs > 1 ? 's' : ''} prioritaire${totalRecs > 1 ? 's' : ''} ont été identifiées.`
         : '';
     lines.push(`Points faibles détectés : ${weakAreas.join(', ')}.${suffix}`);
-  } else if (g < 80) {
+  } else if (globalScore != null && g < 80) {
     lines.push(
       `Les scores sont corrects dans l'ensemble, mais quelques optimisations permettraient d'améliorer votre classement Google et votre taux de conversion.`
     );
@@ -290,7 +300,7 @@ function buildFreeScanNarrative(globalScore, perfScore, secScore, seoScore, uxSc
         criticals.length > 1 ? 'nécessitent' : 'nécessite'
       } une correction urgente pour protéger vos visiteurs et votre réputation.`
     );
-  } else if (g >= 60) {
+  } else if (globalScore != null && g >= 60) {
     lines.push(
       `Aucune alerte critique détectée — votre site ne présente pas de danger immédiat pour vos visiteurs.`
     );
@@ -306,7 +316,8 @@ function buildFreeScanNarrative(globalScore, perfScore, secScore, seoScore, uxSc
 export default function Analyse() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { saveScan } = useScans();
+  const { saveScan, getScansByUrl } = useScans();
+  const consumedScanRequestRef = useRef(null);
 
   const { isAuthenticated, user, signup, login } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -332,12 +343,42 @@ export default function Analyse() {
 
   const displayData = useMemo(() => filterWebisafeOnlyChecks(scanData, isAdmin), [scanData, isAdmin]);
 
-  // Affiche FreemiumGate automatiquement après 3s si pas encore payé
+  const conclusionRef = useRef(null);
+  const freemiumTriggeredRef = useRef(false);
+
+  // Affiche FreemiumGate après scroll sur ScoreCards + conclusion OU 30s
   useEffect(() => {
-    if (scanState === 'results' && scanData && !isUnlocked && !hasPaid) {
-      const timer = setTimeout(() => setShowFreemiumGate(true), 3000);
-      return () => clearTimeout(timer);
+    if (scanState !== 'results' || !scanData || isUnlocked || hasPaid) return;
+
+    // Fallback 30s
+    const fallbackTimer = setTimeout(() => {
+      if (!freemiumTriggeredRef.current) {
+        freemiumTriggeredRef.current = true;
+        setShowFreemiumGate(true);
+      }
+    }, 30000);
+
+    // Scroll-based : déclenche quand la conclusion a été vue (après ScoreCards)
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !freemiumTriggeredRef.current) {
+            freemiumTriggeredRef.current = true;
+            setShowFreemiumGate(true);
+          }
+        });
+      },
+      { threshold: 0.3 }
+    );
+
+    if (conclusionRef.current) {
+      observer.observe(conclusionRef.current);
     }
+
+    return () => {
+      clearTimeout(fallbackTimer);
+      observer.disconnect();
+    };
   }, [scanState, scanData, isUnlocked, hasPaid]);
 
   // Pré-remplit l'email avec celui du compte connecté si disponible
@@ -347,7 +388,7 @@ export default function Analyse() {
     }
   }, [isAuthenticated, user]);
 
-  const performScan = useCallback(async () => {
+  const performScan = useCallback(async (force = false) => {
     trackClarityEvent('scan_initiated', url);
     if (!url) {
       setScanError({ type: 'INVALID_URL', error: 'Aucune URL spécifiée.' });
@@ -363,6 +404,25 @@ export default function Analyse() {
       return;
     }
 
+    // Vérifier le cache local avant de lancer un nouveau scan
+    if (!force) {
+      const cachedScans = getScansByUrl(url);
+      if (cachedScans.length > 0) {
+        const latest = cachedScans[cachedScans.length - 1];
+        const ageMs = Date.now() - new Date(latest.scanned_at || latest.savedAt).getTime();
+        const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
+
+        if (ageMs < MAX_AGE_MS && latest.scores?.global != null) {
+          setScanId(latest.id);
+          setScanData(latest);
+          setHasPaid(latest.paid || false);
+          setScanState('results');
+          trackClarityEvent('scan_restored_from_cache', url);
+          return;
+        }
+      }
+    }
+
     try {
       const data = await runFullAnalysis(url, ({ step }) => setCurrentStep(step), effectiveScanEmail);
 
@@ -375,16 +435,6 @@ export default function Analyse() {
       const scanPayload = { ...data, email: effectiveScanEmail, paid: false };
       const id = saveScan(scanPayload);
       const storedScan = { ...scanPayload, id };
-
-      try {
-        await supabase.from('scan_events').insert({
-          domain: extractDomain(url),
-          score: storedScan.scores?.global ?? storedScan.global_score ?? null,
-          country: storedScan.metrics?.performance?.server_location?.country ?? 'CI',
-          created_at: new Date().toISOString(),
-        });
-      } catch (_) {
-      }
 
       setScanId(id);
       setScanData(storedScan);
@@ -416,9 +466,21 @@ export default function Analyse() {
       });
       setScanState('error');
     }
-  }, [email, isAuthenticated, user, saveScan, url]);
+  }, [email, isAuthenticated, user, saveScan, url, getScansByUrl]);
 
-  useEffect(() => { performScan(); }, [performScan]);
+  useEffect(() => {
+    const scanRequestKey = `${url}|${email}`;
+    if (consumedScanRequestRef.current === scanRequestKey) return;
+
+    const forceFreshScan = shouldForceFreshScan(searchParams);
+    consumedScanRequestRef.current = scanRequestKey;
+
+    if (forceFreshScan) {
+      navigate(stripFreshScanMarker(searchParams), { replace: true });
+    }
+
+    performScan(forceFreshScan);
+  }, [email, navigate, performScan, searchParams, url]);
 
   // ── Handlers flux de paiement ─────────────────────────────────────────────
 
@@ -447,11 +509,11 @@ export default function Analyse() {
    * IMPORTANT : on ne retourne PAS de redirectTo ici,
    * ce qui empêche AuthModal de faire navigate() et de quitter la page.
    */
-  const handleAuthSuccess = useCallback((mode, formData) => {
+  const handleAuthSuccess = useCallback(async (mode, formData) => {
     let result;
 
     if (mode === 'signup') {
-      result = signup(
+      result = await signup(
         formData.name,
         formData.email,
         formData.phone,
@@ -459,7 +521,7 @@ export default function Analyse() {
         formData.phoneCountry,
       );
     } else {
-      result = login(formData.email, formData.password);
+      result = await login(formData.email, formData.password);
     }
 
     // Échec : on renvoie l'erreur à AuthModal qui l'affiche
@@ -508,6 +570,14 @@ export default function Analyse() {
     setShowFreemiumGate(false);
   }, [userEmail]);
 
+  const handleRetry = useCallback(() => {
+    setScanError(null);
+    setScanState('scanning');
+    setCurrentStep(0);
+    consumedScanRequestRef.current = null;
+    performScan(true);
+  }, [performScan]);
+
   const handleViewDetails = () => {
     if (hasPaid && scanId) {
       navigate(`/rapport/${scanId}`);
@@ -524,19 +594,17 @@ export default function Analyse() {
           error: 'Aucune URL spécifiée.',
           suggestion: "Retournez à l'accueil et entrez une URL à analyser.",
         }}
+        onRetry={handleRetry}
       />
     );
   }
 
   if (scanState === 'scanning') return <ScanProgress currentStep={currentStep} url={url} />;
-  if (scanState === 'error' || !scanData) return <ErrorState error={scanError} />;
+  if (scanState === 'error' || !scanData) return <ErrorState error={scanError} onRetry={handleRetry} />;
 
   // ── Valeurs sûres ─────────────────────────────────────────────────────────
-  const globalScore = Number.isFinite(Number(displayData.global_score))
-    ? Number(displayData.global_score)
-    : Number.isFinite(Number(displayData?.scores?.global))
-      ? Number(displayData.scores.global)
-      : 0;
+  const rawGlobal = displayData.global_score ?? displayData?.scores?.global ?? null;
+  const globalScore = rawGlobal != null && Number.isFinite(Number(rawGlobal)) ? Number(rawGlobal) : null;
 
   const performanceScore = displayData?.scores?.performance ?? null;
   const securityScore = displayData?.scores?.security ?? null;
@@ -548,6 +616,10 @@ export default function Analyse() {
     displayData.metrics?.performance?.server_location ??
     displayData.performance?.server_location ??
     null;
+
+  const scanConfidence = displayData.scan_confidence ?? 'high';
+  const protectionDetected = displayData.protection_detected ?? null;
+
   const conclusionText = buildFreeScanNarrative(
     globalScore,
     performanceScore,
@@ -555,19 +627,14 @@ export default function Analyse() {
     seoScore,
     uxScore,
     criticalAlerts,
-    displayData?.recommendations ?? []
+    displayData?.recommendations ?? [],
+    scanConfidence,
+    protectionDetected
   );
 
   return (
     <div className="min-h-screen pt-24 pb-32 px-4">
       <div className="max-w-5xl mx-auto">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-1 text-white hover:text-primary text-sm mb-4 transition-colors"
-        >
-          <ArrowLeft size={16} /> Retour à l'accueil
-        </button>
-
         <div className="mb-8">
           <p className="text-primary text-sm font-semibold uppercase tracking-[0.24em] mb-2">
             Rapport d'audit gratuit
@@ -575,6 +642,14 @@ export default function Analyse() {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">
             Analyse de {extractDomain(url)}
           </h1>
+          {scanConfidence !== 'high' && (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-yellow-500/10 border-yellow-500/30 text-yellow-200 text-xs font-medium">
+              <span aria-hidden="true">⚠️</span>
+              {scanConfidence === 'low'
+                ? 'Scan limité — protection anti-bot détectée'
+                : 'Analyse partielle — certains résultats indisponibles'}
+            </div>
+          )}
         </div>
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
           <PremiumScoreCard
@@ -599,7 +674,9 @@ export default function Analyse() {
         <LargeSiteDisclaimer url={normalizeURL(url)} score={globalScore} />
 
         <CriticalAlertsBanner alerts={criticalAlerts} />
-        
+
+        <ScanInsightCards scanData={displayData} url={url} score={globalScore} />
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
           <ScoreCard
             title="Performance"
@@ -640,8 +717,9 @@ export default function Analyse() {
         </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 18, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
+          ref={conclusionRef}
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.15, ease: 'easeOut' }}
           className="scan-conclusion-card relative overflow-hidden rounded-[28px] p-[1px] mb-12"
         >

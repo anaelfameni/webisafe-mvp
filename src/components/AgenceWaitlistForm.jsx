@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
 
 export default function AgenceWaitlistForm() {
   const [email, setEmail] = useState('');
@@ -10,14 +9,16 @@ export default function AgenceWaitlistForm() {
     if (!email) return;
     setStatus('loading');
 
-    const { error } = await supabase
-      .from('leads')
-      .upsert(
-        { email, source: 'agence_waitlist' },
-        { onConflict: 'email' }
-      );
-
-    setStatus(error ? 'error' : 'success');
+    try {
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, source: 'agence_waitlist' }),
+      });
+      setStatus(response.ok ? 'success' : 'error');
+    } catch {
+      setStatus('error');
+    }
   };
 
   if (status === 'success') {

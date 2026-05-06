@@ -1,24 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
-import { Resend } from 'resend'
+import { escapeHtml, requireCronSecret, sendResendEmail } from './_utils.js'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
-const resend = new Resend(process.env.RESEND_API_KEY)
 
 export default async function handler(req, res) {
   // Sécuriser l'endpoint — seul le cron peut l'appeler
-  const secret = req.headers['x-cron-secret']
-  if (secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Non autorisé' })
-  }
+  if (!requireCronSecret(req, res)) return;
 
   // 1. Récupérer tous les clients Protect actifs
   const { data: clients } = await supabase
-    .from('protect_clients')
+    .from('subscriptions')
     .select('*')
-    .eq('active', true)
+    .eq('status', 'active')
 
   if (!clients?.length) return res.json({ checked: 0 })
 
@@ -67,13 +63,12 @@ export default async function handler(req, res) {
           })
 
           // Envoyer alerte email
-          await resend.emails.send({
-            from: 'Webisafe Protect <onboarding@resend.dev>',
+          await sendResendEmail({
             to: client.user_email,
-            subject: `⚠️ ALERTE — ${client.name || client.url} est HORS LIGNE`,
+            subject: `⚠️ ALERTE — ${String(client.name || client.url).replace(/[\r\n]+/g, ' ')} est HORS LIGNE`,
             html: `
               <h2>Votre site est inaccessible</h2>
-              <p><strong>${client.url}</strong> ne répond plus.</p>
+              <p><strong>${escapeHtml(client.url)}</strong> ne répond plus.</p>
               <p>Détecté à : ${new Date().toLocaleString('fr-FR')}</p>
               <p>Nous continuons à surveiller et vous notifierons dès le retour en ligne.</p>
             `
@@ -98,10 +93,9 @@ export default async function handler(req, res) {
           }).eq('id', incident.id)
 
           // Email de retour en ligne
-          await resend.emails.send({
-            from: 'Webisafe Protect <onboarding@resend.dev>',
+          await sendResendEmail({
             to: client.user_email,
-            subject: `✅ ${client.name || client.url} est de nouveau en ligne`,
+            subject: `✅ ${String(client.name || client.url).replace(/[\r\n]+/g, ' ')} est de nouveau en ligne`,
             html: `
               <h2>Votre site est rétabli</h2>
               <p>Durée de l'incident : <strong>${durationMin} minutes</strong></p>

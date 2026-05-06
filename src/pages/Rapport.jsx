@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -25,6 +25,7 @@ import CriticalAlertsBanner from '../components/CriticalAlertsBanner';
 import PremiumScoreCard from '../components/PremiumScoreCard';
 import RecommendationCard from '../components/RecommendationCard';
 import HighlightedTechText from '../components/HighlightedTechText';
+import ScanInsightCards from '../components/ScanInsightCards';
 
 import { useAuth } from '../hooks/useAuth';
 import { useScans } from '../hooks/useScans';
@@ -107,14 +108,11 @@ function ServerLocationBox({ serverLocation }) {
 
 // ── Disclaimer grands sites ───────────────────────────────────────────────────
 function buildImprovementSentence(recommendations) {
-  const improvements = (recommendations ?? [])
-    .map((rec) => rec?.action || rec?.title || rec?.titre)
-    .filter(Boolean)
-    .slice(0, 4);
+  const improvementCount = recommendations?.length ?? 0;
 
-  if (improvements.length === 0) return null;
+  if (improvementCount === 0) return null;
 
-  return `Améliorations à faire détectées : ${improvements.join(' ; ')} ; leur correction peut renforcer la confiance, fluidifier l'expérience utilisateur et transformer davantage de visiteurs en prospects ou clients.`;
+  return `${improvementCount} amélioration${improvementCount > 1 ? 's' : ''} à faire ${improvementCount > 1 ? 'ont' : 'a'} été détectée${improvementCount > 1 ? 's' : ''} par le scan ; ${improvementCount > 1 ? 'leur correction peut' : 'sa correction peut'} renforcer la confiance, fluidifier l'expérience utilisateur et transformer davantage de visiteurs en prospects ou clients.`;
 }
 
 function buildSmartNarrative(norm) {
@@ -246,6 +244,12 @@ function normalizeScan(scan) {
     secM?.advanced_security_score ??
     scan.security?.extended_security_score ??
     scan.security?.advanced_security_score ??
+    (extendedChecks.length > 0
+      ? Math.max(0, 100 - extendedChecks
+        .filter(c => c.status === 'fail')
+        .reduce((sum, c) => sum + (Number(c.score_impact) || 0), 0))
+      : null) ??
+    scores.security ??
     null;
 
   const criticalAlerts = Array.isArray(scan.critical_alerts) ? scan.critical_alerts : [];
@@ -631,6 +635,14 @@ export default function Rapport() {
             badgeLiftMobile={true}
           />
 
+          <div className="mt-6">
+            <ScanInsightCards
+              scanData={norm ?? scan}
+              url={scan.url}
+              score={norm?.scores?.global ?? scan?.scores?.global ?? scan?.global_score ?? 0}
+            />
+          </div>
+
           {/* Badges (critical alerts, server location, ...) placed here */}
           {norm?.criticalAlerts && norm.criticalAlerts.length > 0 && (
             <div className="mt-4">
@@ -702,7 +714,14 @@ export default function Rapport() {
                 ))}
               </div>
 
-              <div className="pt-2 flex justify-center">
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Link
+                  to="/corrections"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-full font-medium transition-all"
+                >
+                  <Wrench size={16} />
+                  Voir les packs de correction
+                </Link>
                 <a
                   href={`https://wa.me/${REPORT_FIX_WHATSAPP}?text=${encodeURIComponent(
                     `Bonjour, j'ai reçu mon rapport pour ${scan.url} et je voudrais corriger les failles.`
@@ -870,9 +889,9 @@ export default function Rapport() {
               label="WAF détecté"
               value={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'waf');
-                if (!c) return 'N/A';
+                if (!c) return 'Check non exécuté';
                 if (c.status === 'error') return 'Indisponible';
-                return c.title ?? 'N/A';
+                return c.title ?? 'Résultat disponible';
               })()}
               status={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'waf');
@@ -886,9 +905,9 @@ export default function Rapport() {
               label="Sous-domaines découverts"
               value={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'subdomains');
-                if (!c) return 'N/A';
+                if (!c) return 'Check non exécuté';
                 if (c.status === 'error') return 'Indisponible';
-                return c.data?.total ?? 'N/A';
+                return c.data?.total ?? 0;
               })()}
               status={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'subdomains');
@@ -902,9 +921,9 @@ export default function Rapport() {
               label="security.txt"
               value={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'security_txt');
-                if (!c) return 'N/A';
+                if (!c) return 'Check non exécuté';
                 if (c.status === 'error') return 'Indisponible';
-                return c.title ?? 'N/A';
+                return c.title ?? 'Résultat disponible';
               })()}
               status={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'security_txt');
@@ -918,9 +937,9 @@ export default function Rapport() {
               label="CORS"
               value={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'cors');
-                if (!c) return 'N/A';
+                if (!c) return 'Check non exécuté';
                 if (c.status === 'error') return 'Indisponible';
-                return c.title ?? 'N/A';
+                return c.title ?? 'Résultat disponible';
               })()}
               status={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'cors');
@@ -934,9 +953,9 @@ export default function Rapport() {
               label="Supply Chain"
               value={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'supply_chain');
-                if (!c) return 'N/A';
+                if (!c) return 'Check non exécuté';
                 if (c.status === 'error') return 'Indisponible';
-                return c.title ?? 'N/A';
+                return c.title ?? 'Résultat disponible';
               })()}
               status={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'supply_chain');
@@ -950,9 +969,9 @@ export default function Rapport() {
               label="Email avancé (SPF/DMARC/DKIM)"
               value={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'email_advanced');
-                if (!c) return 'N/A';
+                if (!c) return 'Check non exécuté';
                 if (c.status === 'error') return 'Indisponible';
-                return c.title ?? 'N/A';
+                return c.title ?? 'Résultat disponible';
               })()}
               status={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'email_advanced');
@@ -1206,6 +1225,13 @@ export default function Rapport() {
             Notre équipe peut vous accompagner dans la mise en œuvre des corrections.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              to={`/corrections?url=${encodeURIComponent(scan.url || '')}`}
+              className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-full font-medium text-sm transition-all"
+            >
+              <Wrench size={16} />
+              Voir les packs de correction
+            </Link>
             <a
               href={`https://wa.me/${REPORT_FIX_WHATSAPP}?text=${encodeURIComponent(
                 `Bonjour, j'ai reçu mon rapport pour ${scan.url} et je voudrais corriger les failles.`
@@ -1217,13 +1243,6 @@ export default function Rapport() {
               <MessageCircle size={16} />
               Contacter Webisafe pour corriger
             </a>
-            <Link
-              to={`/corrections?url=${encodeURIComponent(scan.url || '')}`}
-              className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-full font-medium text-sm transition-all"
-            >
-              <Wrench size={16} />
-              Voir les packs de correction
-            </Link>
             <Link
               to="/contact"
               className="flex items-center gap-2 px-6 py-3 bg-card-bg border border-border-color hover:border-primary/50 text-text-primary rounded-full text-sm transition-all"

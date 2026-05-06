@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { setCorsHeaders, checkRateLimit, json } from './_utils.js'
+import { setCorsHeaders, checkRateLimit, json, escapeHtml } from './_utils.js'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const SUPABASE_URL =
@@ -91,15 +91,15 @@ export default async function handler(req, res) {
       const { error } = await resend.emails.send({
         from: FROM_EMAIL,
         to: ADMIN_EMAIL,
-        reply_to: email,
-        subject: `📩 Nouveau message de ${name} — ${subject || 'sans objet'}`,
+        reply_to: trimmedEmail,
+        subject: `📩 Nouveau message de ${trimmedName.replace(/[\r\n]+/g, ' ')} — ${(trimmedSubject || 'sans objet').replace(/[\r\n]+/g, ' ')}`,
         html: `
           <h2>Nouveau message via Webisafe</h2>
-          <p><strong>Nom :</strong> ${name}</p>
-          <p><strong>Email :</strong> <a href="mailto:${email}">${email}</a></p>
-          <p><strong>Sujet :</strong> ${subject || '—'}</p>
+          <p><strong>Nom :</strong> ${escapeHtml(trimmedName)}</p>
+          <p><strong>Email :</strong> <a href="mailto:${escapeHtml(trimmedEmail)}">${escapeHtml(trimmedEmail)}</a></p>
+          <p><strong>Sujet :</strong> ${escapeHtml(trimmedSubject || '—')}</p>
           <hr/>
-          <p>${String(message).replace(/\n/g, '<br/>')}</p>
+          <p>${escapeHtml(trimmedMessage).replace(/\n/g, '<br/>')}</p>
         `,
       })
       if (error) {
@@ -114,10 +114,10 @@ export default async function handler(req, res) {
     try {
       const { error } = await resend.emails.send({
         from: FROM_EMAIL,
-        to: email,
+        to: trimmedEmail,
         subject: 'Votre message a bien été reçu',
         html: `
-          <h2>Bonjour ${name},</h2>
+          <h2>Bonjour ${escapeHtml(trimmedName)},</h2>
           <p>Nous avons bien reçu votre message et vous répondrons dans les 24h.</p>
           <p style="color:#888">— L'équipe Webisafe</p>
         `,

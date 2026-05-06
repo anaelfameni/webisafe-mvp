@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { json, readJsonBody, sendResendEmail, setCorsHeaders } from './_utils.js';
+import { json, readJsonBody, sendResendEmail, setCorsHeaders, escapeHtml } from './_utils.js';
 
 const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
   ? createClient(
@@ -88,8 +88,8 @@ export default async function handler(req, res) {
   try {
     await sendResendEmail({
       to: 'admin@webisafe.ci',
-      subject: `🆕 Nouveau Protect Basic — ${user_email}`,
-      html: `<p><strong>Nouveau Protect Basic</strong></p><p>User : ${user_email}</p><p>Site : ${site_url}</p><p>Montant : ${PROTECT_BASIC_PRICE.toLocaleString('fr-FR')} FCFA/mois</p><p>Wave : ${wave_phone || 'N/A'}</p><p>Code : ${payment_code || 'N/A'}</p>`,
+      subject: `🆕 Nouveau Protect Basic — ${String(user_email).replace(/[\r\n]+/g, ' ')}`,
+      html: `<p><strong>Nouveau Protect Basic</strong></p><p>User : ${escapeHtml(user_email)}</p><p>Site : ${escapeHtml(site_url)}</p><p>Montant : ${PROTECT_BASIC_PRICE.toLocaleString('fr-FR')} FCFA/mois</p><p>Wave : ${escapeHtml(wave_phone || 'N/A')}</p><p>Code : ${escapeHtml(payment_code || 'N/A')}</p>`,
     });
   } catch { /* non-bloquant */ }
 

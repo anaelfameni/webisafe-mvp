@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabaseClient' // ton import existant
 
 function readLocalScanEvents() {
   try {
@@ -30,53 +29,41 @@ export function useLiveStats() {
   useEffect(() => {
     // 1. Chargement initial
     async function fetchInitial() {
-      // Compteur total
-      const { count } = await supabase
-        .from('scan_events')
-        .select('*', { count: 'exact', head: true })
+      try {
+        const response = await fetch('/api/stats')
+        const payload = response.ok ? await response.json() : null
+        const localActivity = readLocalScanEvents()
+        const remoteActivity = Array.isArray(payload?.recent_scans)
+          ? payload.recent_scans.map((scan) => ({
+              domain: scan.domain,
+              score: scan.score,
+              country: scan.country || 'CI',
+              created_at: scan.scanned_at || scan.created_at,
+            }))
+          : []
+        const mergedActivity = [...remoteActivity, ...localActivity]
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          .slice(0, 10)
 
-      // 10 derniers scans
-      const { data } = await supabase
-        .from('scan_events')
-        .select('domain, score, country, created_at')
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      const localActivity = readLocalScanEvents()
-      const remoteActivity = Array.isArray(data) ? data : []
-      const mergedActivity = [...remoteActivity, ...localActivity]
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-        .slice(0, 10)
-
-      setTotalScans(Math.max(count || 0, localActivity.length))
-      setActivity(mergedActivity)
-
-      setLoading(false)
+        setTotalScans(Math.max(payload?.stats?.total_scans || 0, localActivity.length))
+        setActivity(mergedActivity)
+      } catch {
+        const localActivity = readLocalScanEvents()
+        setTotalScans(localActivity.length)
+        setActivity(localActivity)
+      } finally {
+        setLoading(false)
+      }
     }
 
     fetchInitial()
 
-    // 2. Subscription Realtime — écoute les nouveaux scans
-    const channel = supabase
-      .channel('scan_events_live')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'scan_events' },
-        (payload) => {
-          const newScan = payload.new
-
-          // Mettre à jour le compteur
-          setTotalScans(prev => (prev || 0) + 1)
-
-          // Ajouter en tête du feed, garder max 10
-          setActivity(prev => [newScan, ...prev].slice(0, 10))
-        }
-      )
-      .subscribe()
+    // 2. Rafraîchissement périodique des derniers scans publics
+    const channel = window.setInterval(fetchInitial, 30000)
 
     // Cleanup à la destruction du composant
     return () => {
-      supabase.removeChannel(channel)
+      window.clearInterval(channel)
     }
   }, [])
 

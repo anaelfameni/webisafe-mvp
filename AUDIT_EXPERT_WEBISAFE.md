@@ -321,13 +321,266 @@ Les corrections suivantes ont été appliquées au codebase :
 
 ---
 
+## 6.6. Revue critique vérifiée — 6 mai 2026
+
+Cette section corrige le statut réel du projet après relecture des services critiques : authentification, stockage des scans, paiements, emails, Supabase, API backend, cron Vercel et exécution des commandes de vérification.
+
+### Statut vérifié
+
+| Élément | Résultat | Impact MVP |
+|---------|----------|------------|
+| **Build production** | `npm run build` passe avec succès | Déployable techniquement |
+| **Tests** | `npm test` échoue : **25 fichiers failed / 32**, seulement **7 passed** | Non acceptable pour CI/CD |
+| **Bundle** | `vendor` ≈ **2 479 kB minifié / 793 kB gzip** | Risque performance mobile |
+| **Backend scan** | `/api/scan` a validation URL, cache 24h, rate limit 5/min et fallbacks | Base solide |
+| **Paiement premium** | Validation paiement encore faite côté client via Supabase REST | Bloquant commercial |
+| **Emails** | Resend encore appelé depuis le frontend avec `VITE_RESEND_API_KEY` | Bloquant sécurité |
+| **Protect / crons** | Mismatch de colonnes et protection cron incompatible avec Vercel Cron par défaut | Protect non fiable |
+
+### Verdict MVP
+
+**Webisafe est vendable uniquement en bêta privée encadrée**, avec validation manuelle stricte par l'équipe.
+
+Il n'est **pas encore prêt pour un lancement self-service payant** ou une campagne marketing large, car plusieurs flux qui débloquent la valeur payante reposent encore sur des contrôles côté client ou sur des hypothèses Supabase/RLS non garanties dans le dépôt.
+
+### P0 — Blocages à corriger avant vente publique
+
+#### 1. Auth admin/test encore hardcodée dans le bundle
+**Fichiers :**
+- `src/utils/adminAuth.js:1-4`
+- `src/hooks/useAuth.js:1-2`
+- `src/hooks/useAuth.js:136-139`
+- `src/hooks/useAuth.js:181-187`
+
+`adminAuth.js` contient encore :
+- `admin@test.com`
+- `123admin123`
+- `client@test.com`
+- `123client123`
+
+Même si Supabase Auth est utilisé, le hook garde un fallback local pour les utilisateurs `admin_user` et `client_user`. Ce point contredit la section "corrections implémentées" précédente.
+
+**Risque :** accès admin possible via inspection du bundle ou reproduction du flux local.
+
+**Action :**
+- Supprimer `adminAuth.js` du runtime production.
+- Supprimer `isLocalTestUser`.
+- Autoriser l'admin uniquement via Supabase Auth + table `users/profiles.role = admin`.
+- Refuser toute route admin si aucun JWT Supabase valide n'est présent.
+
+#### 2. Validation paiement premium encore côté client
+**Fichiers :**
+- `src/pages/Admin.jsx:140-145`
+- `src/utils/paymentApi.js:74-82`
+- `src/utils/paymentApi.js:103-117`
+- `api/confirm-payment.js`
+- `api/reject-payment.js`
+
+Le panel admin valide un paiement avec :
+- `updatePaymentRequest(...)`
+- `markScanPaid(...)`
+
+Ces fonctions écrivent directement dans Supabase via `supabaseRest.js` et la clé anon. Les endpoints `/api/confirm-payment` et `/api/reject-payment` envoient surtout des emails ; ils ne sécurisent pas la mutation métier.
+
+**Risque :**
+- Un utilisateur peut potentiellement modifier `payment_requests` ou `scans.paid` si les policies Supabase sont permissives.
+- Le déblocage du rapport premium dépend d'un état modifiable côté client.
+
+**Action :**
+- Déplacer toute validation/rejet paiement dans `/api/confirm-payment` et `/api/reject-payment`.
+- Ajouter `requireAdmin(req, res)` sur ces endpoints.
+- Faire les updates `payment_requests.status` et `scans.paid` côté serveur avec `SUPABASE_SERVICE_ROLE_KEY`.
+- Retirer `markScanPaid` et `updatePaymentRequest` du frontend admin.
+
+#### 3. Clé Resend exposable côté client
+**Fichiers :**
+- `src/utils/emailApi.js:1`
+- `src/utils/emailApi.js:34-45`
+- `src/utils/emailApi.js:85-96`
+- `src/utils/emailApi.js:137-149`
+- `src/lib/envValidation.js:7-17`
+- `api/_utils.js:116`
+
+`emailApi.js` appelle directement `https://api.resend.com/emails` depuis le navigateur avec `VITE_RESEND_API_KEY`.
+
+**Risque :**
+- Une clé `VITE_` est intégrée au bundle public.
+- N'importe qui peut réutiliser la clé pour envoyer des emails au nom de Webisafe.
+- Risque de blacklist domaine, abus de quota et réputation email dégradée.
+
+**Action :**
+- Supprimer `VITE_RESEND_API_KEY` du frontend.
+- Remplacer `sendNurtureEmail`, `sendProtectReceiptEmail`, `sendAlertFollowUpEmail` par des endpoints `/api/send-*`.
+- Dans `api/_utils.js`, ne jamais fallback sur `process.env.VITE_RESEND_API_KEY`.
+
+#### 4. RLS Supabase non démontrée pour les tables les plus sensibles
+**Fichiers :**
+- `src/utils/supabaseRest.js`
+- `supabase/scan_events.sql`
+- `supabase/auth_users_profile_sync.sql`
+
+Le dépôt contient des SQL pour `scan_events`, `scan_analytics`, `contact_messages` et `users`, mais aucun fichier RLS vérifié pour :
+- `scans`
+- `payment_requests`
+- `subscriptions`
+- `scan_history`
+- `correction_requests`
+- `affiliates`
+- `protect_clients`
+- `uptime_logs`
+- `incidents`
+- `alerts`
+
+`supabaseRest.js` utilise la clé anon comme `Authorization: Bearer <anon key>` pour lire/upsert côté client. Sans RLS stricte, les données clients et paiements sont exposées.
+
+**Action :**
+- Créer un fichier SQL par table critique avec RLS.
+- Interdire aux rôles `anon/authenticated` toute écriture directe sur `payment_requests.status`, `scans.paid`, `subscriptions.status`.
+- Autoriser chaque utilisateur à lire uniquement ses propres scans/paiements.
+- Limiter `scan_events` à un dataset réellement anonymisé ou désactiver Realtime public.
+
+#### 5. Endpoints user sans vérification d'appartenance
+**Fichiers :**
+- `api/history/[user_id].js`
+- `api/uptime/[user_id].js`
+- `api/badge/[site_url].js`
+
+Ces endpoints acceptent `user_id` ou `site_url` depuis l'URL et lisent les données via service key/anon côté serveur, sans vérifier que le JWT correspond au propriétaire.
+
+**Risque :**
+- Énumération d'historiques par `user_id`.
+- Fuite de sites clients Protect.
+- Badge public acceptable uniquement si conçu comme public et documenté.
+
+**Action :**
+- Ajouter `Authorization: Bearer <JWT>` côté client.
+- Vérifier `supabase.auth.getUser(token)` côté serveur.
+- Comparer `user.id` au `user_id` demandé, sauf endpoint explicitement public.
+
+#### 6. Webisafe Protect : crons et colonnes incohérents
+**Fichiers :**
+- `api/subscribe.js`
+- `api/cron/monthly-scan.js`
+- `api/cron/uptime-check.js`
+- `api/cron/alert-followup.js`
+- `api/monitor-check.js`
+- `vercel.json`
+
+`subscribe.js` insère les colonnes `site_url` et `user_email`, mais `monthly-scan.js` et `uptime-check.js` lisent `sub.url` et `sub.email`. Résultat probable : les crons parcourent les abonnements actifs mais ignorent tous les sites.
+
+Les crons `monthly-scan.js` et `uptime-check.js` exigent `x-cron-secret` ou `?secret=...`. Or les Vercel Crons configurés dans `vercel.json` appellent simplement l'URL planifiée ; ils n'ajoutent pas ce header custom par défaut. `monitor-check.js` exige aussi `x-cron-secret` et utilise une autre table (`protect_clients`) que le flux d'abonnement (`subscriptions`).
+
+**Risque :**
+- Webisafe Protect vendu mais scan mensuel/uptime non exécuté.
+- Multiplication de deux systèmes de monitoring concurrents : `subscriptions` vs `protect_clients`.
+
+**Action :**
+- Choisir un seul modèle : `subscriptions`.
+- Corriger les champs en `site_url` et `user_email`.
+- Adapter l'auth cron à Vercel : secret dans l'URL cron, endpoint proxy, ou vérification compatible avec l'environnement Vercel.
+- Supprimer ou réconcilier `monitor-check.js`.
+
+#### 7. SSRF partiellement traité mais pas complet
+**Fichier :** `api/scan.js`
+
+La validation bloque `localhost`, `.local` et les IP privées en entrée directe. C'est bien, mais elle ne résout pas les DNS avant fetch.
+
+**Risque :**
+- Domaine public pointant vers une IP privée.
+- DNS rebinding.
+- Accès indirect à des ressources internes depuis la fonction serverless.
+
+**Action :**
+- Résoudre A/AAAA avant chaque fetch serveur.
+- Bloquer les plages privées/link-local après résolution.
+- Revalider après redirection.
+
+#### 8. Injection HTML dans emails transactionnels
+**Fichiers :**
+- `api/contact.js`
+- `api/correction-request.js`
+- `api/reject-subscription.js`
+- `src/utils/emailApi.js`
+
+Plusieurs emails interpolent directement `name`, `email`, `url`, `message`, `rejection_reason` dans du HTML.
+
+**Risque :**
+- Injection HTML dans l'email admin/client.
+- Phishing ou liens trompeurs dans les boîtes email.
+
+**Action :**
+- Ajouter un helper `escapeHtml`.
+- Échapper toutes les valeurs utilisateur avant interpolation HTML.
+- Valider `url`, `email`, `phone`, `pack` avec Zod.
+
+### P1 — Fiabilité et qualité à traiter immédiatement après les P0
+
+#### Tests non exploitables
+`npm test` échoue actuellement :
+- **25 fichiers failed**
+- **7 fichiers passed**
+- **21 tests passed**
+
+Exemples vérifiés :
+- `src/utils/scanConclusion.test.js` importe `./scanConclusion.js`, fichier absent.
+- `src/utils/textEncoding.test.js` ne contient aucune suite de test.
+- `src/utils/validators.test.js` ne contient aucune suite de test.
+
+**Action :**
+- Supprimer ou compléter les fichiers de test vides.
+- Restaurer `scanConclusion.js` ou corriger l'import.
+- Ajouter un workflow CI qui exécute `npm test -- --run` puis `npm run build`.
+
+#### Bundle vendor trop lourd
+Le build passe, mais `dist/assets/vendor-*.js` atteint environ **2,48 MB minifié**.
+
+**Action :**
+- Auditer `@react-pdf/renderer`, `jspdf`, `html2canvas`, `recharts`, `framer-motion`.
+- Charger PDF/charts uniquement dans les pages qui les utilisent.
+- Vérifier le `manualChunks` Vite actuel, car le chunk `vendor` reste trop gros.
+
+#### Variables d'environnement client mal classées
+`src/lib/envValidation.js` exige ou liste des variables `VITE_` qui ne devraient pas être côté client :
+- `VITE_GOOGLE_PAGESPEED_KEY`
+- `VITE_VIRUSTOTAL_API_KEY`
+- `VITE_RESEND_API_KEY`
+- `VITE_UPTIMEROBOT_API_KEY`
+- `VITE_CRON_SECRET`
+
+**Action :**
+- Garder côté client uniquement `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_PUBLIC_APP_URL`, analytics publics.
+- Déplacer toutes les clés d'API tierces côté Vercel Functions.
+
+#### Stats publiques bug probable
+**Fichier :** `api/stats.js`
+
+La requête :
+`select('id', { count: 'exact', head: true })`
+retourne normalement `data = null` et `count` séparé. Le code calcule `totalRows?.length ?? 0`, donc `total_scans` risque d'être toujours `0`.
+
+**Action :**
+- Lire `const { count } = ...` et retourner `count ?? 0`.
+
+### Plan court terme recommandé
+
+| Délai | Action | Objectif |
+|-------|--------|----------|
+| **24h** | Supprimer auth admin hardcodée + fallback local | Éviter accès admin trivial |
+| **24-48h** | Déplacer validation paiement côté API admin | Sécuriser le déblocage premium |
+| **48h** | Retirer Resend/PageSpeed/VirusTotal/UptimeRobot des `VITE_*` | Protéger les secrets |
+| **48-72h** | Ajouter RLS SQL pour tables paiement/scans/subscriptions | Protéger données clients |
+| **72h** | Corriger crons Protect + colonnes `site_url/user_email` | Rendre l'abonnement vendable |
+| **1 semaine** | Faire passer tests + CI | Stabiliser releases |
+
+---
+
 ## 7. Conclusion
 
-Webisafe est un **produit solide, bien pensé et esthétiquement abouti**. Le positionnement sur les PME africaines est intelligent, le parcours freemium est bien huilé, et l'intégration Wave Money est adaptée au marché local. Le design et le copywriting sont au-dessus de la moyenne des SaaS africains.
+Webisafe est un **produit solide, bien pensé et esthétiquement abouti**. Le positionnement sur les PME africaines est intelligent, le parcours freemium est clair, et l'intégration Wave Money est adaptée au marché local. Le design et le copywriting sont au-dessus de la moyenne des SaaS africains.
 
-**Cependant, les 3 failles de sécurité P0 (mots de passe en clair, admin hardcodé, XSS potentiel) sont des blocages absolus.** Elles doivent être corrigées **avant toute campagne marketing, presse, ou levée de fonds**. Une fois ces points traités, Webisafe passera à un niveau **17/20** et pourra prétendre à une scale régionale (UEMOA + CEMAC).
+**Cependant, la revue vérifiée du 6 mai montre que le MVP n'est pas encore prêt pour une vente publique self-service.** Les blocages prioritaires sont l'auth admin/test encore hardcodée, la validation paiement côté client, l'exposition potentielle de Resend via `VITE_RESEND_API_KEY`, l'absence de RLS documentée sur les tables sensibles, et les crons Protect incohérents avec le schéma actuel.
 
-**Prochaine milestone recommandée :** Corriger les P0 → Lancer un beta test fermé avec 10 agences web à Abidjan → Itérer sur les retours → Puis ouverture grand public.
+**Prochaine milestone recommandée :** Corriger les P0 de la section 6.6 → refaire passer `npm test` et `npm run build` → lancer un beta test fermé avec 10 agences web à Abidjan → itérer sur les retours → puis ouverture grand public.
 
 ---
 

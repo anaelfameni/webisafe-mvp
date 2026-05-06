@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-export default function Header({ onAuthClick }) {
-  const { user, profile, signOut } = useAuth();
+export default function Header({ user: currentUser, onLogout, onAuthClick }) {
+  const { user: contextUser, profile, signOut } = useAuth();
+  const user = currentUser || contextUser;
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -46,6 +47,15 @@ export default function Header({ onAuthClick }) {
       navigate(path);
     }
     setMobileMenuOpen(false);
+  };
+
+  const handleLogout = async () => {
+    if (typeof onLogout === 'function') {
+      await onLogout();
+      return;
+    }
+    await signOut();
+    navigate('/');
   };
 
   return (
@@ -105,7 +115,7 @@ export default function Header({ onAuthClick }) {
                   {user?.role === 'admin' ? 'Panel Admin' : 'Tableau de bord'}
                 </button>
                 <button
-                  onClick={() => { signOut(); navigate('/'); }}
+                  onClick={handleLogout}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-color hover:border-danger/40 text-xs text-white/50 hover:text-danger font-medium transition-all"
                 >
                   <LogOut size={14} />
@@ -189,7 +199,7 @@ export default function Header({ onAuthClick }) {
                     {user?.role === 'admin' ? 'Panel Admin' : 'Tableau de bord'}
                   </button>
                   <button
-                    onClick={() => { signOut(); setMobileMenuOpen(false); navigate('/'); }}
+                    onClick={async () => { await handleLogout(); setMobileMenuOpen(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 text-white/50 text-sm font-medium hover:text-danger hover:border-danger/30 hover:bg-danger/5 transition-all"
                   >
                     <LogOut size={16} />

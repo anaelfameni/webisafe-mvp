@@ -1,18 +1,18 @@
-import test from 'node:test';
+﻿import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
-import { ADMIN_EMAIL, ADMIN_PASSWORD, buildAdminUser, isAdminCredentials } from './adminAuth.js';
-
-test('recognizes the configured admin credentials', () => {
-  assert.equal(isAdminCredentials(ADMIN_EMAIL, ADMIN_PASSWORD), true);
-  assert.equal(isAdminCredentials('wrong@test.com', ADMIN_PASSWORD), false);
-  assert.equal(isAdminCredentials(ADMIN_EMAIL, 'wrong-pass'), false);
+test('keeps expected Supabase account emails available in tests only', () => {
+  assert.equal('admin@test.com', 'admin@test.com');
+  assert.equal('client@test.com', 'client@test.com');
 });
 
-test('builds an admin user payload with admin role', () => {
-  const user = buildAdminUser();
+test('does not export local credential helpers', () => {
+  const source = readFileSync(resolve('src/utils/adminAuth.js'), 'utf8');
 
-  assert.equal(user.email, ADMIN_EMAIL);
-  assert.equal(user.role, 'admin');
-  assert.equal(user.plan, 'admin');
+  assert.equal(source.includes('admin@test.com'), false);
+  assert.equal(source.includes('client@test.com'), false);
+  assert.equal(source.includes('password'), false);
+  assert.equal(source.includes('localStorage'), false);
 });

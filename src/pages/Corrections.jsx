@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -6,6 +6,7 @@ import {
   Zap,
   Shield,
   ArrowRight,
+  ArrowLeft,
   CheckCircle2,
   Loader2,
   Clock,
@@ -17,6 +18,9 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { submitCorrectionRequest } from '../utils/correctionApi';
+import { buildPackImprovements } from '../utils/correctionPacks';
+import { useScans } from '../hooks/useScans';
+import { extractDomain, normalizeURL, isValidURL } from '../utils/validators';
 
 const PACKS = [
   {
@@ -28,13 +32,13 @@ const PACKS = [
     color: 'text-yellow-400',
     bg: 'bg-yellow-400/10 border-yellow-400/20',
     features: [
-      '3 problèmes simples corrigés',
-      'Meta tags & Open Graph',
-      'Compression images basique',
-      'Sitemap XML généré',
+      'Jusqu’à 3 améliorations rapides du scan',
+      'SEO de base : meta tags, Open Graph, sitemap',
+      'Optimisation légère des images et contenus',
+      'Validation post-correction',
       'Délai : 24–48h',
     ],
-    bestFor: 'Sites avec peu de problèmes, besoin rapide',
+    bestFor: 'Sites avec peu d’améliorations ou besoin rapide',
   },
   {
     id: 'standard',
@@ -46,13 +50,13 @@ const PACKS = [
     bg: 'bg-primary/10 border-primary/20',
     popular: true,
     features: [
-      'Toutes les corrections prioritaires',
-      'Sécurité : headers HTTPS, mixed-content',
-      'Performance : cache, compression avancée',
+      'Améliorations prioritaires détectées',
+      'Sécurité : headers, HTTPS, mixed-content',
+      'Performance : cache, compression, poids de page',
       'SEO : indexation, canonical, schema.org',
       'Délai : 3–5 jours',
     ],
-    bestFor: 'La majorité des PME — le choix recommandé',
+    bestFor: 'La majorité des sites audités — le choix recommandé',
   },
   {
     id: 'complet',
@@ -63,18 +67,21 @@ const PACKS = [
     color: 'text-emerald-400',
     bg: 'bg-emerald-400/10 border-emerald-400/20',
     features: [
-      'Optimisation totale du site',
-      'Refactor mobile & responsive',
-      'Setup monitoring WebiSafe Protect',
+      'Toutes les améliorations détectées par le scan',
+      'Refonte ciblée mobile & responsive si nécessaire',
+      'Monitoring WebiSafe Protect',
       'Audit post-correction + rapport PDF',
       'Délai : 1–2 semaines',
     ],
-    bestFor: 'Sites critiques, e-commerce, institutions',
+    bestFor: 'Sites critiques, e-commerce, institutions ou refonte complète',
   },
 ];
 
-function PackCard({ pack, selected, onSelect }) {
+function PackCard({ pack, selected, onSelect, hasScanRecommendations }) {
   const Icon = pack.icon;
+  const visibleImprovements = pack.scanImprovements?.slice(0, pack.id === 'complet' ? 6 : 4) ?? [];
+  const hiddenImprovements = (pack.scanImprovements?.length ?? 0) - visibleImprovements.length;
+
   return (
     <motion.button
       whileHover={{ scale: 1.02 }}
@@ -110,6 +117,27 @@ function PackCard({ pack, selected, onSelect }) {
         ))}
       </ul>
 
+      {visibleImprovements.length > 0 && (
+        <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/50">
+            {hasScanRecommendations ? 'Améliorations du scan incluses' : 'Améliorations possibles incluses'}
+          </p>
+          <ul className="space-y-1.5">
+            {visibleImprovements.map((improvement, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-white/70">
+                <CheckCircle2 size={12} className="mt-0.5 flex-shrink-0 text-primary" />
+                {improvement}
+              </li>
+            ))}
+          </ul>
+          {hiddenImprovements > 0 && (
+            <p className="mt-2 text-xs font-medium text-primary">
+              + {hiddenImprovements} autre{hiddenImprovements > 1 ? 's' : ''} amélioration{hiddenImprovements > 1 ? 's' : ''} incluse{hiddenImprovements > 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
+      )}
+
       <p className="text-xs text-white/40 italic">{pack.bestFor}</p>
 
       {selected && (
@@ -124,6 +152,7 @@ function PackCard({ pack, selected, onSelect }) {
 export default function Corrections() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { scans } = useScans();
   const prefilledUrl = searchParams.get('url') || '';
 
   const [selectedPack, setSelectedPack] = useState('standard');
@@ -137,13 +166,39 @@ export default function Corrections() {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const activeUrl = form.url || prefilledUrl;
+  const relatedScan = useMemo(() => {
+    if (!activeUrl) return null;
+
+    const normalizedActiveUrl = normalizeURL(activeUrl);
+    const activeDomain = extractDomain(activeUrl);
+
+    return [...scans]
+      .filter((scan) => {
+        const scanUrl = scan?.url || scan?.requested_url || scan?.final_url || '';
+        if (!scanUrl) return false;
+        return normalizeURL(scanUrl) === normalizedActiveUrl || extractDomain(scanUrl) === activeDomain;
+      })
+      .sort((a, b) => new Date(b.scanned_at || b.savedAt || 0) - new Date(a.scanned_at || a.savedAt || 0))[0] || null;
+  }, [activeUrl, scans]);
+  const scanRecommendations = relatedScan?.recommendations || relatedScan?.recommandations || [];
+  const packImprovements = useMemo(() => buildPackImprovements(scanRecommendations), [scanRecommendations]);
+  const hasScanRecommendations = scanRecommendations.length > 0;
+  const packs = useMemo(
+    () => PACKS.map((pack) => ({ ...pack, scanImprovements: packImprovements[pack.id] ?? [] })),
+    [packImprovements]
+  );
 
   const validate = () => {
     const e = {};
     if (!form.name.trim()) e.name = 'Votre nom est requis';
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       e.email = 'Email valide requis';
-    if (!form.url.trim()) e.url = "L'URL du site est requise";
+    if (!form.url.trim()) {
+      e.url = "L'URL du site est requise";
+    } else if (!isValidURL(form.url)) {
+      e.url = "Veuillez entrer une URL ou un nom de domaine valide (ex: monsite.ci)";
+    }
     if (!selectedPack) e.pack = 'Veuillez choisir un pack';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -155,13 +210,19 @@ export default function Corrections() {
 
     setSubmitting(true);
     try {
+      const selectedImprovements = packImprovements[selectedPack] ?? [];
+      const correctionContext = selectedImprovements.length > 0
+        ? `Améliorations prises en charge par le pack ${PACKS.find((p) => p.id === selectedPack)?.name || selectedPack} :\n- ${selectedImprovements.join('\n- ')}`
+        : '';
+      const fullMessage = [form.message.trim(), correctionContext].filter(Boolean).join('\n\n');
+
       await submitCorrectionRequest({
         name: form.name,
         email: form.email,
         phone: form.phone,
-        url: form.url,
+        url: normalizeURL(form.url),
         pack: selectedPack,
-        message: form.message,
+        message: fullMessage,
       });
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -215,6 +276,25 @@ export default function Corrections() {
   return (
     <div className="min-h-screen pt-24 pb-20 px-4">
       <div className="max-w-5xl mx-auto">
+        {/* Bouton retour */}
+        <div className="mb-4">
+          <button
+            onClick={() => {
+              if (relatedScan?.id) {
+                navigate(`/rapport/${relatedScan.id}`);
+              } else if (prefilledUrl) {
+                navigate(`/analyse?url=${encodeURIComponent(prefilledUrl)}`);
+              } else {
+                navigate('/');
+              }
+            }}
+            className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-primary transition-colors"
+          >
+            <ArrowLeft size={16} />
+            {relatedScan?.id ? "Retour au rapport d'audit" : prefilledUrl ? "Retour à l'analyse" : "Retour à l'accueil"}
+          </button>
+        </div>
+
         {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -231,7 +311,7 @@ export default function Corrections() {
           <p className="text-lg text-white/70 max-w-2xl mx-auto">
             Vous avez reçu votre audit. Vous savez ce qui ne va pas.{' '}
             <strong className="text-white">Ne cherchez pas un développeur.</strong>{' '}
-            Notre équipe corrige tout pour vous — en français, en FCFA, via Wave.
+            Notre équipe corrige tout pour vous.
           </p>
         </motion.div>
 
@@ -261,12 +341,13 @@ export default function Corrections() {
         >
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Choisissez votre pack</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {PACKS.map((pack) => (
+            {packs.map((pack) => (
               <PackCard
                 key={pack.id}
                 pack={pack}
                 selected={selectedPack === pack.id}
                 onSelect={setSelectedPack}
+                hasScanRecommendations={hasScanRecommendations}
               />
             ))}
           </div>
@@ -340,10 +421,16 @@ export default function Corrections() {
                     <Globe size={14} className="inline mr-1" /> URL du site à corriger
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     value={form.url}
                     onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-                    placeholder="https://monsite.ci"
+                    onBlur={(e) => {
+                      const val = e.target.value.trim();
+                      if (val && isValidURL(val)) {
+                        setForm((f) => ({ ...f, url: normalizeURL(val) }));
+                      }
+                    }}
+                    placeholder="monsite.ci ou https://monsite.ci"
                     className="w-full rounded-xl border border-white/10 bg-dark-navy px-4 py-3 text-white placeholder-white/30 outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all"
                   />
                   {errors.url && <p className="text-xs text-red-400 mt-1">{errors.url}</p>}
@@ -367,13 +454,13 @@ export default function Corrections() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-white/70">Pack sélectionné</span>
                   <span className="text-sm font-bold text-primary">
-                    {PACKS.find((p) => p.id === selectedPack)?.name}
+                    {packs.find((p) => p.id === selectedPack)?.name}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-white/70">Prix estimé</span>
                   <span className="text-lg font-bold text-white">
-                    {PACKS.find((p) => p.id === selectedPack)?.price}{' '}
+                    {packs.find((p) => p.id === selectedPack)?.price}{' '}
                     <span className="text-sm font-normal text-white/60">FCFA</span>
                   </span>
                 </div>

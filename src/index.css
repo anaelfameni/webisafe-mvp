@@ -220,6 +220,12 @@ input:focus, textarea:focus, select:focus {
   animation: marquee 30s linear infinite;
 }
 
+@media (max-width: 768px) {
+  .animate-marquee {
+    animation: marquee 10s linear infinite;
+  }
+}
+
 .animate-marquee:hover {
   animation-play-state: paused;
 }

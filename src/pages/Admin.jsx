@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Loader2, RefreshCw, ShieldAlert, LayoutDashboard, CreditCard,
@@ -7,8 +7,9 @@ import {
   CheckCircle2, XCircle, AlertTriangle, ArrowRight, Eye, Wrench,
 } from 'lucide-react';
 import ToastMessage from '../components/ToastMessage';
-import { fetchPaymentRequests, markScanPaid, sendConfirmPayment, sendRejectPayment, updatePaymentRequest } from '../utils/paymentApi';
+import { fetchPaymentRequests, fetchScans, sendConfirmPayment, sendRejectPayment } from '../utils/paymentApi';
 import { fetchCorrectionRequests } from '../utils/correctionApi';
+import { mergeAdminScans, readLegacyScans } from '../utils/adminScanHistory';
 import { computePaymentStats, formatFcfa, getRelativeTimeLabel, isPendingPaymentStatus } from '../utils/wavePayment';
 import { supabase } from '../lib/supabaseClient';
 
@@ -44,10 +45,13 @@ const ADMIN_NAV = [
 
 export default function Admin({ user }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const justLoggedIn = location.state?.justLoggedIn;
   const isAuthorized = user?.role === 'admin';
 
   const [payments, setPayments] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
+  const [scans, setScans] = useState([]);
   const [correctionRequests, setCorrectionRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -60,7 +64,7 @@ export default function Admin({ user }) {
   const [activePage, setActivePage] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => { if (!isAuthorized) navigate('/', { replace: true }); }, [isAuthorized, navigate]);
+  useEffect(() => { if (!justLoggedIn && !isAuthorized) navigate('/', { replace: true }); }, [justLoggedIn, isAuthorized, navigate]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2800); return () => clearTimeout(t); }, [toast]);
 
   async function getAdminHeaders() {
@@ -103,14 +107,33 @@ export default function Admin({ user }) {
     } catch { /* non-bloquant */ }
   }, []);
 
+  const loadScans = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const rows = await fetchScans(100);
+      setScans(mergeAdminScans(rows || [], readLegacyScans()).slice(0, 100));
+      setLastRefreshedAt(new Date());
+    } catch (error) {
+      const legacyRows = readLegacyScans();
+      if (legacyRows.length > 0) {
+        setScans(mergeAdminScans([], legacyRows).slice(0, 100));
+      } else {
+        setToast({ type: 'error', message: error.message || 'Chargement impossible.' });
+      }
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isAuthorized) return;
     loadPayments();
     loadSubscriptions();
+    loadScans();
     loadCorrections();
     const interval = setInterval(() => { loadPayments(true); loadSubscriptions(true); }, 30000);
     return () => clearInterval(interval);
-  }, [isAuthorized, loadPayments, loadSubscriptions, loadCorrections]);
+  }, [isAuthorized, loadPayments, loadSubscriptions, loadScans, loadCorrections]);
 
   const pendingPayments = useMemo(() => payments.filter(p => isPendingPaymentStatus(p.status)), [payments]);
   const pendingSubscriptions = useMemo(() => subscriptions.filter(s => s.status === 'pending'), [subscriptions]);
@@ -119,9 +142,7 @@ export default function Admin({ user }) {
   const handleValidate = async (payment) => {
     setActionId(payment.id);
     try {
-      await updatePaymentRequest(payment.id, { status: 'validated', validated_at: new Date().toISOString(), validated_by: 'admin' });
-      await markScanPaid(payment.scan_id);
-      try { await sendConfirmPayment({ payment_code: payment.payment_code, user_email: payment.user_email, scan_id: payment.scan_id, url_to_audit: payment.url_to_audit }); } catch {}
+      await sendConfirmPayment({ payment_id: payment.id });
       setToast({ type: 'success', message: 'Paiement valide. Email envoye au client.' });
       await loadPayments(true);
     } catch (error) {
@@ -133,8 +154,7 @@ export default function Admin({ user }) {
     if (!rejectingPayment || !rejectionReason.trim()) { setToast({ type: 'error', message: 'Veuillez saisir une raison.' }); return; }
     setActionId(rejectingPayment.id);
     try {
-      await updatePaymentRequest(rejectingPayment.id, { status: 'rejected', rejection_reason: rejectionReason.trim() });
-      try { await sendRejectPayment({ user_email: rejectingPayment.user_email, rejection_reason: rejectionReason.trim() }); } catch {}
+      await sendRejectPayment({ payment_id: rejectingPayment.id, rejection_reason: rejectionReason.trim() });
       setToast({ type: 'success', message: 'Paiement rejete. Email envoye au client.' });
       setRejectingPayment(null); setRejectionReason('');
       await loadPayments(true);
@@ -376,37 +396,60 @@ export default function Admin({ user }) {
               {/* PAGE: Scans */}
               {activePage === 'scans' && (
                 <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-white font-bold text-lg">Historique des scans</h2>
+                    <button onClick={() => loadScans(true)} className="inline-flex items-center gap-2 text-xs text-white/50 hover:text-white transition">
+                      <RefreshCw size={12} /> Actualiser
+                    </button>
+                  </div>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <AdminKpiCard tone="blue" value={payments.length} label="Scans totaux" icon={<Activity size={18} />} />
-                    <AdminKpiCard tone="green" value={stats.validatedTodayCount} label="Audits premium livrés" icon={<CheckCircle2 size={18} />} />
+                    <AdminKpiCard tone="blue" value={scans.length} label="Scans totaux" icon={<Activity size={18} />} />
+                    <AdminKpiCard tone="green" value={scans.filter(s => s.paid).length} label="Audits premium" icon={<CheckCircle2 size={18} />} />
                   </div>
-                  <div className="bg-[#111827] border border-white/10 rounded-2xl p-5">
-                    <h3 className="text-white font-bold mb-4">Tous les scans</h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
-                        <thead><tr className="border-b border-white/10 text-white/40 text-xs">
-                          <th className="px-4 py-3 text-left">Code</th>
-                          <th className="px-4 py-3 text-left">Site</th>
-                          <th className="px-4 py-3 text-left">Client</th>
-                          <th className="px-4 py-3 text-left">Type</th>
-                          <th className="px-4 py-3 text-left">Statut</th>
-                          <th className="px-4 py-3 text-left">Date</th>
-                        </tr></thead>
-                        <tbody>
-                          {payments.map(p => (
-                            <tr key={p.id} className="border-t border-white/5 text-white/70 hover:bg-white/5">
-                              <td className="px-4 py-3 font-mono text-primary text-xs">{p.payment_code}</td>
-                              <td className="px-4 py-3 text-xs max-w-[160px] truncate">{p.url_to_audit}</td>
-                              <td className="px-4 py-3 text-xs">{p.user_email}</td>
-                              <td className="px-4 py-3 text-xs">Audit Premium</td>
-                              <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${p.status === 'validated' ? 'bg-success/10 text-success' : p.status === 'rejected' ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'}`}>{p.status}</span></td>
-                              <td className="px-4 py-3 text-xs text-white/40">{new Date(p.created_at).toLocaleDateString('fr-FR')}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  {scans.length === 0 ? (
+                    <div className="bg-[#111827] border border-white/10 rounded-2xl p-8 text-center">
+                      <Activity size={32} className="mx-auto text-white/20 mb-3" />
+                      <p className="text-white/50 text-sm">Aucun scan enregistré pour le moment.</p>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="bg-[#111827] border border-white/10 rounded-2xl p-5">
+                      <h3 className="text-white font-bold mb-4">Tous les scans ({scans.length})</h3>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead><tr className="border-b border-white/10 text-white/40 text-xs">
+                            <th className="px-4 py-3 text-left">ID</th>
+                            <th className="px-4 py-3 text-left">Site</th>
+                            <th className="px-4 py-3 text-left">Email</th>
+                            <th className="px-4 py-3 text-left">Score</th>
+                            <th className="px-4 py-3 text-left">Type</th>
+                            <th className="px-4 py-3 text-left">Date</th>
+                          </tr></thead>
+                          <tbody>
+                            {scans.map(s => (
+                              <tr key={s.id} className="border-t border-white/5 text-white/70 hover:bg-white/5">
+                                <td className="px-4 py-3 font-mono text-primary text-xs max-w-[120px] truncate">{s.id}</td>
+                                <td className="px-4 py-3 text-xs max-w-[180px] truncate">{s.url}</td>
+                                <td className="px-4 py-3 text-xs">{s.user_email || '—'}</td>
+                                <td className="px-4 py-3 text-xs">
+                                  <span className={`font-semibold ${s.score >= 70 ? 'text-success' : s.score >= 40 ? 'text-warning' : 'text-danger'}`}>
+                                    {s.score ?? '—'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-xs px-2 py-0.5 rounded-full ${s.paid ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'}`}>
+                                    {s.paid ? 'Premium' : 'Gratuit'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-xs text-white/40">
+                                  {s.scanned_at ? new Date(s.scanned_at).toLocaleDateString('fr-FR') : '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -594,7 +637,7 @@ export default function Admin({ user }) {
                   <div className="bg-[#111827] border border-white/10 rounded-2xl p-6">
                     <h3 className="text-white font-bold mb-4">Variables d'environnement requises</h3>
                     <div className="space-y-2 text-sm">
-                      {['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'RESEND_API_KEY', 'UPTIMEROBOT_API_KEY', 'CRON_SECRET'].map(key => (
+                      {['Configuration base de données', 'Clé service backend', 'Service email backend', 'Monitoring backend', 'Secret cron backend'].map(key => (
                         <div key={key} className="flex items-center gap-2 py-1">
                           <span className="w-2 h-2 rounded-full bg-success" />
                           <code className="text-primary text-xs">{key}</code>

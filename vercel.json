@@ -43,10 +43,6 @@
       "maxDuration": 60,
       "regions": ["cpt1"]
     },
-    "api/cron/uptime-check.js": {
-      "memory": 256,
-      "maxDuration": 30
-    },
     "api/cron/alert-followup.js": {
       "memory": 256,
       "maxDuration": 30
@@ -56,10 +52,6 @@
     {
       "path": "/api/cron/monthly-scan",
       "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/cron/uptime-check",
-      "schedule": "0 */6 * * *"
     },
     {
       "path": "/api/cron/alert-followup",

@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import { buildPremiumExplanationParagraphs } from './premiumExplanation.js';
@@ -40,10 +40,10 @@ test('builds an introduction, numbered issue paragraphs, and a persuasive action
   assert.match(paragraphs[1], /point critique/i);
   assert.match(paragraphs[1], /credibilite|revenus|marque/i);
   assert.match(paragraphs[2], /^2\./);
-  assert.match(paragraphs[2], /probl[eè]me important/i);
-  assert.match(paragraphs[2], /cons[eé]quence concr[eè]te|ralentir le parcours utilisateur/i);
+  assert.match(paragraphs[2], /probl[eÃ¨]me important/i);
+  assert.match(paragraphs[2], /cons[eÃ©]quence concr[eÃ¨]te|ralentir le parcours utilisateur/i);
   assert.match(paragraphs[3], /^3\./);
-  assert.match(paragraphs[3], /am[eé]lioration utile/i);
+  assert.match(paragraphs[3], /am[eÃ©]lioration utile/i);
   assert.match(paragraphs[3], /pas le plus urgent/i);
   assert.match(paragraphs[4], /plan d'action global|ordre de correction/i);
   assert.match(paragraphs[4], /risque|faire ces corrections vous-meme|Webisafe peut prendre en charge/i);

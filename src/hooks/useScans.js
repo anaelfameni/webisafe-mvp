@@ -43,7 +43,7 @@ export function useScans() {
 
     const scan = {
       ...scanData,
-      id: scanData.id || `scan_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      id: scanData.id || scanData.scan_id || `scan_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       // Date du scan réel (depuis le backend si disponible, sinon maintenant)
       scanned_at: scanData.scanned_at || scanData.scan_duration_ms
         ? (scanData.scanned_at || new Date().toISOString())

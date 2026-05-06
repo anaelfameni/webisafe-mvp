@@ -19,13 +19,13 @@ export function AuthProvider({ children }) {
   // Adapte handleAuth pour matcher l'API ancienne du contexte
   async function handleAuth(mode, { name, email, phone, password, phoneCountry }) {
     if (mode === 'signup') {
-      const result = hook.signup(name, email, phone, password, phoneCountry)
+      const result = await hook.signup(name, email, phone, password, phoneCountry)
       if (!result.success) return { success: false, error: result.error }
       return { success: true, redirectTo: '/dashboard' }
     }
 
     if (mode === 'login') {
-      const result = hook.login(email, password)
+      const result = await hook.login(email, password)
       if (!result.success) return { success: false, error: result.error }
       if (result.user?.role === 'admin') {
         return { success: true, redirectTo: '/admin' }
@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
-    hook.logout()
+    await hook.logout()
   }
 
   return (

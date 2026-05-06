@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { json, readJsonBody, sendResendEmail, setCorsHeaders, requireAdmin } from './_utils.js';
+import { json, readJsonBody, sendResendEmail, setCorsHeaders, requireAdmin, escapeHtml } from './_utils.js';
 
 const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
   ? createClient(
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
       <span style="background:#1566F0;color:#fff;padding:8px 16px;border-radius:8px;font-weight:bold;font-size:18px;">Webi<span style="color:#93C5FD">safe</span></span>
     </div>
     <h2 style="color:#22C55E;">✅ Abonnement activé !</h2>
-    <p>Votre abonnement <strong>Webisafe Protect Basic</strong> pour <strong>${sub.site_url}</strong> est maintenant actif.</p>
+    <p>Votre abonnement <strong>Webisafe Protect Basic</strong> pour <strong>${escapeHtml(sub.site_url)}</strong> est maintenant actif.</p>
     <ul style="color:#CBD5E1;">
       <li>✓ Monitoring uptime 24h/24 activé</li>
       <li>✓ Scan mensuel automatique programmé</li>

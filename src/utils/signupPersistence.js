@@ -1,8 +1,4 @@
-import { insertRow } from './supabaseRest.js';
-
-const env = import.meta.env ?? {};
-
-export const SIGNUPS_TABLE = env.VITE_SUPABASE_SIGNUPS_TABLE || 'users';
+export const SIGNUP_PROFILE_ENDPOINT = '/api/profile';
 
 export function buildSignupRecord(user) {
   return {
@@ -16,8 +12,14 @@ export function buildSignupRecord(user) {
 }
 
 export async function persistSignupRecord(user, options = {}) {
-  const insert = options.insert || insertRow;
-  const table = options.table || SIGNUPS_TABLE;
+  const persist = options.persist;
 
-  return insert(table, buildSignupRecord(user));
+  if (typeof persist !== 'function') {
+    throw new Error('Signup persistence must be handled by an authenticated backend endpoint');
+  }
+
+  return persist(buildSignupRecord(user), {
+    endpoint: options.endpoint || SIGNUP_PROFILE_ENDPOINT,
+    token: options.token,
+  });
 }

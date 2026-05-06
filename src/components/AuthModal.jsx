@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Eye, EyeOff, Loader2, Lock, Mail, Phone, User, X } from 'lucide-react';
+import { ChevronDown, Eye, EyeOff, Loader2, Lock, Mail, Phone, User, X, ArrowLeft } from 'lucide-react';
 import {
   buildInternationalPhone,
   COUNTRY_DIAL_CODES,
@@ -44,6 +44,7 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
   const [showCountryMenu, setShowCountryMenu] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -68,6 +69,7 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
     setShowPassword(false);
     setShowCountryMenu(false);
     setError('');
+    setForgotSent(false);
   };
 
   const handleSubmit = async (event) => {
@@ -75,6 +77,31 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
     setError('');
 
     // Validation téléphone seulement en signup
+    if (mode === 'forgot') {
+      if (!email) {
+        setError('Veuillez saisir votre email.');
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await fetch('/api/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setForgotSent(true);
+        } else {
+          setError(data.error || 'Une erreur est survenue.');
+        }
+      } catch {
+        setError('Erreur réseau. Veuillez réessayer.');
+      }
+      setLoading(false);
+      return;
+    }
+
     if (mode === 'signup') {
       const localPhone = normalizePhoneDigits(phone);
       if (localPhone.length < 6) {
@@ -123,7 +150,7 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
 
       // Navigation uniquement si le parent la demande explicitement
       if (result.redirectTo) {
-        navigate(result.redirectTo);
+        navigate(result.redirectTo, { state: { justLoggedIn: true } });
       }
 
       return;
@@ -154,7 +181,7 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
           >
             <div className="flex items-center justify-between p-5 border-b border-border-color">
               <h3 className="text-lg font-bold text-white">
-                {mode === 'login' ? 'Connexion' : 'Créer un compte'}
+                {mode === 'login' ? 'Connexion' : mode === 'forgot' ? 'Mot de passe oublié' : 'Créer un compte'}
               </h3>
               <button
                 onClick={onClose}
@@ -166,7 +193,16 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              {mode === 'signup' && (
+              {mode === 'forgot' && forgotSent && (
+                <div className="bg-success/10 border border-success/30 rounded-xl p-4 text-center">
+                  <p className="text-success text-sm font-medium">Email envoyé !</p>
+                  <p className="text-white/60 text-xs mt-1">
+                    Si un compte existe avec cet email, vous recevrez un lien de réinitialisation.
+                  </p>
+                </div>
+              )}
+
+              {mode !== 'forgot' && mode === 'signup' && (
                 <>
                   <div>
                     <label className="text-text-secondary text-sm mb-1 block">Nom complet</label>
@@ -298,48 +334,61 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
                 </div>
               </div>
 
-              <div>
-                <label className="text-text-secondary text-sm mb-1 block">Mot de passe</label>
-                <div className="relative">
-                  <Lock
-                    size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
-                  />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="••••••••"
-                    required
-                    minLength={8}
-                    aria-describedby="password-strength"
-                    className="w-full pl-10 pr-10 py-3 bg-dark-navy border border-border-color rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-primary transition-colors text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-white transition-colors"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                {mode === 'signup' && password.length > 0 && (
-                  <div className="mt-2" id="password-strength" role="status" aria-live="polite">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${passwordStrength.color} transition-all duration-300`}
-                          style={{ width: `${(passwordStrength.level / 4) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-text-secondary">{passwordStrength.label}</span>
-                    </div>
-                    <p className="text-[10px] text-text-secondary/70 mt-1">
-                      8 caractères minimum, avec majuscule, minuscule et chiffre.
-                    </p>
+              {mode !== 'forgot' && (
+                <div>
+                  <label className="text-text-secondary text-sm mb-1 block">Mot de passe</label>
+                  <div className="relative">
+                    <Lock
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+                    />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder="••••••••"
+                      required
+                      minLength={8}
+                      aria-describedby="password-strength"
+                      className="w-full pl-10 pr-10 py-3 bg-dark-navy border border-border-color rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-primary transition-colors text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-white transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                   </div>
-                )}
-              </div>
+                  {mode === 'signup' && password.length > 0 && (
+                    <div className="mt-2" id="password-strength" role="status" aria-live="polite">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${passwordStrength.color} transition-all duration-300`}
+                            style={{ width: `${(passwordStrength.level / 4) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-text-secondary">{passwordStrength.label}</span>
+                      </div>
+                      <p className="text-[10px] text-text-secondary/70 mt-1">
+                        8 caractères minimum, avec majuscule, minuscule et chiffre.
+                      </p>
+                    </div>
+                  )}
+                  {mode === 'login' && (
+                    <div className="mt-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => { setMode('forgot'); setError(''); setForgotSent(false); }}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Mot de passe oublié ?
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {error && (
                 <motion.p
@@ -360,13 +409,23 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
                   <Loader2 size={18} className="animate-spin" />
                 ) : mode === 'login' ? (
                   'Se connecter'
+                ) : mode === 'forgot' ? (
+                  'Envoyer le lien'
                 ) : (
                   'Créer mon compte'
                 )}
               </button>
 
               <p className="text-center text-text-secondary text-sm">
-                {mode === 'login' ? (
+                {mode === 'forgot' ? (
+                  <button
+                    type="button"
+                    onClick={() => { setMode('login'); setError(''); setForgotSent(false); }}
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    <ArrowLeft size={14} /> Retour à la connexion
+                  </button>
+                ) : mode === 'login' ? (
                   <>
                     Pas de compte ?{' '}
                     <button

@@ -1,10 +1,10 @@
-import test from 'node:test';
+﻿import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const filesToCheck = ['src/pages/Dashboard.jsx', 'src/hooks/useAuth.js'];
-const mojibakePattern = /Ã|Â|â/;
+const mojibakePattern = /Ãƒ|Ã‚|Ã¢/;
 
 for (const relativePath of filesToCheck) {
   test(`text content in ${relativePath} does not contain mojibake sequences`, () => {

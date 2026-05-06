@@ -47,12 +47,46 @@ function ensureRequiredEnv() {
 }
 
 // ── Sites de test ─────────────────────────────────────────────────────────────
+// 30 sites : 10 sites ivoiens + 20 plus gros sites mondiaux & africains
 const TEST_SITES = [
+  // --- 10 sites ivoiens ---
   'https://abidjan.net',
   'https://orange.ci',
-  'https://google.com',
-  'https://wordpress.com',
   'https://jumia.ci',
+  'https://gouv.ci',
+  'https://cie.ci',
+  'https://aircoteivoire.com',
+  'https://nsia.ci',
+  'https://fratmat.info',
+  'https://koaci.com',
+  'https://sodeci.ci',
+
+  // --- 20 plus gros sites mondiaux & africains ---
+  'https://apple.com',
+  'https://amazon.com',
+  'https://facebook.com',
+  'https://microsoft.com',
+  'https://netflix.com',
+  'https://youtube.com',
+  'https://instagram.com',
+  'https://linkedin.com',
+  'https://github.com',
+  'https://wikipedia.org',
+  'https://booking.com',
+  'https://spotify.com',
+  'https://reddit.com',
+  'https://tiktok.com',
+  'https://paypal.com',
+  'https://ebay.com',
+  'https://cloudflare.com',
+  'https://stripe.com',
+  'https://x.com',
+  'https://binance.com',
+  'https://jumia.com',
+  'https://ecobank.com',
+  'https://jeuneafrique.com',
+  'https://france24.com',
+  'https://airbnb.com',
 ];
 
 // ── Couleurs terminal ─────────────────────────────────────────────────────────
@@ -110,12 +144,64 @@ function printInfoRow(label, value, note = '') {
   );
 }
 
+function printCheckRow(label, status, note = '') {
+  const statusColor = status === 'pass' ? GREEN : status === 'fail' ? RED : status === 'warning' ? YELLOW : CYAN;
+  const statusIcon = status === 'pass' ? '✓' : status === 'fail' ? '✗' : status === 'warning' ? '⚠' : '○';
+  console.log(
+    `  ${label.padEnd(28)}` +
+    `${statusColor}${statusIcon} ${String(status ?? 'N/A').padEnd(10)}${RESET}` +
+    (note ? `${CYAN}ℹ ${note}${RESET}` : '')
+  );
+}
+
+function printCheckList(title, checks, maxDisplay = 10) {
+  if (!Array.isArray(checks) || checks.length === 0) {
+    console.log(`  ${CYAN}${title} : Aucun check retourné${RESET}`);
+    return;
+  }
+  console.log(`  ${BOLD}${title} (${checks.length} checks) :${RESET}`);
+  checks.slice(0, maxDisplay).forEach((c) => {
+    const name = c.check_name ?? c.title ?? 'unknown';
+    printCheckRow(`    · ${name}`, c.status, c.criticality ? `(${c.criticality})` : '');
+  });
+  if (checks.length > maxDisplay) {
+    console.log(`    ${CYAN}… et ${checks.length - maxDisplay} autre(s)${RESET}`);
+  }
+}
+
+function countAdvancedChecks(checks) {
+  if (!Array.isArray(checks)) return { pass: 0, fail: 0, warning: 0, total: 0 };
+  return {
+    pass: checks.filter(c => c.status === 'pass').length,
+    fail: checks.filter(c => c.status === 'fail').length,
+    warning: checks.filter(c => c.status === 'warning').length,
+    total: checks.length,
+  };
+}
+
+function buildPageSpeedProbeUrls(url) {
+  const urls = [];
+  try {
+    const parsed = new URL(url);
+    urls.push(parsed.href);
+    if (!parsed.hostname.startsWith('www.') && parsed.hostname.includes('.')) {
+      const wwwUrl = new URL(parsed.href);
+      wwwUrl.hostname = `www.${parsed.hostname}`;
+      urls.push(wwwUrl.href);
+    }
+  } catch {
+    urls.push(url);
+  }
+  return Array.from(new Set(urls));
+}
+
 // ── API PageSpeed (référence) ─────────────────────────────────────────────────
 async function getPageSpeedData(url) {
-  try {
+  for (const probeUrl of buildPageSpeedProbeUrls(url)) {
+    try {
     const endpoint =
       `https://www.googleapis.com/pagespeedonline/v5/runPagespeed` +
-      `?url=${encodeURIComponent(url)}&strategy=mobile&key=${API_KEY}` +
+      `?url=${encodeURIComponent(probeUrl)}&strategy=mobile&key=${API_KEY}` +
       `&category=performance&category=seo&category=best-practices&category=accessibility`;
 
     const res = await fetch(endpoint);
@@ -123,22 +209,36 @@ async function getPageSpeedData(url) {
     const lhr = data.lighthouseResult;
 
     if (!lhr) {
-      console.error(warn(`  ⚠ PageSpeed: pas de lighthouseResult pour ${url}`));
-      return null;
+      console.error(warn(`  ⚠ PageSpeed: pas de lighthouseResult pour ${probeUrl}`));
+      continue;
     }
 
+    const audits = lhr.audits ?? {};
+    const categories = lhr.categories ?? {};
+
     return {
-      performance: Math.round((lhr.categories?.performance?.score ?? 0) * 100),
-      seo: Math.round((lhr.categories?.seo?.score ?? 0) * 100),
-      https: lhr.audits?.['is-on-https']?.score === 1,
+      performance: Math.round((categories.performance?.score ?? 0) * 100),
+      seo: Math.round((categories.seo?.score ?? 0) * 100),
+      bestPractices: Math.round((categories['best-practices']?.score ?? 0) * 100),
+      accessibility: Math.round((categories.accessibility?.score ?? 0) * 100),
+      url: probeUrl,
+      finalUrl: lhr.finalUrl ?? data.id ?? null,
+
+      // Sécurité basique
+      https: audits['is-on-https']?.score === 1,
+      http2: audits['uses-http2']?.score === 1,
+      redirectsHttp: audits['redirects-http']?.score === 1,
+      noVulnerableLibs: audits['no-vulnerable-libraries']?.score === 1,
       viewport: null,
       tapTargets: null,
       fontSize: null,
     };
   } catch (e) {
-    console.error(fail(`  ✗ PageSpeed error (${url}): ${e.message}`));
-    return null;
+      console.error(fail(`  ✗ PageSpeed error (${probeUrl}): ${e.message}`));
+    }
   }
+
+  return null;
 }
 
 // ── API Webisafe ──────────────────────────────────────────────────────────────
@@ -159,21 +259,45 @@ async function getWebisafeData(url) {
     const seo = metrics.seo ?? {};
     const ux = metrics.ux ?? {};
 
+    // Métadonnées globales du scan
+    const globalScore = data.global_score ?? data.data?.global_score ?? null;
+    const grade = data.grade ?? data.data?.grade ?? null;
+    const scanConfidence = data.scan_confidence ?? data.data?.scan_confidence ?? null;
+    const scannerErrors = data.scanner_errors ?? data.data?.scanner_errors ?? {};
+    const scanDurationMs = data.scan_duration_ms ?? data.data?.scan_duration_ms ?? null;
+    const detectedTech = data.detected_technology ?? data.data?.detected_technology ?? {};
+
     return {
+      url: data.url ?? data.data?.url ?? null,
+      requested_url: data.requested_url ?? data.data?.requested_url ?? null,
+      audit_url: data.audit_url ?? data.data?.audit_url ?? null,
+      final_url: data.final_url ?? data.data?.final_url ?? null,
+
       // Scores globaux
       performance: scores.performance ?? null,
       security: scores.security ?? null,
       seo: scores.seo ?? null,
       ux_mobile: scores.ux ?? scores.ux_mobile ?? null,
+      global_score: globalScore,
+      grade,
 
       // IMPORTANT : perf partial (fallback)
       perf_partial: perf.partial ?? null,
 
-      // Sécurité
+      // ── Sécurité avancée ──────────────────────────────────────────────
       https: url.startsWith('https'),
       headers_manquants: null,
       malware: sec.malware_detected ?? null,
       failles_owasp: null,
+
+      // Sécurité avancée (backend scan.js)
+      legacy_score: sec.legacy_score ?? null,
+      advanced_security_score: sec.advanced_security_score ?? null,
+      extended_security_score: sec.extended_security_score ?? null,
+      advanced_checks: sec.advanced_checks ?? null,
+      extended_checks: sec.extended_checks ?? null,
+      failed_checks: sec.failed_checks ?? null,
+      advanced_counts: sec.advanced_counts ?? null,
 
       // SEO
       seo_partial: seo.partial ?? null,
@@ -190,6 +314,12 @@ async function getWebisafeData(url) {
       tap_targets: ux.tap_targets_ok ?? null,
       font_size: null,
       vitesse_mobile: ux.accessibility_score ?? null,
+
+      // Métadonnées scanner
+      scan_confidence: scanConfidence,
+      scanner_errors: scannerErrors,
+      scan_duration_ms: scanDurationMs,
+      detected_technology: detectedTech,
     };
   } catch (e) {
     console.error(fail(`  ✗ Webisafe error (${url}): ${e.message}`));
@@ -201,6 +331,7 @@ async function getWebisafeData(url) {
 function calibratePerformance(w, g, results) {
   console.log(`\n  ${BOLD}⚡ PERFORMANCE${RESET}`);
   console.log('  ' + separator('·', 70));
+  printInfoRow('URL PageSpeed', g.url ?? null, g.finalUrl ? `final: ${g.finalUrl}` : '');
 
   // Si Webisafe est en fallback (partial=true), on n'applique pas le seuil PSI
   if (w.perf_partial === true) {
@@ -221,27 +352,73 @@ function calibratePerformance(w, g, results) {
 }
 
 // ── Calibration Sécurité ──────────────────────────────────────────────────────
+const REQUIRED_ADVANCED_CHECKS = ['waf', 'subdomains', 'security_txt', 'cors', 'supply_chain', 'email_advanced'];
+
 function calibrateSecurity(w, g, results) {
   console.log(`\n  ${BOLD}🔒 SÉCURITÉ${RESET}`);
   console.log('  ' + separator('·', 70));
 
-  printInfoRow('Score global', w.security, 'Pas de référence PageSpeed → vérification manuelle');
+  // ── Scores ────────────────────────────────────────────────────────
+  printInfoRow('Score global (combiné)', w.security, 'Legacy + Advanced + Extended');
+  printInfoRow('  └─ Legacy score', w.legacy_score, 'Scan de base');
+  printInfoRow('  └─ Advanced score', w.advanced_security_score, 'runAdvancedSecurityChecks()');
+  printInfoRow('  └─ Extended score', w.extended_security_score, 'runExtendedSecurityChecks()');
+
+  // ── Comparisons PageSpeed ───────────────────────────────────────
+  console.log(`\n  ${BOLD}Comparaison PageSpeed (best-practices) :${RESET}`);
   printBoolRow('HTTPS', w.https, g.https);
-  printInfoRow('Headers manquants',
-    w.headers_manquants !== null ? `${w.headers_manquants} manquant(s)` : null,
-    'Vérifier sur securityheaders.com'
-  );
+  printBoolRow('HTTP/2', null, g.http2);
+  printBoolRow('Redirects HTTP→HTTPS', null, g.redirectsHttp);
+  printBoolRow('No vulnerable libs', null, g.noVulnerableLibs);
+  printInfoRow('Best-Practices score', g.bestPractices, 'PageSpeed');
+
+  // ── Checks avancés ──────────────────────────────────────────────
+  console.log(`\n  ${BOLD}Sécurité avancée :${RESET}`);
+  const advCounts = countAdvancedChecks(w.advanced_checks);
+  const extCounts = countAdvancedChecks(w.extended_checks);
+
+  printInfoRow('Checks avancés', `${advCounts.pass}/${advCounts.total} pass`, `fail=${advCounts.fail} warning=${advCounts.warning}`);
+  printInfoRow('Checks étendus', `${extCounts.pass}/${extCounts.total} pass`, `fail=${extCounts.fail} warning=${extCounts.warning}`);
+
+  printCheckList('Checks avancés', w.advanced_checks, 6);
+  printCheckList('Checks étendus', w.extended_checks, 6);
+
+  // ── Validation des checks requis ─────────────────────────────────
+  const advNames = new Set((w.advanced_checks ?? []).map(c => c?.check_name).filter(Boolean));
+  const extNames = new Set((w.extended_checks ?? []).map(c => c?.check_name).filter(Boolean));
+  const allNames = new Set([...advNames, ...extNames]);
+  const missingRequired = REQUIRED_ADVANCED_CHECKS.filter(name => !allNames.has(name));
+
+  if (missingRequired.length > 0) {
+    console.log(`\n  ${YELLOW}⚠ Checks requis manquants : ${missingRequired.join(', ')}${RESET}`);
+  } else {
+    console.log(`\n  ${ok('✓ Tous les checks avancés requis sont présents')}`);
+  }
+
+  // ── Failed checks globaux ───────────────────────────────────────
+  if (Array.isArray(w.failed_checks) && w.failed_checks.length > 0) {
+    console.log(`\n  ${YELLOW}Failed checks globaux : ${w.failed_checks.join(', ')}${RESET}`);
+  }
+
+  // ── Malware ─────────────────────────────────────────────────────
   printInfoRow('Malware',
     w.malware !== null ? (w.malware ? '⚠ Détecté' : 'Aucun') : null,
     'Vérifier sur virustotal.com'
   );
-  printInfoRow('Failles OWASP',
-    w.failles_owasp !== null ? `${w.failles_owasp} faille(s)` : null,
-    'Vérifier manuellement'
-  );
 
-  const passed = w.https === g.https;
-  if (!passed) results.failed.push('Sécurité — HTTPS divergent');
+  // ── Critère de passage ──────────────────────────────────────────
+  const httpsOk = w.https === g.https;
+  const hasAdvanced = w.advanced_checks && w.advanced_checks.length > 0;
+  const hasExtended = w.extended_checks && w.extended_checks.length > 0;
+  const requiredOk = missingRequired.length === 0;
+
+  const passed = httpsOk && hasAdvanced && hasExtended && requiredOk;
+
+  if (!httpsOk) results.failed.push('Sécurité — HTTPS divergent vs PageSpeed');
+  if (!hasAdvanced) results.failed.push('Sécurité — Aucun check avancé retourné');
+  if (!hasExtended) results.failed.push('Sécurité — Aucun check étendu retourné');
+  if (!requiredOk) results.failed.push(`Sécurité — Checks requis manquants : ${missingRequired.join(', ')}`);
+
   return passed;
 }
 
@@ -281,6 +458,44 @@ function calibrateSEO(w, g, results) {
   return passed;
 }
 
+// ── Calibration Métadonnées ───────────────────────────────────────────────────
+function calibrateMetadata(w, results) {
+  console.log(`\n  ${BOLD}📊 MÉTADONNÉES DU SCAN${RESET}`);
+  console.log('  ' + separator('·', 70));
+
+  printInfoRow('Score global', w.global_score, `Grade: ${w.grade ?? 'N/A'}`);
+  printInfoRow('URL scannée', w.url ?? null, w.audit_url ? `audit: ${w.audit_url}` : '');
+  printInfoRow('URL finale', w.final_url ?? null);
+  printInfoRow('Confiance scan', w.scan_confidence, 'low | medium | high');
+  printInfoRow('Durée scan', w.scan_duration_ms !== null ? `${w.scan_duration_ms}ms` : null);
+
+  const errors = w.scanner_errors ?? {};
+  const hasErrors = Object.values(errors).some(e => e != null);
+  if (hasErrors) {
+    console.log(`  ${YELLOW}⚠ Erreurs scanner détectées :${RESET}`);
+    Object.entries(errors).forEach(([key, err]) => {
+      if (err) console.log(`    · ${key}: ${err}`);
+    });
+  } else {
+    console.log(`  ${ok('✓ Aucune erreur scanner')}`);
+  }
+
+  const tech = w.detected_technology ?? {};
+  printInfoRow('CMS détecté', tech.cms ?? null);
+  printInfoRow('Technologies', Array.isArray(tech.technologies) ? tech.technologies.join(', ') : null);
+  printInfoRow('Hosting pays', tech.hosting_country ?? null);
+  printInfoRow('Hosting ISP', tech.hosting_isp ?? null);
+  printInfoRow('Is local Africa', tech.is_local_africa !== null ? String(tech.is_local_africa) : null);
+
+  const confidenceOk = w.scan_confidence === 'high' || w.scan_confidence === 'medium';
+  const noScannerErrors = !hasErrors;
+
+  const passed = confidenceOk && noScannerErrors;
+  if (!confidenceOk) results.failed.push(`Métadonnées — Confiance scan trop faible (${w.scan_confidence})`);
+  if (!noScannerErrors) results.failed.push('Métadonnées — Erreurs scanner détectées');
+  return passed;
+}
+
 // ── Calibration UX Mobile ─────────────────────────────────────────────────────
 function calibrateUX(w, g, results) {
   console.log(`\n  ${BOLD}📱 UX MOBILE${RESET}`);
@@ -311,12 +526,13 @@ function calibrateUX(w, g, results) {
 }
 
 // ── Résumé d'un site ──────────────────────────────────────────────────────────
-function printSiteSummary(perfOk, secOk, seoOk, uxOk) {
+function printSiteSummary(perfOk, secOk, seoOk, uxOk, metaOk) {
   console.log(`\n  ${BOLD}Résumé du site :${RESET}`);
   console.log(`    Performance : ${perfOk ? ok('✓ Validé') : fail('✗ À revoir')}`);
   console.log(`    Sécurité    : ${secOk ? ok('✓ Validé') : fail('✗ À revoir')}`);
   console.log(`    SEO         : ${seoOk ? ok('✓ Validé') : fail('✗ À revoir')}`);
   console.log(`    UX Mobile   : ${uxOk ? ok('✓ Validé') : fail('✗ À revoir')}`);
+  console.log(`    Métadonnées : ${metaOk ? ok('✓ Validé') : fail('✗ À revoir')}`);
 }
 
 // ── Rapport final ─────────────────────────────────────────────────────────────
@@ -337,9 +553,11 @@ function printFinalReport({ passed, total, failed }) {
 
   console.log(`${CYAN}  Seuils utilisés :${RESET}`);
   console.log(`    Performance : écart ≤ 15 pts vs PageSpeed (sauf si partial=true)`);
-  console.log(`    Sécurité    : concordance HTTPS + vérifications manuelles conseillées`);
+  console.log(`    Sécurité    : HTTPS concordant + checks avancés/étendus présents`);
+  console.log(`                  + tous les checks requis (waf, subdomains, security_txt, cors, supply_chain, email_advanced)`);
   console.log(`    SEO         : écart ≤ 15 pts vs PageSpeed`);
-  console.log(`    UX Mobile   : ≥ 2/3 signaux concordants avec PageSpeed\n`);
+  console.log(`    UX Mobile   : ≥ 2/3 signaux concordants avec PageSpeed`);
+  console.log(`    Métadonnées : confiance ≥ medium + aucune erreur scanner\n`);
 }
 
 // ── Runner ────────────────────────────────────────────────────────────────────
@@ -348,7 +566,7 @@ async function runCalibration() {
   ensureRequiredEnv();
 
   console.log(`\n${BOLD}${CYAN}${'═'.repeat(90)}${RESET}`);
-  console.log(`${BOLD}${CYAN}  CALIBRATION WEBISAFE — Performance · Sécurité · SEO · UX Mobile${RESET}`);
+  console.log(`${BOLD}${CYAN}  CALIBRATION WEBISAFE — 30 sites · Performance · Sécurité avancée · SEO · UX Mobile${RESET}`);
   console.log(`${BOLD}${CYAN}${'═'.repeat(90)}${RESET}\n`);
 
   const maskedKey = `${API_KEY.slice(0, 6)}…${API_KEY.slice(-4)}`;
@@ -376,15 +594,17 @@ async function runCalibration() {
     const secOk = calibrateSecurity(w, g, siteResults);
     const seoOk = calibrateSEO(w, g, siteResults);
     const uxOk = calibrateUX(w, g, siteResults);
+    const metaOk = calibrateMetadata(w, siteResults);
 
-    globalResults.total += 4;
+    globalResults.total += 5;
     if (perfOk) globalResults.passed++;
     if (secOk) globalResults.passed++;
     if (seoOk) globalResults.passed++;
     if (uxOk) globalResults.passed++;
+    if (metaOk) globalResults.passed++;
     globalResults.failed.push(...siteResults.failed);
 
-    printSiteSummary(perfOk, secOk, seoOk, uxOk);
+    printSiteSummary(perfOk, secOk, seoOk, uxOk, metaOk);
   }
 
   printFinalReport(globalResults);

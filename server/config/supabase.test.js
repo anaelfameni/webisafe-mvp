@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 test('exports null client when Supabase is not configured for local development', async () => {

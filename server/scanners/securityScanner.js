@@ -28,13 +28,15 @@ const SENSITIVE_TARGETS = [
   { path: '/api/swagger-ui.html', penalty: 5, severity: 'medium', label: 'Swagger UI' },
 ];
 
+// Severities calibrées : ces headers sont des best practices défensives, pas des failles
+// exploitables en soi quand HTTPS est actif. Aucun ne devrait être marqué 'high' ou 'critical'.
 const SECURITY_HEADERS_CONFIG = {
-  'strict-transport-security': { points: 20, label: 'HSTS', message: 'HSTS absent — Attaque Man-in-the-Middle possible' },
-  'content-security-policy': { points: 20, label: 'CSP', message: 'CSP absent — Injection de scripts malveillants possible (XSS)' },
-  'x-frame-options': { points: 15, label: 'X-Frame-Options', message: 'X-Frame-Options absent — Clickjacking possible' },
-  'x-content-type-options': { points: 10, label: 'X-Content-Type-Options', message: 'X-Content-Type-Options absent — MIME sniffing possible' },
-  'referrer-policy': { points: 10, label: 'Referrer-Policy', message: "Referrer-Policy absent — Fuite d'URLs sensibles" },
-  'permissions-policy': { points: 10, label: 'Permissions-Policy', message: 'Permissions-Policy absent — Accès caméra/micro non contrôlé' },
+  'strict-transport-security': { points: 20, severity: 'medium', label: 'HSTS', message: 'HSTS absent — protection downgrade HTTPS recommandée' },
+  'content-security-policy': { points: 20, severity: 'medium', label: 'CSP', message: 'CSP absent — défense en profondeur contre XSS recommandée' },
+  'x-frame-options': { points: 15, severity: 'low', label: 'X-Frame-Options', message: 'X-Frame-Options absent — anti-clickjacking recommandé' },
+  'x-content-type-options': { points: 10, severity: 'low', label: 'X-Content-Type-Options', message: 'X-Content-Type-Options absent — anti-MIME-sniffing recommandé' },
+  'referrer-policy': { points: 10, severity: 'low', label: 'Referrer-Policy', message: "Referrer-Policy absent — contrôle des fuites d'URL recommandé" },
+  'permissions-policy': { points: 10, severity: 'low', label: 'Permissions-Policy', message: 'Permissions-Policy absent — contrôle APIs navigateur recommandé' },
 };
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
@@ -109,36 +111,55 @@ async function checkObservatory(url) {
 
 // ── 3) Headers de sécurité ───────────────────────────────────────────────────
 async function checkSecurityHeaders(url) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_HEADERS_MS);
   try {
-    const response = await fetch(url, {
-      method: 'HEAD',
-      signal: controller.signal,
+    const fetchHeaders = (method) => fetch(url, {
+      method,
+      signal: AbortSignal.timeout(TIMEOUT_HEADERS_MS),
+      redirect: 'follow',
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
     });
-    // Utiliser l'URL finale après redirections pour déterminer si HTTPS est actif
+
+    let response;
+    try {
+      response = await fetchHeaders('HEAD');
+      if (!response.ok) throw new Error(`HEAD HTTP ${response.status}`);
+    } catch (headErr) {
+      console.warn('[SECURITY] HEAD headers check failed, fallback GET:', headErr.message);
+      response = await fetchHeaders('GET');
+    }
+
+    let analyzed = analyzeSecurityHeaders(response.headers, response.url || url);
+    const hasUsefulHeaderSignal =
+      analyzed.headers_presents.length > 0 ||
+      response.headers.get('server') ||
+      response.headers.get('content-type');
+
+    if (!hasUsefulHeaderSignal) {
+      response = await fetchHeaders('GET');
+      analyzed = analyzeSecurityHeaders(response.headers, response.url || url);
+    }
+
     const finalUrl = response.url || url;
-    return { ...analyzeSecurityHeaders(response.headers, finalUrl), finalUrl };
+    return { ...analyzed, finalUrl };
   } catch (err) {
     console.warn('[SECURITY] Headers check failed:', err.message);
     const isHttps = url.startsWith('https://');
     return {
       score: 0,
       headers_presents: [],
-      headers_manquants: Object.values(SECURITY_HEADERS_CONFIG).map(h => ({ header: h.label, message: h.message })),
+      headers_manquants: Object.values(SECURITY_HEADERS_CONFIG).map(h => ({ header: h.label, message: h.message, severity: h.severity })),
       cookie_issues: [],
       header_score: 0,
       ssl_grade: isHttps ? 'Unknown' : 'Absent',
       grade: 'F',
     };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
 export function analyzeSecurityHeaders(headers, url = '') {
-  let score = 15;
+  // Baseline 30 (au lieu de 15) : un site qui répond correctement a déjà une base saine.
+  // Chaque header présent ajoute son poids.
+  let score = 30;
   const present = [];
   const missing = [];
 
@@ -147,7 +168,7 @@ export function analyzeSecurityHeaders(headers, url = '') {
       score += config.points;
       present.push(header);
     } else {
-      missing.push({ header: config.label, message: config.message });
+      missing.push({ header: config.label, message: config.message, severity: config.severity });
     }
   }
 
@@ -316,22 +337,29 @@ export async function fetchSSLGrade(domain) {
 }
 
 // ── Score composite ───────────────────────────────────────────────────────────
-// Répartition : 20 HTTPS + 25 Observatory + 25 Malware + 20 Headers + 10 Fichiers
-function computeSecurityScore({ malwareDetected, observatoryScore, isHttps, headerScore, sensitiveCritical }) {
-  if (malwareDetected === true) return 0;
+// Répartition rééquilibrée : 35 HTTPS + 35 Malware + 15 Observatory/Headers + 10 Fichiers + 5 SSL
+// Les fondamentaux (HTTPS + pas de malware) pèsent 70 pts. Les best practices headers : 15 pts max.
+function computeSecurityScore({ malwareDetected, observatoryScore, isHttps, headerScore, sensitiveCritical, ssl_grade }) {
+  if (malwareDetected === true) return Math.min(25, clamp(0, 0, 100));
   let score = 0;
 
-  score += isHttps ? 20 : 0;
+  // Fondamentaux (75 pts)
+  score += isHttps ? 35 : 0;                         // chiffrement transport
+  score += isHttps ? 5 : 0;                          // SSL valide (implicite si HTTPS répond)
+  if (malwareDetected === false) score += 35;        // vérifié OK
+  else if (malwareDetected === null) score += 30;    // non vérifié → bénéfice du doute
 
-  if (observatoryScore !== null) score += Math.round((observatoryScore / 100) * 25);
-  else if (headerScore !== null) score += Math.round((headerScore / 100) * 25);
-  else score += 8;
+  // Best practices (15 pts max)
+  if (observatoryScore !== null) score += Math.round((observatoryScore / 100) * 15);
+  else if (headerScore !== null) score += Math.round((headerScore / 100) * 15);
+  else score += 5;
 
-  score += malwareDetected === false ? 25 : 12;
+  // SSL (5 pts)
+  if (ssl_grade === 'A+' || ssl_grade === 'A') score += 5;
+  else if (ssl_grade === 'B' || ssl_grade === 'C') score += 2;
+  else if (ssl_grade === 'D' || ssl_grade === 'E' || ssl_grade === 'F') score -= 5;
 
-  if (headerScore !== null) score += Math.round((headerScore / 100) * 20);
-  else if (isHttps) score += 10;
-
+  // Hygiène (10 pts)
   if (!sensitiveCritical) score += 10;
 
   return clamp(score, 0, 100);
@@ -363,7 +391,7 @@ export async function scanSecurity(url, vtApiKey) {
     ? headersResult.value
     : {
       headers_presents: [],
-      headers_manquants: Object.values(SECURITY_HEADERS_CONFIG).map(h => ({ header: h.label, message: h.message })),
+      headers_manquants: Object.values(SECURITY_HEADERS_CONFIG).map(h => ({ header: h.label, message: h.message, severity: h.severity })),
       cookie_issues: [],
       header_score: null,
       ssl_grade: isHttps ? 'Unknown' : 'Absent',
@@ -393,12 +421,15 @@ export async function scanSecurity(url, vtApiKey) {
   if (sensitiveResult.status === 'rejected') console.error('[SECURITY] Sensitive files :', sensitiveResult.reason?.message);
   if (sslResult.status === 'rejected') console.error('[SECURITY] SSL Labs :', sslResult.reason?.message);
 
+  const resolvedSslGrade = sslData.grade !== 'N/A' ? sslData.grade : headersData.ssl_grade;
+
   const baseScore = computeSecurityScore({
     malwareDetected,
     observatoryScore,
     isHttps,
     headerScore: headersData.header_score,
     sensitiveCritical: sensitiveData.critical,
+    ssl_grade: resolvedSslGrade,
   });
 
   const finalScore = Math.max(0, baseScore - (sensitiveData.score_penalty ?? 0));

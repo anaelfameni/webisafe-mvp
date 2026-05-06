@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
@@ -22,7 +22,7 @@ test('buildAdminPaymentNotificationEmail builds the admin alert email with the e
   assert.match(email.html, /💰 Nouveau paiement à valider/);
   assert.match(email.html, /WBS-1234-ABCD/);
   assert.match(email.html, /35 000 FCFA/);
-  assert.match(email.html, /https:\/\/webisafe\.ci\/admin\?token=WEBISAFE_ADMIN_2025/);
+  assert.match(email.html, /https:\/\/webisafe\.ci\/admin/);
   assert.match(email.html, /Valider dans le Panel Admin/);
 });
 

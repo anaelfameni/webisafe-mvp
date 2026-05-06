@@ -142,7 +142,7 @@ export default function PricingSection({ onScan, hideHeader = false }) {
               </ul>
 
               {plan.prerequisite && (
-                <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-warning/8 border border-warning/20 rounded-xl">
+                <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-warning/10 border border-warning/20 rounded-xl">
                   <Lock size={11} className="text-warning flex-shrink-0" />
                   <p className="text-warning/80 text-[11px] leading-tight">Addon mensuel — requiert un audit premium initial (35 000 FCFA)</p>
                 </div>

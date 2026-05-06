@@ -3,10 +3,13 @@ import { getScoreColor, getScoreBadge } from '../utils/calculateScore';
 import { ChevronRight, Lock } from 'lucide-react';
 
 export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewDetails, extra }) {
-  const safeScore   = score ?? 0;
-  const color       = getScoreColor(safeScore);
-  const badge       = getScoreBadge(safeScore);
-  const progressWidth = `${safeScore}%`;
+  const isNull = score === null;
+  const safeScore = isNull ? 0 : (score ?? 0);
+  const color = isNull ? '#6b7280' : getScoreColor(safeScore);
+  const badge = isNull
+    ? { text: 'Partiel', color: 'bg-yellow-500/10 text-yellow-300 border border-yellow-500/20' }
+    : getScoreBadge(safeScore);
+  const progressWidth = isNull ? '0%' : `${safeScore}%`;
 
   return (
     <motion.div
@@ -27,9 +30,9 @@ export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewD
         </div>
         <div className="text-right">
           <span className="text-2xl font-bold" style={{ color }}>
-            {score ?? 'N/A'}
+            {isNull ? '—' : (score ?? 'N/A')}
           </span>
-          {score != null && <span className="text-white text-sm">/100</span>}
+          {!isNull && score != null && <span className="text-white text-sm">/100</span>}
         </div>
       </div>
 
@@ -38,11 +41,16 @@ export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewD
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: progressWidth }}
-          transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
+          transition={{ duration: isNull ? 0 : 1, delay: 0.3, ease: 'easeOut' }}
           className="h-full rounded-full"
           style={{ backgroundColor: color }}
         />
       </div>
+      {isNull && (
+        <p className="text-xs text-white/40 mb-3">
+          Scan partiel — ce score est indisponible car une protection anti-bot a été détectée.
+        </p>
+      )}
 
       {/* Métriques */}
       <div className="space-y-2.5">

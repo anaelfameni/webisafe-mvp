@@ -1,7 +1,7 @@
-import test from 'node:test';
+﻿import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
-import { validateUrl, normalizeURL } from './validators.js';
+import { validateUrl, normalizeURL, buildAccessibilityProbeUrls } from './validators.js';
 
 test('normalizes localhost without protocol to HTTP for local scans', () => {
   assert.equal(normalizeURL('localhost:5173'), 'http://localhost:5173/');
@@ -10,6 +10,13 @@ test('normalizes localhost without protocol to HTTP for local scans', () => {
 
 test('keeps public domains on HTTPS when protocol is omitted', () => {
   assert.equal(normalizeURL('example.com'), 'https://example.com/');
+});
+
+test('adds www fallback probe for bare public domains', () => {
+  assert.deepEqual(buildAccessibilityProbeUrls('https://nsiabanque.ci/'), [
+    'https://nsiabanque.ci/',
+    'https://www.nsiabanque.ci/',
+  ]);
 });
 
 test('allows localhost and loopback scan URLs', () => {

@@ -1,4 +1,6 @@
 import * as cheerio from 'cheerio';
+import { detectProtectionPage } from '../utils/protectionDetection.js';
+import { getPageSpeedScore } from './pageSpeedScanner.js';
 
 const TIMEOUT_MS = 8_000;
 const PAGESPEED_TIMEOUT_MS = 25_000;
@@ -55,11 +57,14 @@ async function fetchPageSpeedSeoScore(url, apiKey) {
  *   ─────────────────────
  *   Total max   100 pts
  */
-export async function scanSEO(url, apiKey) {
+export async function scanSEO(url, apiKey, pageSpeedData = null) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   let html;
+  let responseHeaders = null;
+  let finalUrl = url;
+  let fetchError = null;
   try {
     const response = await fetch(url, {
       signal: controller.signal,
@@ -74,9 +79,66 @@ export async function scanSEO(url, apiKey) {
       throw new Error(`HTTP ${response.status} lors du fetch HTML`);
     }
 
+    responseHeaders = response.headers;
+    finalUrl = response.url || url;
     html = await response.text();
+  } catch (err) {
+    fetchError = err;
   } finally {
     clearTimeout(timer);
+  }
+
+  if (!html) {
+    const pageSpeedScore = pageSpeedData
+      ? getPageSpeedScore(pageSpeedData, 'seo')
+      : await fetchPageSpeedSeoScore(url, apiKey);
+    return {
+      score: pageSpeedScore,
+      local_score: null,
+      pageSpeed_score: pageSpeedScore,
+      has_title: null,
+      title_length: null,
+      has_description: null,
+      desc_length: null,
+      h1_count: null,
+      has_viewport: null,
+      has_open_graph: null,
+      has_canonical: null,
+      is_indexable: null,
+      crawlable_ratio: null,
+      descriptive_ratio: null,
+      partial: true,
+      partial_reason: fetchError?.message || 'html_unavailable',
+      protection_detected: null,
+      html_snippet: '',
+    };
+  }
+
+  const protection = detectProtectionPage({ url, finalUrl, html, headers: responseHeaders });
+  if (protection.detected) {
+    const pageSpeedScore = pageSpeedData
+      ? getPageSpeedScore(pageSpeedData, 'seo')
+      : await fetchPageSpeedSeoScore(url, apiKey);
+    return {
+      score: pageSpeedScore,
+      local_score: null,
+      pageSpeed_score: pageSpeedScore,
+      has_title: null,
+      title_length: null,
+      has_description: null,
+      desc_length: null,
+      h1_count: null,
+      has_viewport: null,
+      has_open_graph: null,
+      has_canonical: null,
+      is_indexable: null,
+      crawlable_ratio: null,
+      descriptive_ratio: null,
+      partial: true,
+      partial_reason: 'protection_detected',
+      protection_detected: protection,
+      html_snippet: html.slice(0, 60_000),
+    };
   }
 
   const $ = cheerio.load(html);
@@ -191,7 +253,9 @@ export async function scanSEO(url, apiKey) {
   if (hasOpenGraph) score += 2;
 
   const localScore = Math.min(100, score);
-  const pageSpeedScore = await fetchPageSpeedSeoScore(url, apiKey);
+  const pageSpeedScore = pageSpeedData
+    ? getPageSpeedScore(pageSpeedData, 'seo')
+    : await fetchPageSpeedSeoScore(url, apiKey);
 
   return {
     score: pageSpeedScore ?? localScore,
@@ -209,5 +273,7 @@ export async function scanSEO(url, apiKey) {
     crawlable_ratio: Math.round(crawlableRatio * 100),
     descriptive_ratio: Math.round(descriptiveRatio * 100),
     partial: pageSpeedScore === null && Boolean(apiKey),
+    protection_detected: null,
+    html_snippet: html.slice(0, 60_000),
   };
 }

@@ -51,7 +51,7 @@ export function buildAdminPaymentNotificationEmail({
   const clientEmail = escapeHtml(user_email);
   const auditUrl = escapeHtml(url_to_audit);
   const wavePhone = escapeHtml(wave_phone);
-  const ctaUrl = `${appUrl}/admin?token=WEBISAFE_ADMIN_2025`;
+  const ctaUrl = `${appUrl}/admin`;
 
   const body = `
     <p style="margin:0 0 22px;font-size:15px;line-height:1.7;color:#cbd5e1">
@@ -76,7 +76,7 @@ export function buildAdminPaymentNotificationEmail({
 
   return {
     to: 'webisafe@gmail.com',
-    subject: `🔔 [ACTION REQUISE] Nouveau paiement Wave — ${payment_code}`,
+    subject: `🔔 [ACTION REQUISE] Nouveau paiement Wave — ${String(payment_code || '').replace(/[\r\n]+/g, ' ')}`,
     html: createEmailShell({
       title: '💰 Nouveau paiement à valider',
       body,

@@ -1,4 +1,10 @@
 const HTTP_PROTOCOL_RE = /^https?:\/\//i;
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+  'Cache-Control': 'no-cache',
+};
 
 function hostFromInput(input) {
   const hostPart = input.split(/[/?#]/, 1)[0];
@@ -81,33 +87,49 @@ export function validateUrl(url) {
   }
 }
 
+export function buildAccessibilityProbeUrls(url) {
+  const urls = [];
+  try {
+    const parsed = new URL(url);
+    urls.push(parsed.href);
+    if (!parsed.hostname.startsWith('www.') && parsed.hostname.includes('.')) {
+      const wwwUrl = new URL(parsed.href);
+      wwwUrl.hostname = `www.${parsed.hostname}`;
+      urls.push(wwwUrl.href);
+    }
+  } catch {
+    urls.push(url);
+  }
+  return Array.from(new Set(urls));
+}
+
 /**
  * Vérifie si un site est accessible
  */
 export async function checkUrlAccessible(url) {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+  let lastStatus = null;
+  for (const probeUrl of buildAccessibilityProbeUrls(url)) {
+    for (const method of ['HEAD', 'GET']) {
+      try {
+        const response = await fetch(probeUrl, {
+          method,
+          signal: AbortSignal.timeout(8000),
+          redirect: 'follow',
+          headers: BROWSER_HEADERS,
+        });
 
-    const response = await fetch(url, {
-      method: 'HEAD',
-      signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
-    });
-
-    clearTimeout(timeout);
-
-    if (response.status >= 500) {
-      return { accessible: false, error: 'Le site retourne une erreur serveur' };
+        lastStatus = response.status;
+        if (response.status < 500) {
+          return { accessible: true, url: probeUrl, final_url: response.url || probeUrl };
+        }
+      } catch {
+      }
     }
-
-    return { accessible: true };
-  } catch (err) {
-    return {
-      accessible: false,
-      error: err.name === 'AbortError'
-        ? 'Le site met trop de temps à répondre (timeout)'
-        : "Ce site est inaccessible ou l'URL est incorrecte",
-    };
   }
+
+  if (lastStatus >= 500) {
+    return { accessible: false, error: 'Le site retourne une erreur serveur' };
+  }
+
+  return { accessible: false, error: "Impossible de joindre le site. Vérifiez l'URL." };
 }

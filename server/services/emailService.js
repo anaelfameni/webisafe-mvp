@@ -4,7 +4,7 @@ const EMAIL_FROM = 'Webisafe <webisafe@gmail.com>';
 
 // Initialisation lazy — évite le crash au démarrage si la clé est absente
 function getResend() {
-  const key = process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY;
+  const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.warn('[EMAIL] ⚠️  RESEND_API_KEY manquante — emails désactivés');
     return null;

@@ -7,12 +7,15 @@ import {
   ArrowRight, BarChart3, CheckCircle2, ExternalLink, Plus, Trash2,
   Download, TrendingUp, TrendingDown, AlertTriangle, Activity,
   Sparkles, PartyPopper, Handshake, Users, ChevronRight, Wrench,
+  Settings, KeyRound,
 } from 'lucide-react';
 import { useScans } from '../hooks/useScans';
+import { useAuth } from '../hooks/useAuth';
 import { getScoreBadge, getScoreColor } from '../utils/calculateScore';
 import { formatDate, extractDomain } from '../utils/validators';
-import { fetchPaymentRequestsByEmail } from '../utils/paymentApi';
+import { fetchLatestPaymentRequest } from '../utils/paymentApi';
 import { buildValidatedPremiumMap } from '../utils/premiumAccess';
+import { supabase } from '../lib/supabaseClient';
 import { shouldShowDashboardWelcome } from '../utils/dashboardWelcome';
 import ScoreEvolutionChart from '../components/ScoreEvolutionChart';
 import { generatePDF } from '../utils/generatePDF';
@@ -519,6 +522,175 @@ function PageSubscription({ user, navigate }) {
   );
 }
 
+// ── Page: Paramètres ──────────────────────────────────────────────────────────
+function PageSettings({ user }) {
+  const { changePassword } = useAuth();
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showOld, setShowOld] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  function getPasswordStrength(pw) {
+    if (!pw || pw.length < 8) return { level: 0, label: 'Trop court (8 min)', color: 'bg-red-500' };
+    let score = 0;
+    if (/[a-z]/.test(pw)) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    const levels = [
+      { label: 'Faible', color: 'bg-red-500' },
+      { label: 'Moyen', color: 'bg-orange-500' },
+      { label: 'Bon', color: 'bg-yellow-400' },
+      { label: 'Fort', color: 'bg-green-500' },
+    ];
+    return { level: score, label: levels[score - 1]?.label || 'Faible', color: levels[score - 1]?.color || 'bg-red-500' };
+  }
+
+  const passwordStrength = getPasswordStrength(newPassword);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess(false);
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setError('Veuillez remplir tous les champs.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (!/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setError('Le nouveau mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+
+    setLoading(true);
+    const result = await changePassword(oldPassword, newPassword);
+    setLoading(false);
+
+    if (result.success) {
+      setSuccess(true);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } else {
+      setError(result.error || 'Erreur lors du changement de mot de passe.');
+    }
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-lg">
+      <div className="bg-card-bg border border-border-color rounded-2xl p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+            <KeyRound size={20} className="text-primary" />
+          </div>
+          <div>
+            <h3 className="text-white font-bold text-base">Sécurité du compte</h3>
+            <p className="text-white/50 text-xs">{user?.email}</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-text-secondary text-sm mb-1 block">Ancien mot de passe</label>
+            <div className="relative">
+              <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+              <input
+                type={showOld ? 'text' : 'password'}
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full pl-10 pr-10 py-3 bg-dark-navy border border-border-color rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-primary transition-colors text-sm"
+              />
+              <button type="button" onClick={() => setShowOld(!showOld)} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-white transition-colors">
+                {showOld ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-text-secondary text-sm mb-1 block">Nouveau mot de passe</label>
+            <div className="relative">
+              <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+              <input
+                type={showNew ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={8}
+                className="w-full pl-10 pr-10 py-3 bg-dark-navy border border-border-color rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-primary transition-colors text-sm"
+              />
+              <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-white transition-colors">
+                {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {newPassword.length > 0 && (
+              <div className="mt-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div className={`h-full ${passwordStrength.color} transition-all duration-300`} style={{ width: `${(passwordStrength.level / 4) * 100}%` }} />
+                  </div>
+                  <span className="text-[10px] text-text-secondary">{passwordStrength.label}</span>
+                </div>
+                <p className="text-[10px] text-text-secondary/70 mt-1">8 caractères minimum, avec majuscule, minuscule et chiffre.</p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="text-text-secondary text-sm mb-1 block">Confirmer le nouveau mot de passe</label>
+            <div className="relative">
+              <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+              <input
+                type={showNew ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={8}
+                className="w-full pl-10 pr-4 py-3 bg-dark-navy border border-border-color rounded-xl text-white placeholder:text-text-secondary/50 focus:outline-none focus:border-primary transition-colors text-sm"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-danger text-sm text-center bg-danger/10 rounded-lg p-2">
+              {error}
+            </motion.p>
+          )}
+
+          {success && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 text-success text-sm bg-success/10 rounded-lg p-2">
+              <CheckCircle2 size={16} /> Mot de passe mis à jour avec succès.
+            </motion.div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 bg-primary hover:bg-primary-hover text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {loading ? <Loader2 size={18} className="animate-spin" /> : 'Changer le mot de passe'}
+          </button>
+        </form>
+      </div>
+    </motion.div>
+  );
+}
+
 // ── Sidebar nav items ─────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   { id: 'overview', label: 'Vue d\'ensemble', icon: <LayoutDashboard size={18} /> },
@@ -527,6 +699,7 @@ const NAV_ITEMS = [
   { id: 'performance', label: 'Performance', icon: <Zap size={18} /> },
   { id: 'history', label: 'Historique', icon: <History size={18} /> },
   { id: 'subscription', label: 'Mon Abonnement', icon: <CreditCard size={18} /> },
+  { id: 'settings', label: 'Paramètres', icon: <Settings size={18} /> },
 ];
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
@@ -553,7 +726,9 @@ export default function Dashboard({ user }) {
     async function sync() {
       if (!user?.email || scans.length === 0) { if (active) setValidatedPremiumMap({}); return; }
       try {
-        const reqs = await fetchPaymentRequestsByEmail(user.email, 50);
+        const reqs = (await Promise.all(
+          scans.slice(0, 50).map((scan) => fetchLatestPaymentRequest(scan.id).catch(() => null))
+        )).filter(Boolean);
         if (!active) return;
         const map = buildValidatedPremiumMap(scans, reqs || []);
         Object.keys(map).forEach(id => markAsPaid(id));
@@ -566,13 +741,16 @@ export default function Dashboard({ user }) {
 
   useEffect(() => {
     if (!user?.id) return;
-    fetch(`/api/uptime/${user.id}`)
+    supabase.auth.getSession()
+      .then(({ data }) => fetch(`/api/uptime/${user.id}`, {
+        headers: data?.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {},
+      }))
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.success) setUptime(data); })
       .catch(() => {});
   }, [user?.id]);
 
-  const PAGE_TITLES = { overview: 'Vue d\'ensemble', reports: 'Rapports', security: 'Sécurité', performance: 'Performance', history: 'Historique', subscription: 'Mon Abonnement' };
+  const PAGE_TITLES = { overview: 'Vue d\'ensemble', reports: 'Rapports', security: 'Sécurité', performance: 'Performance', history: 'Historique', subscription: 'Mon Abonnement', settings: 'Paramètres' };
 
   if (!user) {
     return (
@@ -690,6 +868,7 @@ export default function Dashboard({ user }) {
               {activePage === 'performance' && <PagePerformance scans={scans} />}
               {activePage === 'history' && <PageHistory scans={scans} navigate={navigate} />}
               {activePage === 'subscription' && <PageSubscription user={user} navigate={navigate} />}
+              {activePage === 'settings' && <PageSettings user={user} />}
             </motion.div>
           </AnimatePresence>
         </main>

@@ -1,7 +1,6 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 
-import { SIGNUPS_TABLE, buildSignupRecord, persistSignupRecord } from './signupPersistence.js';
+import { SIGNUP_PROFILE_ENDPOINT, buildSignupRecord, persistSignupRecord } from './signupPersistence.js';
 
 test('buildSignupRecord maps signup coordinates for Supabase storage', () => {
   const createdAt = '2026-04-21T22:15:00.000Z';
@@ -15,7 +14,7 @@ test('buildSignupRecord maps signup coordinates for Supabase storage', () => {
     createdAt,
   });
 
-  assert.deepEqual(record, {
+  expect(record).toEqual({
     id: 'user_123',
     name: 'Ada Lovelace',
     email: 'ada@example.com',
@@ -25,7 +24,7 @@ test('buildSignupRecord maps signup coordinates for Supabase storage', () => {
   });
 });
 
-test('persistSignupRecord inserts the record into the signups table', async () => {
+test('persistSignupRecord delegates persistence to a backend endpoint adapter', async () => {
   const calls = [];
 
   const saved = await persistSignupRecord(
@@ -38,22 +37,26 @@ test('persistSignupRecord inserts the record into the signups table', async () =
       createdAt: '2026-04-21T22:16:00.000Z',
     },
     {
-      insert: async (table, body) => {
-        calls.push({ table, body });
-        return { table, ...body };
+      persist: async (body, context) => {
+        calls.push({ body, context });
+        return { ...body, persisted: true };
       },
+      token: 'jwt-token',
     }
   );
 
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].table, SIGNUPS_TABLE);
-  assert.deepEqual(saved, {
-    table: SIGNUPS_TABLE,
+  expect(calls.length).toBe(1);
+  expect(calls[0].context).toEqual({
+    endpoint: SIGNUP_PROFILE_ENDPOINT,
+    token: 'jwt-token',
+  });
+  expect(saved).toEqual({
     id: 'user_456',
     name: 'Grace Hopper',
     email: 'grace@example.com',
     phone: '+2250102030405',
     phone_country: 'CI',
     created_at: '2026-04-21T22:16:00.000Z',
+    persisted: true,
   });
 });

@@ -1,6 +1,5 @@
-import { insertRow, selectRows, updateRows, upsertRow } from './supabaseRest';
-import { WAVE_PAYMENT_AMOUNT } from './wavePayment';
 import { mergePaymentRequests } from './paymentRequestsCache';
+import { supabase } from '../lib/supabaseClient';
 
 const PAYMENT_REQUESTS_CACHE_KEY = 'webisafe_payment_requests_cache';
 
@@ -33,97 +32,32 @@ function upsertCachedPaymentRequest(row) {
 }
 
 export async function persistScanRecord(scan) {
-  try {
-    return await upsertRow(
-      'scans',
-      {
-        id: scan.id,
-        url: scan.url,
-        email: scan.email || null,
-        scan_date: scan.scanDate || new Date().toISOString(),
-        data: scan,
-        paid: Boolean(scan.paid),
-      },
-      'id'
-    );
-  } catch {
-    return null;
-  }
+  return scan || null;
 }
 
 export async function fetchRemoteScan(scanId) {
-  const rows = await selectRows('scans', `select=*&id=eq.${encodeURIComponent(scanId)}&limit=1`);
-  const row = rows?.[0];
-
-  if (!row) {
-    return null;
-  }
-
-  const scanData = row.data || row.results_json || {};
-
-  return {
-    ...scanData,
-    id: row.id,
-    url: row.url || scanData?.url,
-    email: row.email || scanData?.email || scanData?.user_email,
-    scanDate: row.scan_date || row.scanned_at || scanData?.scanDate || scanData?.scanned_at,
-    paid: Boolean(row.paid),
-  };
-}
-
-export async function markScanPaid(scanId) {
-  try {
-    return await updateRows('scans', `id=eq.${encodeURIComponent(scanId)}`, {
-      paid: true,
-    });
-  } catch {
-    return null;
-  }
+  const response = await fetch(`/api/scan-record?id=${encodeURIComponent(scanId)}`);
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.scan || null;
 }
 
 export async function createPaymentRequest(payload) {
-  const fallbackRow = upsertCachedPaymentRequest({
-    id: payload.id || `local_${Date.now()}`,
-    amount: WAVE_PAYMENT_AMOUNT,
-    ...payload,
-    created_at: payload.created_at || new Date().toISOString(),
-  });
-
-  try {
-    const remoteRow = await insertRow('payment_requests', {
-      amount: WAVE_PAYMENT_AMOUNT,
-      ...payload,
-    });
-    return upsertCachedPaymentRequest(remoteRow);
-  } catch {
-    return fallbackRow;
-  }
+  return reportPayment(payload);
 }
 
 export async function updatePaymentRequest(id, payload) {
-  const currentLocal = readCachedPaymentRequests().find((item) => item.id === id);
-  const fallbackRow = upsertCachedPaymentRequest({
-    ...(currentLocal || { id, created_at: new Date().toISOString() }),
-    ...payload,
-    id,
-  });
-
-  try {
-    const remoteRow = await updateRows('payment_requests', `id=eq.${encodeURIComponent(id)}`, payload);
-    return upsertCachedPaymentRequest(remoteRow || fallbackRow);
-  } catch {
-    return fallbackRow;
-  }
+  return reportPayment({ ...payload, id });
 }
 
 export async function fetchLatestPaymentRequest(scanId) {
   const localRows = readCachedPaymentRequests().filter((row) => row.scan_id === scanId);
 
   try {
-    const rows = await selectRows(
-      'payment_requests',
-      `select=*&scan_id=eq.${encodeURIComponent(scanId)}&order=created_at.desc&limit=1`
-    );
+    const response = await fetch(`/api/payment-status?scan_id=${encodeURIComponent(scanId)}`);
+    if (!response.ok) throw new Error('Chargement statut paiement impossible');
+    const data = await response.json();
+    const rows = data.payment ? [data.payment] : [];
     const merged = mergePaymentRequests(rows || [], localRows);
     writeCachedPaymentRequests(mergePaymentRequests(rows || [], readCachedPaymentRequests()));
     return merged[0] || null;
@@ -136,10 +70,17 @@ export async function fetchPaymentRequests(limit = 20) {
   const localRows = readCachedPaymentRequests();
 
   try {
-    const remoteRows = await selectRows(
-      'payment_requests',
-      `select=*&order=created_at.desc&limit=${limit}`
-    );
+    const { data: { session } } = await supabase.auth.getSession();
+    const response = await fetch(`/api/payment-requests?limit=${encodeURIComponent(limit)}`, {
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+    });
+
+    if (!response.ok) {
+      throw new Error('Chargement paiements impossible');
+    }
+
+    const data = await response.json();
+    const remoteRows = data.payments || [];
     const merged = mergePaymentRequests(remoteRows || [], localRows).slice(0, limit);
     writeCachedPaymentRequests(mergePaymentRequests(remoteRows || [], localRows));
     return merged;
@@ -152,24 +93,22 @@ export async function fetchPaymentRequestsByEmail(email, limit = 50) {
   if (!email) return [];
 
   const localRows = readCachedPaymentRequests().filter((row) => row.user_email === email);
-
-  try {
-    const remoteRows = await selectRows(
-      'payment_requests',
-      `select=*&user_email=eq.${encodeURIComponent(email)}&order=created_at.desc&limit=${limit}`
-    );
-    const merged = mergePaymentRequests(remoteRows || [], localRows).slice(0, limit);
-    writeCachedPaymentRequests(mergePaymentRequests(remoteRows || [], readCachedPaymentRequests()));
-    return merged;
-  } catch {
-    return mergePaymentRequests([], localRows).slice(0, limit);
-  }
+  return mergePaymentRequests([], localRows).slice(0, limit);
 }
 
-async function postApi(path, payload) {
+async function postApi(path, payload, options = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+
+  if (options.auth) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers.Authorization = `Bearer ${session.access_token}`;
+    }
+  }
+
   const response = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -185,10 +124,39 @@ export function notifyAdmin(payload) {
   return postApi('/api/notify-admin', payload);
 }
 
+export async function reportPayment(payload) {
+  const response = await postApi('/api/report-payment', payload);
+  const payment = response?.payment || response;
+  upsertCachedPaymentRequest(payment);
+  return payment;
+}
+
 export function sendConfirmPayment(payload) {
-  return postApi('/api/confirm-payment', payload);
+  return postApi('/api/confirm-payment', payload, { auth: true });
 }
 
 export function sendRejectPayment(payload) {
-  return postApi('/api/reject-payment', payload);
+  return postApi('/api/reject-payment', payload, { auth: true });
+}
+
+export function unlockScanAsAdmin(payload) {
+  return postApi('/api/unlock-scan', payload, { auth: true });
+}
+
+export function markScanPaid(scanId) {
+  return unlockScanAsAdmin({ scan_id: scanId });
+}
+
+export async function fetchScans(limit = 50) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const response = await fetch(`/api/admin-scans?limit=${encodeURIComponent(limit)}`, {
+    headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+  });
+
+  if (!response.ok) {
+    throw new Error('Chargement scans impossible');
+  }
+
+  const data = await response.json();
+  return data.scans || [];
 }

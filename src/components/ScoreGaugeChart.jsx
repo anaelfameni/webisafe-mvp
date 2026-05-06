@@ -62,13 +62,18 @@ export default function ScoreGaugeChart({
   showLegend = true,
   badgeLiftMobile = false,
 }) {
-  const [currentScore, setCurrentScore] = useState(0);
+  const isNull = score === null;
+  const [currentScore, setCurrentScore] = useState(isNull ? null : 0);
   const [hoveredSeg, setHoveredSeg] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0, visible: false, seg: null });
-  const activeSegment = getActiveSegment(currentScore);
+  const activeSegment = getActiveSegment(isNull ? 0 : currentScore);
   const hasAnimated = useRef(false);
 
   useEffect(() => {
+    if (isNull) {
+      setCurrentScore(null);
+      return;
+    }
     if (hasAnimated.current) {
       setCurrentScore(score);
       return;
@@ -93,7 +98,65 @@ export default function ScoreGaugeChart({
 
     frameId = requestAnimationFrame(update);
     return () => cancelAnimationFrame(frameId);
-  }, [score, compact]);
+  }, [score, compact, isNull]);
+
+  const containerClass = compact
+    ? 'relative w-[250px] h-[145px] sm:w-[270px] sm:h-[155px] z-10 flex-shrink-0'
+    : 'relative w-[300px] h-[160px] sm:w-[320px] sm:h-[180px] z-10 flex-shrink-0';
+
+  const scoreBlockClass = compact
+    ? badgeLiftMobile
+      ? 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-6 sm:translate-y-10'
+      : 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-8 sm:translate-y-10'
+    : badgeLiftMobile
+      ? 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-8 sm:translate-y-12'
+      : 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-10 sm:translate-y-12';
+
+  if (isNull) {
+    return (
+      <div className={containerClass}>
+        <svg
+          viewBox="0 0 320 180"
+          width="100%"
+          height="100%"
+          style={{ filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.4))', overflow: 'visible' }}
+        >
+          <path d={describeSolidArc(cx, cy, outerR + 8, -90, 90)} fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+          <path d={describeArc(cx, cy, outerR, innerR, -90, 90)} fill="rgba(255,255,255,0.03)" />
+          {segments.map((seg) => {
+            const startAngle = startAngleAcc;
+            const endAngle = startAngleAcc + (seg.percent / 100) * 180;
+            startAngleAcc = endAngle;
+            return (
+              <path
+                key={seg.id}
+                d={describeArc(cx, cy, outerR, innerR, startAngle, endAngle)}
+                fill={seg.color}
+                opacity={0.15}
+              />
+            );
+          })}
+          <path d={describeSolidArc(cx, cy, innerR - 2, -90, 90)} fill="#0d1530" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+        </svg>
+        <div className={scoreBlockClass}>
+          <div className={`${compact ? 'text-[10px]' : 'text-[11px]'} text-white/40 tracking-[2.5px] uppercase font-semibold mb-1`}>
+            Score
+          </div>
+          <div className={`${compact ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'} font-extrabold leading-none text-white/20 tracking-[-2px]`}>
+            —
+          </div>
+          <div className={`${compact ? 'text-xs' : 'text-sm'} text-white/25 font-medium mt-0.5`}>
+            Partiel
+          </div>
+          <div className={`inline-flex items-center gap-1.5 ${compact ? 'mt-2 sm:mt-3' : 'mt-3'} px-3 py-1 rounded-full border bg-white/5 border-white/10`}>
+            <span className="text-[11px] font-bold tracking-[1px] uppercase text-white/40">
+              INDISPONIBLE
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const scoreAngle = (currentScore / 100) * 180 - 90;
   const needleLength = outerR + 14;
@@ -115,18 +178,6 @@ export default function ScoreGaugeChart({
   const connectorStart = polarToCart(cx, cy, needleLength + 2, scoreAngle);
   const connectorEnd = polarToCart(cx, cy, outerR + 12, scoreAngle);
   let startAngleAcc = -90;
-
-  const containerClass = compact
-    ? 'relative w-[250px] h-[145px] sm:w-[270px] sm:h-[155px] z-10 flex-shrink-0'
-    : 'relative w-[300px] h-[160px] sm:w-[320px] sm:h-[180px] z-10 flex-shrink-0';
-
-  const scoreBlockClass = compact
-    ? badgeLiftMobile
-      ? 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-6 sm:translate-y-10'
-      : 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-8 sm:translate-y-10'
-    : badgeLiftMobile
-      ? 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-8 sm:translate-y-12'
-      : 'absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pointer-events-none pb-0 translate-y-10 sm:translate-y-12';
 
   return (
     <div className={containerClass}>

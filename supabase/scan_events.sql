@@ -10,5 +10,12 @@ create table if not exists scan_events (
 -- Index pour les requêtes fréquentes (feed temps réel)
 create index if not exists idx_scan_events_created_at on scan_events(created_at desc);
 
+alter table public.scan_events enable row level security;
+
 -- Enable realtime (Supabase Realtime doit être activé sur cette table)
-alter publication supabase_realtime add table scan_events;
+do $$
+begin
+  alter publication supabase_realtime add table public.scan_events;
+exception
+  when duplicate_object then null;
+end $$;

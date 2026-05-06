@@ -1,11 +1,9 @@
-import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
-import { setCorsHeaders } from './_utils.js';
+import { checkRateLimit, escapeHtml, sendResendEmail, setCorsHeaders } from './_utils.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } }) : null;
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 function generateTopIssues(result) {
   const issues = [];
@@ -37,23 +35,27 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
+  const rateLimit = checkRateLimit(req, 10, 60000);
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ error: `Trop de requêtes. Réessayez dans ${rateLimit.retryAfter}s.` });
+  }
+
   const { email, result } = req.body;
   if (!email || !result) return res.status(400).json({ error: 'Email et résultat requis' });
 
-  const score = result.global_score ?? result.score ?? 'N/A';
-  const grade = result.grade ?? '—';
-  const url = result.url ?? 'votre site';
+  const score = escapeHtml(result.global_score ?? result.score ?? 'N/A');
+  const grade = escapeHtml(result.grade ?? '—');
+  const url = escapeHtml(result.url ?? 'votre site');
   const issues = generateTopIssues(result);
 
-  const issueList = issues.map(i => `<li style="margin-bottom:8px;padding-left:24px;position:relative"><span style="position:absolute;left:0;color:#ef4444">●</span>${i}</li>`).join('');
+  const issueList = issues.map(i => `<li style="margin-bottom:8px;padding-left:24px;position:relative"><span style="position:absolute;left:0;color:#ef4444">●</span>${escapeHtml(i)}</li>`).join('');
 
   const rapportUrl = `https://webisafe.ci/rapport/${result.scan_id ?? ''}`;
 
   try {
-    await resend.emails.send({
-      from: 'Webisafe <onboarding@resend.dev>',
+    await sendResendEmail({
       to: email,
-      subject: `Votre audit de sécurité pour ${url} — score ${score}/100`,
+      subject: `Votre audit de sécurité pour ${String(result.url ?? 'votre site').replace(/[\r\n]+/g, ' ')} — score ${String(result.global_score ?? result.score ?? 'N/A').replace(/[\r\n]+/g, ' ')}/100`,
       html: `
         <div style="max-width:600px;margin:0 auto;font-family:system-ui,sans-serif;color:#1f2937">
           <div style="background:#0f172a;padding:32px 24px;text-align:center;border-radius:12px 12px 0 0">
@@ -72,7 +74,7 @@ export default async function handler(req, res) {
             <ol style="padding:0;margin:0;list-style:none">${issueList}</ol>
 
             <div style="margin:24px 0;text-align:center">
-              <a href="${rapportUrl}" style="display:inline-block;background:#1566f0;color:#fff;padding:14px 28px;border-radius:12px;text-decoration:none;font-weight:600">Voir le rapport complet</a>
+              <a href="${escapeHtml(rapportUrl)}" style="display:inline-block;background:#1566f0;color:#fff;padding:14px 28px;border-radius:12px;text-decoration:none;font-weight:600">Voir le rapport complet</a>
             </div>
 
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/>

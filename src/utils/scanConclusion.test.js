@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import { buildScanConclusion } from './scanConclusion.js';
@@ -24,7 +24,7 @@ test('builds a three-paragraph conclusion coherent with weak results and free sc
   });
 
   assert.match(text, /performances|performance/i);
-  assert.match(text, /sécurité|securite/i);
+  assert.match(text, /sÃ©curitÃ©|securite/i);
   assert.match(text, /trafic|conversion|revenus/i);
   assert.match(text, /analyse gratuite|scan gratuit/i);
   assert.match(text, /rapport complet/i);
@@ -60,7 +60,7 @@ test('keeps the conclusion business-oriented even with fewer critical issues', (
     ux: { responsive: true, tapTargets: true, textReadable: true },
   });
 
-  assert.match(text, /marge de progression|points de fragilité|fragilités|axes de progression/i);
+  assert.match(text, /marge de progression|points de fragilitÃ©|fragilitÃ©s|axes de progression/i);
   assert.match(text, /analyse gratuite|scan gratuit/i);
   assert.match(text, /rapport complet/i);
   assert.equal(text.split('\n\n').filter(Boolean).length, 3);

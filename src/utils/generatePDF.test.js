@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { it } from 'vitest';
 
 import assert from 'node:assert/strict';
 
@@ -8,19 +8,19 @@ import { buildPdfAuditModel, buildPdfFilename, sanitizePdfText } from './generat
 
 
 
-test('sanitizePdfText removes unsupported symbols while preserving readable content', () => {
+it('sanitizePdfText preserves French accents while removing unsupported symbols', () => {
 
   const result = sanitizePdfText("Rapport d’audit — Sécurité ✅ 📱 Côte d'Ivoire");
 
 
 
-  assert.equal(result, "Rapport d'audit - Securite Cote d'Ivoire");
+  assert.equal(result, "Rapport d'audit - Sécurité Côte d'Ivoire");
 
 });
 
 
 
-test('buildPdfFilename creates a stable downloadable filename', () => {
+it('buildPdfFilename creates a stable downloadable filename', () => {
 
   const filename = buildPdfFilename({
 
@@ -40,7 +40,7 @@ test('buildPdfFilename creates a stable downloadable filename', () => {
 
 
 
-test('buildPdfFilename extracts a clean domain when only a URL is provided', () => {
+it('buildPdfFilename extracts a clean domain when only a URL is provided', () => {
 
   const filename = buildPdfFilename({
 
@@ -58,7 +58,7 @@ test('buildPdfFilename extracts a clean domain when only a URL is provided', () 
 
 
 
-test('buildPdfAuditModel keeps all important UI report metrics and explanations', () => {
+it('buildPdfAuditModel keeps all important UI report metrics and explanations', () => {
 
   const model = buildPdfAuditModel({
 
@@ -158,6 +158,8 @@ test('buildPdfAuditModel keeps all important UI report metrics and explanations'
 
         security_grade: 'C',
 
+        https_enabled: true,
+
         malware_detected: false,
 
         observatory_score: 55,
@@ -199,6 +201,14 @@ test('buildPdfAuditModel keeps all important UI report metrics and explanations'
       ux: {
 
         grade: 'C',
+
+        compression: 'gzip',
+
+        images_without_alt: 7,
+
+        links_without_text: 2,
+
+        user_zoom_blocked: true,
 
         tap_targets_ok: false,
 
@@ -280,7 +290,7 @@ test('buildPdfAuditModel keeps all important UI report metrics and explanations'
 
     model.sections.performance.metrics.map((item) => item.label),
 
-    ['Score Performance', 'LCP', 'FCP', 'CLS', 'TBT', 'TTI', 'Poids page', 'Mode du scan']
+    ['Score performance', 'LCP', 'FCP', 'CLS', 'TBT', 'TTI', 'Poids de la page', 'Mode du scan']
 
   );
 
@@ -294,7 +304,7 @@ test('buildPdfAuditModel keeps all important UI report metrics and explanations'
 
     model.sections.security.metrics.map((item) => item.label),
 
-    ['Score Securite', 'SSL Grade', 'Grade Headers', 'Malware (VirusTotal)', 'Observatory (Mozilla)']
+    ['Score sécurité', 'Grade SSL', 'HTTPS', 'VirusTotal']
 
   );
 
@@ -310,7 +320,7 @@ test('buildPdfAuditModel keeps all important UI report metrics and explanations'
 
     model.sections.seo.metrics.map((item) => item.label),
 
-    ['Score SEO', 'Title', 'Meta Description', 'H1', 'Viewport', 'Open Graph']
+    ['Score SEO', 'Balise Title', 'Méta Description', 'H1', 'Viewport', 'Open Graph']
 
   );
 
@@ -320,13 +330,13 @@ test('buildPdfAuditModel keeps all important UI report metrics and explanations'
 
     model.sections.ux.metrics.map((item) => item.label),
 
-    ['Score UX', 'Grade UX', 'Tap targets']
+    ['Score UX', 'Grade UX', 'Compression', 'Images sans alt', 'Liens sans texte', 'Zoom bloqué']
 
   );
 
   assert.equal(model.sections.ux.issues[0].type, 'tap-targets');
 
-  assert.match(model.narrative.paragraphs.join('\n'), /Votre audit premium met en evidence/);
+  assert.match(model.narrative.paragraphs.join('\n'), /Votre audit premium met en evidence|Votre audit premium met en évidence/);
 
   assert.match(model.narrative.paragraphs.join('\n'), /Optimiser le LCP/);
 

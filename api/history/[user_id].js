@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { json, setCorsHeaders } from '../_utils.js';
+import { json, setCorsHeaders, requireAuthenticatedUser } from '../_utils.js';
 
 const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
   ? createClient(
@@ -17,6 +17,13 @@ export default async function handler(req, res) {
 
   const { user_id } = req.query;
   if (!user_id) return json(res, 400, { error: 'user_id requis' });
+
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
+  if (user.id !== user_id) {
+    return json(res, 403, { error: 'Accès refusé' });
+  }
 
   const { data, error } = await supabase
     .from('scan_history')

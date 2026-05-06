@@ -1,12 +1,5 @@
 // api/stats.js — Statistiques publiques agrégées (MOAT Webisafe Africa)
-import { createClient } from '@supabase/supabase-js';
-import { setCorsHeaders, checkRateLimit } from './_utils.js';
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || null;
-const supabase = supabaseUrl && supabaseKey
-    ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
-    : null;
+import { setCorsHeaders, checkRateLimit, getSupabaseAdminClient } from './_utils.js';
 
 export const config = { maxDuration: 15 };
 
@@ -20,22 +13,27 @@ export default async function handler(req, res) {
         return res.status(429).json({ success: false, error: 'Trop de requêtes.' });
     }
 
+    const supabase = getSupabaseAdminClient();
     if (!supabase) {
         return res.status(503).json({ success: false, error: 'Base de données indisponible' });
     }
 
     try {
         // ── Agrégations globales ─────────────────────────────────────────────
-        const { data: totalRows, error: totalErr } = await supabase
+        const { count: totalCount, error: totalErr } = await supabase
             .from('scan_analytics')
             .select('id', { count: 'exact', head: true });
 
-        const totalScans = totalRows?.length ?? 0;
+        if (totalErr) throw totalErr;
+
+        const totalScans = totalCount ?? 0;
 
         // Score moyen global
         const { data: avgData, error: avgErr } = await supabase
             .from('scan_analytics')
             .select('score_global');
+
+        if (avgErr) throw avgErr;
 
         const avgScore = avgData?.length
             ? Math.round(avgData.reduce((a, c) => a + (c.score_global ?? 0), 0) / avgData.length)
@@ -47,6 +45,8 @@ export default async function handler(req, res) {
             .select('country_code')
             .limit(1000);
 
+        if (countriesErr) throw countriesErr;
+
         const uniqueCountries = new Set(countries?.map(r => r.country_code) ?? []);
 
         // Répartition par CMS
@@ -55,6 +55,8 @@ export default async function handler(req, res) {
             .select('cms_detected')
             .not('cms_detected', 'is', null)
             .limit(1000);
+
+        if (cmsErr) throw cmsErr;
 
         const cmsCounts = {};
         cmsData?.forEach(r => {
@@ -75,6 +77,8 @@ export default async function handler(req, res) {
             .eq('is_public', true)
             .order('scanned_at', { ascending: false })
             .limit(20);
+
+        if (recentErr) throw recentErr;
 
         return res.json({
             success: true,

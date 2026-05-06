@@ -1,550 +1,742 @@
-import React from 'react';
-import { Document, Link, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer';
-import { formatDate, extractDomain } from './validators.js';
-import { REPORT_FIX_PHONE, REPORT_FIX_PHONE_RAW } from '../config/brand.js';
-import { buildPremiumExplanationParagraphs } from './premiumExplanation.js';
+﻿import React from 'react';
+import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
 
-export function sanitizePdfText(value) {
-  const source = String(value ?? '');
-  return source
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201C\u201D]/g, '"')
-    .replace(/[\u2013\u2014]/g, '-')
-    .replace(/[\u2022]/g, '-')
-    .replace(/[\u2026]/g, '...')
-    .replace(/[\u00A0]/g, ' ')
-    .replace(/[^\x20-\x7E\n]/g, ' ')
-    .replace(/\s+/g, ' ')
+const e = React.createElement;
+
+const COLORS = {
+  bg: '#0A0F1E',
+  panel: '#111827',
+  panelSoft: '#142033',
+  panelDeep: '#0B172A',
+  line: '#263449',
+  cyan: '#00D4FF',
+  text: '#F8FAFC',
+  muted: '#CBD5E1',
+  quiet: '#94A3B8',
+  dim: '#64748B',
+  red: '#EF4444',
+  orange: '#F59E0B',
+  green: '#22C55E',
+  blue: '#38BDF8',
+  black: '#020617',
+};
+
+const SCORE_LIMITS = { critical: 40, warning: 65, good: 85 };
+
+const rawText = (value) => (value === null || value === undefined ? '' : String(value));
+
+export function sanitizePdfText(value = '') {
+  return rawText(value)
+    .normalize('NFC')
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—−]/g, '-')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[^\p{L}\p{N}\s.,;:!?'")(\[\]{}%+\-\/@#&$°_=<>|\\]/gu, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
-function t(value, fallback = 'N/A') { const text = sanitizePdfText(value); return text || fallback; }
-function num(value, fallback = null) { const n = Number(value); return Number.isFinite(n) ? n : fallback; }
-function boolLabel(v, yes = 'Oui', no = 'Non') { if (v === true) return yes; if (v === false) return no; return 'N/A'; }
-function normalizeList(value) { return Array.isArray(value) ? value.filter(Boolean) : []; }
+const pdfText = (value, fallback = '—') => sanitizePdfText(value) || fallback;
+const compact = (values) => values.filter(Boolean);
+const firstDefined = (...values) => values.find((value) => value !== null && value !== undefined && value !== '');
 
-export function buildPdfFilename(reportData) {
-  const rawDomain = reportData.domain || reportData.url || 'site';
-  const sanitizedDomain = t(extractDomain(rawDomain), 'site').replace(/[^a-zA-Z0-9.-]/g, '-');
-  const datePart = new Date(reportData.scanDate || Date.now()).toISOString().split('T')[0];
-  return `Webisafe_Rapport_${sanitizedDomain}_${datePart}.pdf`;
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  return [value];
 }
 
-function getScoreColor(score) {
-  if (score >= 90) return '#3b82f6';
-  if (score >= 70) return '#22c55e';
-  if (score >= 50) return '#eab308';
-  if (score >= 30) return '#f97316';
-  return '#ef4444';
+function asUrl(value) {
+  const current = rawText(value).trim();
+  if (!current) return '';
+  return /^https?:\/\//i.test(current) ? current : `https://${current}`;
 }
 
-function getScoreLabel(score) {
-  const s = num(score, 0);
-  if (s >= 90) return 'Excellent';
-  if (s >= 70) return 'Bon';
-  if (s >= 50) return 'Acceptable';
-  if (s >= 30) return 'Mauvais';
-  return 'Critique';
+function extractDomain(value) {
+  const current = rawText(value).trim();
+  if (!current) return 'site';
+  try {
+    return new URL(asUrl(current)).hostname.replace(/^www\./i, '') || 'site';
+  } catch {
+    return current.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/?#]/)[0] || 'site';
+  }
 }
 
-function statusFromScore(score) {
-  const s = num(score, 0);
-  if (s >= 75) return 'OK';
-  if (s >= 50) return 'A ameliorer';
-  return 'Critique';
+function safeDate(value) {
+  const date = value ? new Date(value) : new Date();
+  return Number.isNaN(date.getTime()) ? new Date() : date;
 }
 
-const WEBISAFE_URL = 'https://webisafe.vercel.app';
-const CORRECTION_URL = `${WEBISAFE_URL}/corrections`;
-const WHATSAPP_URL = `https://wa.me/${REPORT_FIX_PHONE_RAW}?text=${encodeURIComponent("Bonjour Webisafe, je souhaite corriger les problemes identifies dans mon rapport d'audit.")}`;
-
-function buildPremiumExplanation(paragraphs) {
-  const text = Array.isArray(paragraphs) ? paragraphs.join(' ') : String(paragraphs ?? '');
-  const clean = text.replace(/\[.*?\]/g, '').replace(/https?:\/\/[^\s]+/g, '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-  const sentences = clean.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(s => s.length > 10 && s.length < 300);
-  if (sentences.length === 0) return ['Ce site presente un potentiel interessant mais plusieurs points techniques meritent attention.'];
-  const unique = []; const seen = new Set();
-  for (const sentence of sentences) { const key = sentence.toLowerCase().slice(0, 40); if (!seen.has(key)) { seen.add(key); unique.push(sentence); } }
-  return unique.slice(0, 4);
+function formatDate(value) {
+  return safeDate(value).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-const RESOLUTION_TEMPLATES = {
-  securite: "Corriger la configuration de securite concernee, activer les protections HTTP manquantes, renforcer les regles serveur et verifier ensuite que le risque detecte n'est plus exploitable.",
-  security: "Corriger la configuration de securite concernee, activer les protections HTTP manquantes, renforcer les regles serveur et verifier ensuite que le risque detecte n'est plus exploitable.",
-  performance: "Reduire les ressources trop lourdes, differer les scripts non essentiels, compresser les fichiers statiques et ajuster le cache afin de diminuer le temps d'affichage reel sur mobile.",
-  seo: "Mettre a jour les balises, titres, descriptions, structure Hn et donnees de partage afin que Google comprenne mieux la page et que le lien soit plus attractif dans les resultats.",
-  ux: "Adapter les tailles, espacements, contrastes et zones cliquables pour rendre la navigation plus confortable sur smartphone et reduire les abandons.",
-  mobile: "Adapter les tailles, espacements, contrastes et zones cliquables pour rendre la navigation plus confortable sur smartphone et reduire les abandons.",
-  default: "Identifier le reglage ou l'element responsable, appliquer la correction adaptee dans le code ou la configuration, puis refaire un scan pour confirmer la disparition du probleme.",
-};
-
-function firstSentence(text) { const txt = String(text ?? ''); const idx = txt.search(/[.!?](\s|$)/); if (idx === -1) return txt; return txt.slice(0, idx + 1).trim(); }
-function resolutionFor(rec) { const cat = String(rec.category || 'default').toLowerCase().trim(); return RESOLUTION_TEMPLATES[cat] || RESOLUTION_TEMPLATES.default; }
-function buildRecommendationBody(rec) {
-  const intro = firstSentence(rec.description || rec.action || rec.title);
-  const resolution = `Correction recommandee : ${resolutionFor(rec)}`;
-  return { intro, resolution };
+function asNumber(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const match = rawText(value).replace(',', '.').match(/-?\d+(\.\d+)?/);
+  if (!match) return null;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function buildPdfAuditModel(reportData) {
-  const r = reportData || {};
-  const domain = t(r.domain || r.url, 'site inconnu');
-  const url = t(r.url || r.domain, domain);
-  const scanDate = r.scanDate || r.createdAt || new Date().toISOString();
-  const city = r.scanOrigin?.city || r.city || '';
-  const country = r.scanOrigin?.country || r.country || '';
-  const originLabel = country ? `${city || ''}${city ? ', ' : ''}${country}`.trim() : city || 'Local';
-  const globalScore = num(r.scores?.global ?? r.global_score, null);
-  const perfScore = num(r.scores?.performance ?? r.scores?.speed ?? r.performance_score, null);
-  const seoScore = num(r.scores?.seo ?? r.seo_score, null);
-  const securityScore = num(r.scores?.security ?? r.scores?.securite ?? r.security_score, null);
-  const uxScore = num(r.scores?.ux ?? r.scores?.mobile ?? r.ux_score ?? r.mobile_score, null);
-  const recommendations = normalizeList(r.recommendations || r.actions).map((rec, i) => ({
-    title: t(rec.title || rec.name || `Recommandation ${i + 1}`),
-    description: t(rec.description || rec.details || rec.action || ''),
-    category: t(rec.category || rec.type || 'general'),
-    priority: t(rec.priority || rec.urgence || 'IMPORTANT'),
-    time: t(rec.estimatedTime || rec.time || '30 minutes'),
-    difficulty: t(rec.difficulty || rec.complexite || 'Intermediaire'),
-    action: t(rec.action || rec.description || ''),
-  }));
-  const criticalAlerts = recommendations.filter(rec => rec.priority.toLowerCase().includes('critique') || rec.priority.toLowerCase().includes('urgent'));
-  const loadTime = num(r.loadTime || r.load_time || r.metrics?.loadTime, null);
-  const pageSize = num(r.pageSize || r.page_size || r.metrics?.pageSize, null);
-  const requests = num(r.requests || r.metrics?.requests, null);
-  const perfDetails = r.performanceDetails || r.performance || {};
-  const resources = normalizeList(perfDetails.resources || perfDetails.files || r.resources);
-  const hasHTTPS = !!(r.hasHTTPS || r.https || r.security?.https);
-  const hasHSTS = !!(r.hasHSTS || r.hsts || r.security?.hsts);
-  const hasXFrame = !!(r.hasXFrameOptions || r.xframe || r.security?.xframe);
-  const hasXContent = !!(r.hasXContentTypeOptions || r.xcontent || r.security?.xcontent);
-  const securityIssues = normalizeList(r.securityIssues || r.security?.issues || r.vulnerabilities);
-  const seoDetails = r.seoDetails || r.seo || {};
-  const metaTitle = t(seoDetails.title || r.metaTitle || r.title, 'Non defini');
-  const metaDescription = t(seoDetails.description || r.metaDescription || r.description, 'Non definie');
-  const headings = normalizeList(seoDetails.headings || r.headings);
-  const hasCanonical = !!(seoDetails.canonical || r.canonical);
-  const hasSitemap = !!(seoDetails.sitemap || r.sitemap);
-  const hasRobots = !!(seoDetails.robots || r.robots);
-  const ogTags = normalizeList(seoDetails.ogTags || r.ogTags || r.openGraph);
-  const hasAnalytics = !!(r.hasAnalytics || r.analytics || r.tracking);
-  const hasSchema = !!(r.hasSchema || r.schema || r.structuredData || r.microdata);
-  const uxDetails = r.uxDetails || r.ux || r.mobile || {};
-  const isResponsive = !!(uxDetails.isResponsive || r.isResponsive || r.responsive);
-  const mobileScore = num(uxDetails.mobileScore || r.mobileScore, null);
-  const viewport = t(uxDetails.viewport || r.viewport, 'Non configure');
-  const fontSize = t(uxDetails.fontSize || r.fontSize, 'Non verifie');
-  const tapTargets = t(uxDetails.tapTargets || r.tapTargets, 'Non verifie');
-  const cms = t(r.cms || r.platform || r.detectedCMS || 'Non detecte');
-  const server = t(r.server || r.serverType || r.serverSoftware || 'Non detecte');
-  const serverLocation = {
-    city: t(r.serverLocation?.city || r.serverCity || '', 'Inconnue'),
-    country: t(r.serverLocation?.country || r.serverCountry || '', 'Inconnue'),
-    ip: t(r.serverLocation?.ip || r.serverIP || '', 'Non disponible'),
-    provider: t(r.serverLocation?.provider || r.hostingProvider || '', 'Non identifie'),
-  };
-  const serverGrade = r.serverGrade || r.server_grade || 'N/A';
-  const technologies = normalizeList(r.technologies || r.techStack || r.detectedTech || r.tech);
-  const cookies = num(r.cookies || r.cookieCount, null);
-  const hasCookieConsent = boolLabel(r.hasCookieConsent || r.cookieConsent, 'Oui', 'Non');
-  const sslInfo = {
-    valid: boolLabel(r.ssl?.valid || r.hasSSL || r.ssl, 'Oui', 'Non'),
-    issuer: t(r.ssl?.issuer || r.sslIssuer || '', 'Non identifie'),
-    expiry: t(r.ssl?.expiry || r.sslExpiry || '', 'Non disponible'),
-  };
-  const seoSentences = buildPremiumExplanation(buildPremiumExplanationParagraphs(recommendations));
+function scoreValue(value) {
+  const parsed = asNumber(value);
+  if (parsed === null) return null;
+  return Math.max(0, Math.min(100, Math.round(parsed)));
+}
+
+function scoreDisplay(value) {
+  const score = scoreValue(value);
+  return score === null ? 'Non mesuré' : `${score}/100`;
+}
+
+function scoreColor(value) {
+  const score = scoreValue(value);
+  if (score === null) return COLORS.dim;
+  if (score < SCORE_LIMITS.critical) return COLORS.red;
+  if (score < SCORE_LIMITS.warning) return COLORS.orange;
+  if (score < SCORE_LIMITS.good) return COLORS.green;
+  return COLORS.blue;
+}
+
+function scoreLabel(value) {
+  const score = scoreValue(value);
+  if (score === null) return 'Non mesuré';
+  if (score < SCORE_LIMITS.critical) return 'Critique';
+  if (score < SCORE_LIMITS.warning) return 'À corriger';
+  if (score < SCORE_LIMITS.good) return 'Bon';
+  return 'Excellent';
+}
+
+function scoreStatus(value) {
+  const score = scoreValue(value);
+  if (score === null) return 'Non mesuré';
+  if (score < SCORE_LIMITS.critical) return 'Critique';
+  if (score < SCORE_LIMITS.warning) return 'Avertissement';
+  return 'OK';
+}
+
+function normalizeStatus(value) {
+  const current = sanitizePdfText(value).toLowerCase();
+  if (!current || current.includes('non mesur') || current.includes('non exécut') || current.includes('indisponible')) return 'Non mesuré';
+  if (['ok', 'pass', 'passed', 'success', 'présent', 'present', 'activé', 'active', 'complet'].includes(current)) return 'OK';
+  if (current.includes('critique') || current.includes('critical') || current.includes('fail') || current.includes('échec') || current.includes('echec') || current.includes('absent') || current.includes('missing')) return 'Critique';
+  if (current.includes('warn') || current.includes('avert') || current.includes('medium') || current.includes('moyen') || current.includes('partiel')) return 'Avertissement';
+  return pdfText(value);
+}
+
+function statusPalette(value) {
+  const status = normalizeStatus(value);
+  if (status === 'OK') return { bg: '#052E1A', border: '#14532D', text: '#86EFAC' };
+  if (status === 'Avertissement') return { bg: '#3A2507', border: '#92400E', text: '#FCD34D' };
+  if (status === 'Critique') return { bg: '#3B0A12', border: '#991B1B', text: '#FCA5A5' };
+  return { bg: COLORS.panel, border: COLORS.line, text: COLORS.quiet };
+}
+
+function yesNo(value, yes = 'Oui', no = 'Non') {
+  if (value === true) return yes;
+  if (value === false) return no;
+  return 'Non mesuré';
+}
+
+function boolStatus(value, falseStatus = 'Critique') {
+  if (value === true) return 'OK';
+  if (value === false) return falseStatus;
+  return 'Non mesuré';
+}
+
+function formatMs(value) {
+  const parsed = asNumber(value);
+  return parsed === null ? 'Non mesuré' : `${Math.round(parsed)} ms`;
+}
+
+function formatDecimal(value) {
+  const parsed = asNumber(value);
+  if (parsed === null) return 'Non mesuré';
+  return parsed.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function formatMb(value) {
+  const parsed = asNumber(value);
+  return parsed === null ? 'Non mesuré' : `${parsed.toFixed(parsed >= 10 ? 0 : 1)} MB`;
+}
+
+function timingStatus(name, value) {
+  const parsed = asNumber(value);
+  if (parsed === null) return 'Non mesuré';
+  if (name === 'lcp') return parsed <= 2500 ? 'OK' : parsed <= 4000 ? 'Avertissement' : 'Critique';
+  if (name === 'fcp') return parsed <= 1800 ? 'OK' : parsed <= 3000 ? 'Avertissement' : 'Critique';
+  if (name === 'cls') return parsed <= 0.1 ? 'OK' : parsed <= 0.25 ? 'Avertissement' : 'Critique';
+  if (name === 'tbt') return parsed <= 200 ? 'OK' : parsed <= 600 ? 'Avertissement' : 'Critique';
+  if (name === 'tti') return parsed <= 3800 ? 'OK' : parsed <= 7300 ? 'Avertissement' : 'Critique';
+  if (name === 'weight') return parsed <= 2 ? 'OK' : parsed <= 4 ? 'Avertissement' : 'Critique';
+  return 'Non mesuré';
+}
+
+function metric(label, value, status, note = '') {
+  return { label: pdfText(label, ''), value: pdfText(value, 'Non mesuré'), status: normalizeStatus(status), note: pdfText(note, '') };
+}
+
+function row(label, value, status = '') {
+  return [pdfText(label), pdfText(value), status ? normalizeStatus(status) : ''];
+}
+
+function normalizeOpportunity(item) {
+  if (typeof item === 'string') return { title: pdfText(item), description: '', savings: '' };
   return {
-    domain, url, scanDate,
-    scanOrigin: { label: originLabel, city, country },
-    scores: { global: globalScore, performance: perfScore, seo: seoScore, security: securityScore, ux: uxScore },
-    recommendations, criticalAlerts,
-    sections: {
-      performance: { loadTime, pageSize, requests, resources },
-      security: { https: hasHTTPS, hsts: hasHSTS, xframe: hasXFrame, xcontent: hasXContent, issues: securityIssues },
-      seo: { title: metaTitle, description: metaDescription, headings, canonical: hasCanonical, sitemap: hasSitemap, robots: hasRobots, ogTags, analytics: hasAnalytics, schema: hasSchema },
-      ux: { responsive: isResponsive, mobileScore, viewport, fontSize, tapTargets },
-      server: { cms, server, location: serverLocation, grade: serverGrade, technologies, ssl: sslInfo, cookies, cookieConsent: hasCookieConsent },
-    },
-    executiveSummary: seoSentences.join(' '),
+    title: pdfText(firstDefined(item?.title, item?.name, 'Optimisation recommandée')),
+    description: pdfText(firstDefined(item?.description, item?.detail, item?.message, ''), ''),
+    savings: item?.savings_ms !== undefined ? `${Math.round(Number(item.savings_ms))} ms` : pdfText(firstDefined(item?.savings, item?.impact, ''), ''),
   };
 }
 
-const h = React.createElement;
+function normalizeHeader(item) {
+  if (typeof item === 'string') return { header: pdfText(item), message: '', severity: 'Avertissement' };
+  return {
+    header: pdfText(firstDefined(item?.header, item?.name, item?.label, 'Header')),
+    message: pdfText(firstDefined(item?.message, item?.description, item?.recommendation, ''), ''),
+    severity: normalizeStatus(firstDefined(item?.severity, item?.status, 'Avertissement')),
+  };
+}
 
-const C = {
-  primary: '#1566F0',
-  primaryLight: '#38BDF8',
-  dark: '#0F172A',
-  dark2: '#1E293B',
-  border: '#334155',
-  text: '#F8FAFC',
-  muted: '#94A3B8',
-  light: '#1E293B',
-  success: '#22C55E',
-  warning: '#F97316',
-  danger: '#EF4444',
-  white: '#FFFFFF',
-};
+function normalizeIssue(item) {
+  if (typeof item === 'string') return { type: 'issue', message: pdfText(item), impact: '', severity: 'Avertissement' };
+  return {
+    type: pdfText(firstDefined(item?.type, item?.check_name, 'issue')),
+    message: pdfText(firstDefined(item?.message, item?.title, item?.description, 'Problème détecté')),
+    impact: pdfText(firstDefined(item?.impact, item?.impactBusiness, item?.business_impact, ''), ''),
+    severity: normalizeStatus(firstDefined(item?.severity, item?.status, 'Avertissement')),
+  };
+}
+
+function normalizeCheck(item) {
+  const key = pdfText(firstDefined(item?.check_name, item?.key, item?.id, item?.name, 'check')).toLowerCase();
+  return {
+    key,
+    name: pdfText(firstDefined(item?.title, item?.label, item?.name, key)),
+    status: normalizeStatus(firstDefined(item?.status, item?.result, 'Non mesuré')),
+    detail: pdfText(firstDefined(item?.description, item?.technical_detail, item?.message, item?.recommendation, ''), ''),
+    data: item?.data && typeof item.data === 'object' ? item.data : {},
+  };
+}
+
+function priorityRank(value) {
+  const current = rawText(value).toLowerCase();
+  const parsed = asNumber(value);
+  if (parsed !== null) return parsed <= 2 ? 1 : parsed === 3 ? 2 : 3;
+  if (current.includes('urgent') || current.includes('critique') || current.includes('critical') || current.includes('high')) return 1;
+  if (current.includes('important') || current.includes('medium') || current.includes('moyen')) return 2;
+  return 3;
+}
+
+function priorityLabel(rank) {
+  if (rank === 1) return 'Urgente';
+  if (rank === 2) return 'Importante';
+  return 'Amélioration';
+}
+
+function normalizeRecommendation(item, index) {
+  const rank = priorityRank(firstDefined(item?.priority, item?.severity, item?.niveau, 3));
+  const title = pdfText(firstDefined(item?.title, item?.action, item?.message, `Action ${index + 1}`));
+  return {
+    title,
+    action: pdfText(firstDefined(item?.action, item?.recommendation, item?.correction, title)),
+    description: pdfText(firstDefined(item?.description, item?.message, item?.explication, ''), ''),
+    impact: pdfText(firstDefined(item?.impact, item?.impactBusiness, item?.business_impact, ''), ''),
+    impactBusiness: pdfText(firstDefined(item?.impactBusiness, item?.business_impact, item?.impact_business, item?.impact, ''), ''),
+    category: pdfText(firstDefined(item?.category, item?.categorie, 'Général')),
+    difficulty: pdfText(firstDefined(item?.difficulty, item?.difficulte, item?.difficulty_label, ''), ''),
+    time: pdfText(firstDefined(item?.time, item?.duration, item?.time_estimate, ''), ''),
+    rank,
+    priority: priorityLabel(rank),
+  };
+}
+
+function buildPerformance(reportData, scores) {
+  const perf = reportData.metrics?.performance || {};
+  const server = perf.server_location || {};
+  const latency = server.latency_warning || {};
+  const isPartial = perf.partial === true;
+  return {
+    score: scores.performance,
+    metrics: [
+      metric('Score performance', scoreDisplay(scores.performance), scoreStatus(scores.performance), 'Qualité de chargement ressentie par vos visiteurs.'),
+      metric('LCP', formatMs(perf.lcp), timingStatus('lcp', perf.lcp), 'Affichage du contenu principal.'),
+      metric('FCP', formatMs(perf.fcp), timingStatus('fcp', perf.fcp), 'Première apparition visuelle.'),
+      metric('CLS', formatDecimal(perf.cls), timingStatus('cls', perf.cls), 'Stabilité visuelle de la page.'),
+      metric('TBT', formatMs(perf.tbt), timingStatus('tbt', perf.tbt), 'Blocage JavaScript avant interaction.'),
+      metric('TTI', formatMs(perf.tti), timingStatus('tti', perf.tti), 'Temps avant interaction fiable.'),
+      metric('Poids de la page', formatMb(perf.page_weight_mb), timingStatus('weight', perf.page_weight_mb), 'Volume total chargé par le navigateur.'),
+      metric('Mode du scan', isPartial ? 'Partiel' : 'Complet', isPartial ? 'Avertissement' : 'OK', isPartial ? pdfText(perf.partial_reason, 'Données partielles.') : 'Scan complet.'),
+    ],
+    serverLocation: {
+      city: pdfText(server.city, ''), country: pdfText(server.country, ''), isp: pdfText(server.isp, ''), ip: pdfText(server.ip, ''),
+      message: pdfText(latency.message, ''), impact: pdfText(latency.impact, ''), recommendation: pdfText(latency.recommendation, ''),
+    },
+    opportunities: asArray(perf.opportunities).map(normalizeOpportunity),
+  };
+}
+
+function buildSecurity(reportData, scores) {
+  const sec = reportData.metrics?.security || {};
+  const https = firstDefined(sec.https_enabled, sec.https);
+  const sensitive = sec.sensitive_files || {};
+  return {
+    score: scores.security,
+    metrics: [
+      metric('Score sécurité', scoreDisplay(scores.security), scoreStatus(scores.security), 'Score global de sécurité technique.'),
+      metric('Grade SSL', firstDefined(sec.ssl_grade, sec.security_grade, 'Non mesuré'), sec.ssl_grade === 'A' || sec.ssl_grade === 'A+' ? 'OK' : sec.ssl_grade ? 'Avertissement' : 'Non mesuré', 'Qualité TLS/SSL.'),
+      metric('HTTPS', yesNo(https, 'Activé', 'Non activé'), boolStatus(https), 'Protection des échanges entre le visiteur et le site.'),
+      metric('VirusTotal', sec.malware_detected === true ? 'Menace détectée' : sec.malware_detected === false ? 'Aucun malware détecté' : 'Non vérifié', sec.malware_detected === true ? 'Critique' : sec.malware_detected === false ? 'OK' : 'Non mesuré', 'Réputation malware publique.'),
+    ],
+    observatoryScore: scoreDisplay(sec.observatory_score),
+    missingHeaders: asArray(sec.headers_manquants).map(normalizeHeader),
+    cookieIssues: asArray(sec.cookie_issues).map((item) => pdfText(item)),
+    sensitiveFiles: { critical: sensitive.critical === true, alert_message: pdfText(sensitive.alert_message, ''), exposed_files: asArray(sensitive.exposed_files).map((item) => pdfText(item)) },
+  };
+}
+
+function buildAdvancedSecurity(reportData) {
+  const sec = reportData.metrics?.security || {};
+  const allChecks = [...asArray(sec.extended_checks), ...asArray(sec.advanced_checks)].map(normalizeCheck);
+  const checks = allChecks.filter((item, index, source) => source.findIndex((candidate) => candidate.key === item.key) === index);
+  const findCheck = (key) => checks.find((item) => item.key === key);
+  const checkRow = (key, label) => {
+    const item = findCheck(key);
+    return item ? row(label, item.name, item.status) : row(label, 'Check non exécuté', 'Non mesuré');
+  };
+  const email = findCheck('email_advanced');
+  return {
+    score: scoreValue(firstDefined(sec.extended_security_score, sec.advanced_security_score, reportData.scores?.advanced_security)),
+    summaryRows: [
+      checkRow('waf', 'WAF'), checkRow('subdomains', 'Sous-domaines'), checkRow('security_txt', 'security.txt'),
+      checkRow('cors', 'CORS'), checkRow('supply_chain', 'Supply Chain'), checkRow('email_advanced', 'Email SPF/DMARC/DKIM'),
+    ],
+    checks,
+    email: {
+      status: email?.status || 'Non mesuré',
+      spf: email ? (asArray(email.data?.spf).length ? 'Présent' : 'Absent') : '',
+      dmarc: email ? (asArray(email.data?.dmarc).length ? 'Présent' : 'Absent') : '',
+      dkim: email ? (asArray(email.data?.dkim).length ? 'Présent' : 'Absent') : '',
+      missing: asArray(email?.data?.missing).map((item) => pdfText(item)),
+    },
+  };
+}
+
+function buildSeo(reportData, scores) {
+  const seo = reportData.metrics?.seo || {};
+  return {
+    score: scores.seo,
+    metrics: [
+      metric('Score SEO', scoreDisplay(scores.seo), scoreStatus(scores.seo), 'Qualité des signaux de référencement.'),
+      metric('Balise Title', yesNo(seo.has_title, 'Présente', 'Absente'), boolStatus(seo.has_title), 'Titre dans Google.'),
+      metric('Méta Description', yesNo(seo.has_description, 'Présente', 'Absente'), boolStatus(seo.has_description, 'Avertissement'), 'Prévisualisation Google.'),
+      metric('H1', seo.h1_count !== undefined ? `${seo.h1_count}` : 'Non mesuré', seo.h1_count === 1 ? 'OK' : seo.h1_count === undefined ? 'Non mesuré' : 'Avertissement', 'Structure principale.'),
+      metric('Viewport', yesNo(seo.has_viewport, 'Présent', 'Absent'), boolStatus(seo.has_viewport), 'Compatibilité mobile.'),
+      metric('Open Graph', yesNo(seo.has_open_graph, 'Présent', 'Absent'), boolStatus(seo.has_open_graph, 'Avertissement'), 'Présentation lors du partage social.'),
+    ],
+    extraRows: compact([
+      seo.has_canonical !== undefined ? row('Canonical', yesNo(seo.has_canonical, 'Présent', 'Absent'), boolStatus(seo.has_canonical, 'Avertissement')) : null,
+      seo.is_indexable !== undefined ? row('Indexabilité', yesNo(seo.is_indexable, 'Indexable', 'Bloquée'), boolStatus(seo.is_indexable)) : null,
+      seo.has_sitemap !== undefined ? row('Sitemap', yesNo(seo.has_sitemap, 'Présent', 'Absent'), boolStatus(seo.has_sitemap, 'Avertissement')) : null,
+    ]),
+  };
+}
+
+function buildUx(reportData, scores) {
+  const ux = reportData.metrics?.ux || {};
+  return {
+    score: scores.ux,
+    metrics: [
+      metric('Score UX', scoreDisplay(scores.ux), scoreStatus(scores.ux), 'Confort mobile et accessibilité.'),
+      metric('Grade UX', firstDefined(ux.grade, 'Non mesuré'), ux.grade && ['A', 'B'].includes(ux.grade) ? 'OK' : ux.grade ? 'Avertissement' : 'Non mesuré', 'Synthèse ergonomique.'),
+      metric('Compression', firstDefined(ux.compression, 'Non mesurée'), ux.compression ? 'OK' : 'Non mesuré', 'Compression des ressources.'),
+      metric('Images sans alt', ux.images_without_alt !== undefined ? `${ux.images_without_alt}` : 'Non mesuré', ux.images_without_alt > 0 ? 'Avertissement' : ux.images_without_alt === 0 ? 'OK' : 'Non mesuré', 'Accessibilité des images.'),
+      metric('Liens sans texte', ux.links_without_text !== undefined ? `${ux.links_without_text}` : 'Non mesuré', ux.links_without_text > 0 ? 'Avertissement' : ux.links_without_text === 0 ? 'OK' : 'Non mesuré', 'Compréhension des liens.'),
+      metric('Zoom bloqué', yesNo(ux.user_zoom_blocked, 'Oui', 'Non'), ux.user_zoom_blocked === true ? 'Critique' : ux.user_zoom_blocked === false ? 'OK' : 'Non mesuré', 'Agrandissement mobile.'),
+    ],
+    tapTargets: metric('Cibles tactiles', yesNo(ux.tap_targets_ok, 'Correctes', 'Trop proches'), boolStatus(ux.tap_targets_ok, 'Avertissement'), 'Facilité de clic au doigt.'),
+    issues: asArray(ux.issues).map(normalizeIssue),
+  };
+}
+
+export function buildPdfFilename(reportData = {}) {
+  const domain = extractDomain(firstDefined(reportData.domain, reportData.url, 'site'));
+  const safeDomain = pdfText(domain, 'site').replace(/[^a-zA-Z0-9.-]/g, '-') || 'site';
+  const date = safeDate(firstDefined(reportData.scanDate, reportData.scanned_at, reportData.created_at)).toISOString().split('T')[0];
+  return `Webisafe_Rapport_${safeDomain}_${date}.pdf`;
+}
+
+export function buildPdfAuditModel(reportData = {}) {
+  const url = firstDefined(reportData.url, reportData.requested_url, reportData.final_url, reportData.domain, '');
+  const domain = extractDomain(url);
+  const scanDate = firstDefined(reportData.scanDate, reportData.scanned_at, reportData.created_at, new Date().toISOString());
+  const scores = {
+    global: scoreValue(firstDefined(reportData.global_score, reportData.score)),
+    performance: scoreValue(firstDefined(reportData.scores?.performance, reportData.metrics?.performance?.score)),
+    security: scoreValue(firstDefined(reportData.scores?.security, reportData.metrics?.security?.score)),
+    seo: scoreValue(firstDefined(reportData.scores?.seo, reportData.metrics?.seo?.score, reportData.metrics?.seo?.local_score)),
+    ux: scoreValue(firstDefined(reportData.scores?.ux, reportData.metrics?.ux?.score, reportData.metrics?.ux?.accessibility_score)),
+  };
+  const performance = buildPerformance(reportData, scores);
+  const security = buildSecurity(reportData, scores);
+  const advancedSecurity = buildAdvancedSecurity(reportData);
+  const seo = buildSeo(reportData, scores);
+  const ux = buildUx(reportData, scores);
+  const recommendations = asArray(reportData.recommendations).map(normalizeRecommendation).sort((a, b) => a.rank - b.rank);
+  const criticalAlerts = asArray(reportData.critical_alerts).map((item) => ({
+    title: pdfText(firstDefined(item?.title, item?.message, 'Alerte')),
+    message: pdfText(firstDefined(item?.message, item?.description, ''), ''),
+    severity: normalizeStatus(firstDefined(item?.severity, 'Avertissement')),
+    recommendation: pdfText(firstDefined(item?.recommendation, item?.action, ''), ''),
+  }));
+
+  const narrative = {
+    paragraphs: compact([
+      `Votre audit premium met en évidence un niveau global de ${scoreDisplay(scores.global)} pour ${domain}.`,
+      recommendations[0]?.title ? `La première action recommandée est : ${recommendations[0].title}.` : '',
+      'Chaque section isole un sujet et distingue clairement les statuts OK, avertissement et critique.',
+    ]).map((item) => pdfText(item)),
+  };
+
+  return {
+    raw: reportData,
+    url: pdfText(url, ''),
+    domain: pdfText(domain, 'site'),
+    scanDate,
+    scanDateLabel: formatDate(scanDate),
+    scanOrigin: {
+      region_code: pdfText(reportData.scan_origin?.region_code, ''), city: pdfText(reportData.scan_origin?.city, ''),
+      country: pdfText(reportData.scan_origin?.country, ''), label: pdfText(reportData.scan_origin?.label, ''),
+    },
+    scores,
+    cover: {
+      score: scores.global,
+      scoreLabel: scoreLabel(scores.global),
+      scoreColor: scoreColor(scores.global),
+      metadata: compact([
+        ['Domaine audité', pdfText(domain)], ['URL analysée', pdfText(url)], ['Date du scan', formatDate(scanDate)],
+        reportData.scan_origin?.label ? ['Origine de mesure', pdfText(reportData.scan_origin.label)] : null,
+      ]),
+      categoryScores: compact([
+        { label: 'Performance', score: scores.performance }, { label: 'Sécurité', score: scores.security },
+        advancedSecurity.score !== null ? { label: 'Sécurité avancée', score: advancedSecurity.score } : null,
+        { label: 'SEO', score: scores.seo }, { label: 'UX Mobile', score: scores.ux },
+      ]),
+    },
+    sections: { performance, security, advancedSecurity, advanced: advancedSecurity, seo, ux },
+    criticalAlerts,
+    recommendations,
+    recommendationsByPriority: {
+      urgent: recommendations.filter((item) => item.rank === 1),
+      important: recommendations.filter((item) => item.rank === 2),
+      improvement: recommendations.filter((item) => item.rank === 3),
+    },
+    narrative,
+  };
+}
 
 const styles = StyleSheet.create({
-  page: { padding: 34, backgroundColor: C.dark, color: C.text, fontFamily: 'Helvetica', fontSize: 9, lineHeight: 1.35 },
-  cover: { padding: 0, backgroundColor: C.dark, color: C.white, fontFamily: 'Helvetica' },
-  coverHero: { backgroundColor: C.dark, padding: 34, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: C.border },
-  brandRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 36 },
-  logo: { width: 36, height: 36, borderRadius: 8, backgroundColor: C.primary, color: C.white, textAlign: 'center', paddingTop: 8, fontSize: 18, fontWeight: 700, marginRight: 9 },
-  brand: { fontSize: 20, fontWeight: 700 },
-  brandAccent: { color: C.primary },
-  tagline: { fontSize: 8, color: '#DBEAFE', marginTop: 3 },
-  coverTitle: { fontSize: 31, fontWeight: 700, marginBottom: 8, maxWidth: 470 },
-  coverDomain: { fontSize: 14, color: '#DBEAFE', marginBottom: 18 },
-  coverMeta: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  metaPill: { borderRadius: 999, backgroundColor: '#FFFFFF22', paddingVertical: 6, paddingHorizontal: 10, color: C.white, fontSize: 8 },
-  coverBody: { padding: 34, paddingTop: 26 },
-  scorePanel: { flexDirection: 'row', gap: 12, marginBottom: 18 },
-  scoreMain: { width: 135, borderRadius: 18, padding: 18, backgroundColor: C.light, borderWidth: 1, borderColor: C.border },
-  scoreValue: { fontSize: 42, fontWeight: 700, color: C.primary, textAlign: 'center' },
-  scoreLabel: { fontSize: 10, color: C.muted, textAlign: 'center', marginTop: 3 },
-  scoreGrid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  darkCard: { width: '48%', borderRadius: 14, padding: 12, backgroundColor: C.light, borderWidth: 1, borderColor: C.border },
-  darkCardLabel: { fontSize: 8, color: '#BFDBFE', marginBottom: 6 },
-  darkCardValue: { fontSize: 18, fontWeight: 700, color: C.white },
-  summaryDark: { borderRadius: 16, padding: 15, backgroundColor: '#111827', borderWidth: 1, borderColor: '#334155' },
-  summaryTitleDark: { fontSize: 11, fontWeight: 700, color: C.white, marginBottom: 8 },
-  summaryTextDark: { fontSize: 9.3, color: '#E5E7EB' },
-  summaryLead: { fontSize: 10.8, color: C.white, lineHeight: 1.35, marginBottom: 12 },
-  summaryMetricTitle: { fontSize: 9.4, fontWeight: 700, color: C.primaryLight, marginTop: 8, marginBottom: 3 },
-  summaryMetricText: { fontSize: 8.8, color: '#CBD5E1', lineHeight: 1.35 },
-  header: { marginBottom: 18, paddingBottom: 9, borderBottomWidth: 1, borderBottomColor: C.border, flexDirection: 'row', justifyContent: 'space-between' },
-  headerBrand: { color: C.primary, fontWeight: 700, fontSize: 10 },
-  headerDomain: { color: C.muted, fontSize: 8, maxWidth: 230, textAlign: 'right' },
-  footer: { position: 'absolute', bottom: 18, left: 34, right: 34, color: '#94A3B8', fontSize: 7, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 7, flexDirection: 'row', justifyContent: 'space-between' },
-  sectionTitle: { fontSize: 17, fontWeight: 700, color: C.primary, marginBottom: 10 },
-  sectionIntro: { fontSize: 9, color: C.muted, marginBottom: 12 },
-  card: { borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.light, padding: 13, marginBottom: 10 },
-  cardTitle: { fontSize: 11, fontWeight: 700, color: C.text, marginBottom: 7 },
-  paragraph: { fontSize: 9, color: '#CBD5E1' },
-  metricsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  metricCard: { flex: 1, borderRadius: 12, padding: 11, backgroundColor: C.light, borderWidth: 1, borderColor: C.border },
-  metricLabel: { fontSize: 7.5, color: C.muted, marginBottom: 5 },
-  metricValue: { fontSize: 13, fontWeight: 700 },
-  table: { borderWidth: 1, borderColor: C.border, borderRadius: 10, overflow: 'hidden', marginBottom: 12, backgroundColor: C.light },
-  tableHeader: { flexDirection: 'row', backgroundColor: C.primary },
-  th: { color: C.white, fontSize: 7.5, fontWeight: 700, padding: 6 },
-  tr: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: C.border },
-  td: { fontSize: 7.3, color: '#CBD5E1', padding: 6 },
-  recCard: { borderRadius: 13, borderWidth: 1, borderColor: C.border, padding: 13, marginBottom: 10, backgroundColor: C.light, borderLeftWidth: 5 },
-  recTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 7 },
-  recTitle: { fontSize: 10.5, fontWeight: 700, color: C.text, flex: 1 },
-  recPriority: { fontSize: 7, fontWeight: 700, paddingVertical: 3, paddingHorizontal: 7, borderRadius: 999, backgroundColor: '#0F172A' },
-  recIntro: { fontSize: 8.5, color: '#E2E8F0', marginBottom: 8, lineHeight: 1.35 },
-  recCorrection: { fontSize: 8.4, color: '#CBD5E1', lineHeight: 1.35 },
-  recMeta: { fontSize: 7.2, color: C.muted, marginTop: 7 },
-  ctaPage: { padding: 42, backgroundColor: C.dark, color: C.white, fontFamily: 'Helvetica', justifyContent: 'center' },
-  ctaCard: { borderRadius: 22, padding: 30, backgroundColor: '#111827', borderWidth: 1, borderColor: '#334155' },
-  ctaEyebrow: { color: C.primaryLight, fontSize: 10, fontWeight: 700, marginBottom: 9 },
-  ctaTitle: { fontSize: 26, fontWeight: 700, marginBottom: 12 },
-  ctaText: { fontSize: 11, color: '#E5E7EB', marginBottom: 18 },
-  ctaButtons: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  ctaButton: { borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: C.primary, color: C.white, fontSize: 10, fontWeight: 700, textDecoration: 'none' },
-  ctaButtonLight: { borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: '#22C55E', color: C.white, fontSize: 10, fontWeight: 700, textDecoration: 'none' },
+  page: { backgroundColor: COLORS.bg, color: COLORS.text, fontFamily: 'Helvetica', paddingTop: 64, paddingBottom: 54, paddingHorizontal: 34 },
+  header: { position: 'absolute', top: 24, left: 34, right: 34, height: 22, borderBottomWidth: 1, borderBottomColor: COLORS.line, flexDirection: 'row', justifyContent: 'space-between' },
+  brand: { color: COLORS.cyan, fontSize: 11, fontWeight: 700, letterSpacing: 0.5 },
+  headerDomain: { color: COLORS.quiet, fontSize: 8 },
+  footerText: { position: 'absolute', left: 34, bottom: 25, color: COLORS.dim, fontSize: 7.5 },
+  pageNumber: { position: 'absolute', right: 34, bottom: 25, color: COLORS.quiet, fontSize: 7.5 },
+  eyebrow: { color: COLORS.cyan, fontSize: 8, fontWeight: 700, letterSpacing: 1.1, marginBottom: 8, textTransform: 'uppercase' },
+  title: { color: COLORS.text, fontSize: 28, lineHeight: 1.08, fontWeight: 700, marginBottom: 8 },
+  subtitle: { color: COLORS.muted, fontSize: 10.5, lineHeight: 1.45, marginBottom: 18 },
+  hero: { minHeight: 190, borderRadius: 22, borderWidth: 1, borderColor: '#164E63', backgroundColor: COLORS.panelDeep, padding: 22, marginBottom: 18 },
+  heroTitle: { color: COLORS.text, fontSize: 34, lineHeight: 1.05, fontWeight: 700, marginBottom: 10 },
+  heroDomain: { color: COLORS.cyan, fontSize: 16, fontWeight: 700, marginBottom: 12 },
+  p: { color: COLORS.muted, fontSize: 9.2, lineHeight: 1.45, marginBottom: 7 },
+  panel: { backgroundColor: COLORS.panel, borderColor: COLORS.line, borderWidth: 1, borderRadius: 15, padding: 14, marginBottom: 13 },
+  panelTitle: { color: COLORS.text, fontSize: 12, fontWeight: 700, marginBottom: 9 },
+  scoreBox: { backgroundColor: '#0C1626', borderColor: COLORS.line, borderWidth: 1, borderRadius: 16, padding: 15, marginBottom: 14 },
+  scoreTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
+  scoreSmall: { color: COLORS.quiet, fontSize: 8, marginBottom: 4, textTransform: 'uppercase' },
+  scoreBig: { fontSize: 30, fontWeight: 700 },
+  scoreCaption: { color: COLORS.muted, fontSize: 9, lineHeight: 1.35, textAlign: 'right', width: 145 },
+  track: { height: 12, borderRadius: 999, backgroundColor: COLORS.black, borderColor: '#1E293B', borderWidth: 1, overflow: 'hidden' },
+  fill: { height: 10, borderRadius: 999 },
+  ticks: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
+  tick: { color: COLORS.dim, fontSize: 6.5 },
+  cols: { flexDirection: 'row', justifyContent: 'space-between' },
+  half: { width: '48.5%' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 6 },
+  metric: { width: '48.5%', backgroundColor: '#0C1626', borderColor: COLORS.line, borderWidth: 1, borderRadius: 13, padding: 11, marginBottom: 10 },
+  metricLabel: { color: COLORS.quiet, fontSize: 7.5, marginBottom: 5 },
+  metricValue: { color: COLORS.text, fontSize: 13, fontWeight: 700, marginBottom: 7 },
+  metricNote: { color: COLORS.dim, fontSize: 6.7, lineHeight: 1.3, marginTop: 6 },
+  badge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 8 },
+  badgeText: { fontSize: 6.7, fontWeight: 700 },
+  table: { borderWidth: 1, borderColor: COLORS.line, borderRadius: 12, overflow: 'hidden', marginBottom: 8 },
+  tableHead: { backgroundColor: '#0E1A2B', borderBottomWidth: 1, borderBottomColor: COLORS.line, flexDirection: 'row' },
+  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1D2A3D' },
+  th: { color: COLORS.cyan, fontSize: 7.4, fontWeight: 700, paddingVertical: 7, paddingHorizontal: 8, lineHeight: 1.25 },
+  td: { color: COLORS.muted, fontSize: 7.2, paddingVertical: 7, paddingHorizontal: 8, lineHeight: 1.35 },
+  empty: { color: COLORS.quiet, fontSize: 8.5, lineHeight: 1.4 },
+  action: { backgroundColor: '#0C1626', borderColor: COLORS.line, borderWidth: 1, borderRadius: 14, padding: 11, marginBottom: 9 },
+  actionTitle: { color: COLORS.text, fontSize: 10, fontWeight: 700, lineHeight: 1.25, marginBottom: 5 },
+  actionMeta: { color: COLORS.cyan, fontSize: 7, fontWeight: 700, marginBottom: 5 },
+  cta: { backgroundColor: '#062A3A', borderColor: '#0E7490', borderWidth: 1, borderRadius: 18, padding: 17, marginTop: 8 },
+  ctaTitle: { color: COLORS.cyan, fontSize: 15, fontWeight: 700, marginBottom: 8 },
 });
 
-function formatScanDate(model) {
-  try { return model.scanDate ? formatDate(model.scanDate) : formatDate(new Date().toISOString()); }
-  catch { return new Date().toLocaleDateString('fr-FR'); }
-}
-
-function PageFooter({ model }) {
-  return h(View, { style: styles.footer, fixed: true },
-    h(Text, null, `Webisafe - Audit de ${model.domain}`),
-    h(Text, { render: ({ pageNumber, totalPages }) => `Page ${pageNumber} / ${totalPages}` })
+function PageShell({ model, title, children }) {
+  return e(Page, { size: 'A4', style: styles.page, wrap: false },
+    e(View, { fixed: true, style: styles.header }, e(Text, { style: styles.brand }, 'Webisafe'), e(Text, { style: styles.headerDomain }, `${title} - ${model.domain}`)),
+    e(View, null, children),
+    e(Text, { fixed: true, style: styles.footerText }, 'Rapport confidentiel — webisafe.ci'),
+    e(Text, { fixed: true, style: styles.pageNumber, render: ({ pageNumber, totalPages }) => `${pageNumber}/${totalPages}` }),
   );
 }
 
-function ReportPage({ model, title, children }) {
-  return h(Page, { size: 'A4', style: styles.page, wrap: true },
-    h(View, { style: styles.header, fixed: true },
-      h(Text, { style: styles.headerBrand }, 'Webisafe'),
-      h(Text, { style: styles.headerDomain }, `${title} - ${model.domain}`)
+function SectionHeading({ eyebrow, title, subtitle }) {
+  return e(View, { wrap: false }, e(Text, { style: styles.eyebrow }, eyebrow), e(Text, { style: styles.title }, title), e(Text, { style: styles.subtitle }, subtitle));
+}
+
+function Badge({ value }) {
+  const palette = statusPalette(value);
+  return e(View, { style: [styles.badge, { backgroundColor: palette.bg, borderColor: palette.border }], wrap: false }, e(Text, { style: [styles.badgeText, { color: palette.text }] }, normalizeStatus(value)));
+}
+
+function Gauge({ label, value, caption }) {
+  const score = scoreValue(value);
+  return e(View, { style: styles.scoreBox, wrap: false },
+    e(View, { style: styles.scoreTop },
+      e(View, null,
+        e(Text, { style: styles.scoreSmall }, label),
+        e(Text, { style: [styles.scoreBig, { color: scoreColor(value) }] }, score === null ? '—' : `${score}`),
+        e(Text, { style: { color: COLORS.quiet, fontSize: 8, marginTop: 2 } }, score === null ? 'Non mesuré' : `${scoreLabel(score)} / 100`),
+      ),
+      e(Text, { style: styles.scoreCaption }, caption),
     ),
-    children,
-    h(PageFooter, { model })
+    e(View, { style: styles.track }, e(View, { style: [styles.fill, { width: `${score === null ? 0 : score}%`, backgroundColor: scoreColor(value) }] })),
+    e(View, { style: styles.ticks }, e(Text, { style: styles.tick }, '0 critique'), e(Text, { style: styles.tick }, '40'), e(Text, { style: styles.tick }, '65'), e(Text, { style: styles.tick }, '85'), e(Text, { style: styles.tick }, '100 excellent')),
   );
+}
+
+function MiniScore({ item }) {
+  const value = scoreValue(item.score);
+  return e(View, { style: { marginBottom: 9 }, wrap: false },
+    e(View, { style: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 } }, e(Text, { style: { color: COLORS.muted, fontSize: 8.5 } }, item.label), e(Text, { style: { color: scoreColor(value), fontSize: 8.5, fontWeight: 700 } }, scoreDisplay(value))),
+    e(View, { style: [styles.track, { height: 8 }] }, e(View, { style: [styles.fill, { height: 6, width: `${value === null ? 0 : value}%`, backgroundColor: scoreColor(value) }] })),
+  );
+}
+
+function Panel({ title, children }) {
+  return e(View, { style: styles.panel, wrap: false }, e(Text, { style: styles.panelTitle }, title), children);
 }
 
 function MetricCard({ item }) {
-  const color = getScoreColor(Number(String(item.value).replace(/[^0-9.]/g, '')));
-  return h(View, { style: styles.metricCard },
-    h(Text, { style: styles.metricLabel }, t(item.label, '')),
-    h(Text, { style: [styles.metricValue, { color }] }, t(item.value, 'N/A')),
-    h(Text, { style: { fontSize: 7, color: C.muted, marginTop: 4 } }, t(item.status, ''))
-  );
+  return e(View, { style: styles.metric, wrap: false }, e(Text, { style: styles.metricLabel }, item.label), e(Text, { style: styles.metricValue }, item.value), e(Badge, { value: item.status }), item.note ? e(Text, { style: styles.metricNote }, item.note) : null);
 }
 
-function MetricsGrid({ metrics }) {
-  return h(View, { style: styles.metricsRow }, ...metrics.slice(0, 4).map((item, index) => h(MetricCard, { key: `${item.label}-${index}`, item })));
+function MetricGrid({ metrics }) {
+  return e(View, { style: styles.grid }, ...metrics.map((item, index) => e(MetricCard, { key: `${item.label}-${index}`, item })));
 }
 
-function DataTable({ columns, rows, widths }) {
-  return h(View, { style: styles.table, wrap: false },
-    h(View, { style: styles.tableHeader }, ...columns.map((col, i) => h(Text, { key: col, style: [styles.th, { width: widths?.[i] || `${100 / columns.length}%` }] }, t(col, '')))),
-    ...rows.map((row, r) => h(View, { key: `r-${r}`, style: styles.tr },
-      ...row.map((cell, c) => h(Text, { key: `c-${c}`, style: [styles.td, { width: widths?.[c] || `${100 / columns.length}%` }] }, t(cell, '')))
-    ))
-  );
-}
-
-function InfoCard({ title, children }) {
-  return h(View, { style: styles.card }, h(Text, { style: styles.cardTitle }, title), h(Text, { style: styles.paragraph }, children));
-}
-
-function ExecutiveSummaryCard({ model }) {
-  const global = model.scores.global;
-  const alertCount = model.criticalAlerts.length;
-  const recCount = model.recommendations.length;
-  const globalVerdict =
-    global >= 80 ? 'globalement solide'
-    : global >= 60 ? 'fonctionnel mais perfectible'
-    : global >= 40 ? 'en dessous des standards actuels'
-    : 'fragile et a corriger en priorite';
-  const lead = `Le site ${model.domain} obtient un score global de ${global ?? 'N/A'}/100. Son niveau est ${globalVerdict}. ${alertCount > 0 ? `${alertCount} alerte(s) critique(s) doivent etre traitees en priorite.` : "Aucune alerte critique n'a ete remontee lors de ce scan."} ${recCount > 0 ? `${recCount} recommandation(s) priorisee(s) sont proposees pour corriger les points bloquants.` : 'Le site respecte globalement les standards professionnels attendus.'}`;
-  const metrics = [
-    ['Performance', model.scores.performance, "La vitesse percue, le poids des ressources et la stabilite de chargement influencent directement l'experience utilisateur et les conversions."],
-    ['Securite', model.scores.security, "Les protections HTTPS, headers, reputation et signaux de risque determinent le niveau de confiance accorde au site."],
-    ['SEO', model.scores.seo, "La structure technique, les balises et les signaux de partage aident Google a comprendre et presenter correctement la page."],
-    ['UX mobile', model.scores.ux, "L'affichage mobile, les zones tactiles et le confort de lecture conditionnent la capacite des visiteurs a utiliser le site sans friction."],
-  ];
-
-  return h(View, { style: styles.summaryDark },
-    h(Text, { style: styles.summaryTitleDark }, 'Synthese executive'),
-    h(Text, { style: styles.summaryLead }, lead),
-    ...metrics.map(([label, score, text]) => h(View, { key: label },
-      h(Text, { style: styles.summaryMetricTitle }, `${label} (${score != null ? `${score}/100` : 'N/A'})`),
-      h(Text, { style: styles.summaryMetricText }, text)
-    ))
+function DataTable({ columns, rows, widths, maxRows = 7, statusColumn = 2 }) {
+  const visibleRows = asArray(rows).filter((item) => Array.isArray(item) && item.some((cell) => pdfText(cell, '') !== '')).slice(0, maxRows);
+  if (!visibleRows.length) return e(Text, { style: styles.empty }, 'Aucune donnée détaillée disponible.');
+  return e(View, { style: styles.table, wrap: false },
+    e(View, { style: styles.tableHead }, ...columns.map((column, index) => e(Text, { key: column, style: [styles.th, { width: widths[index] }] }, column))),
+    ...visibleRows.map((line, rowIndex) => e(View, { key: rowIndex, style: styles.tableRow, wrap: false },
+      ...line.map((cell, cellIndex) => e(Text, { key: `${rowIndex}-${cellIndex}`, style: [styles.td, { width: widths[cellIndex] }, cellIndex === statusColumn ? { color: statusPalette(cell).text, fontWeight: 700 } : null] }, pdfText(cell))),
+    )),
   );
 }
 
 function CoverPage({ model }) {
-  const scanRows = [
-    `Site analyse : ${t(model.url || model.domain, '-')}`,
-    `Date du scan : ${t(formatScanDate(model), '-')}`,
-    `Contexte : ${model.scanOrigin.label}${model.scanOrigin.city ? ` - ${model.scanOrigin.city}` : ''}`,
-    `Recommandations : ${model.recommendations.length}`,
-    `Alertes critiques : ${model.criticalAlerts.length}`,
-  ];
-  const cards = [
-    ['Performance', model.scores.performance],
-    ['Securite', model.scores.security],
-    ['SEO', model.scores.seo],
-    ['UX Mobile', model.scores.ux],
-  ];
-
-  return h(Page, { size: 'A4', style: styles.cover },
-    h(View, { style: styles.coverHero },
-      h(View, { style: styles.brandRow },
-        h(Text, { style: styles.logo }, 'W'),
-        h(View, null,
-          h(Text, { style: styles.brand }, ['Webi', h(Text, { key: 'safe', style: styles.brandAccent }, 'safe')]),
-          h(Text, { style: styles.tagline }, 'Analyse Web Professionnelle')
-        )
-      ),
-      h(Text, { style: styles.coverTitle }, "Rapport d'Audit Premium"),
-      h(Text, { style: styles.coverDomain }, model.domain),
-      h(View, { style: styles.coverMeta },
-        h(Text, { style: styles.metaPill }, `Scan du ${formatScanDate(model)}`),
-        h(Text, { style: styles.metaPill }, `${model.recommendations.length} recommandation(s)`)
-      )
+  return e(PageShell, { model, title: 'Rapport premium' },
+    e(View, { style: styles.hero, wrap: false },
+      e(Text, { style: styles.eyebrow }, 'Rapport d’audit premium'),
+      e(Text, { style: styles.heroTitle }, 'Audit Webisafe'),
+      e(Text, { style: styles.heroDomain }, model.domain),
+      e(Text, { style: styles.p }, `Analyse générée le ${model.scanDateLabel}. Ce document synthétise les risques, la performance, le SEO, l’expérience mobile et les priorités de correction.`),
+      e(Text, { style: styles.p }, 'Document conçu pour une présentation client : pages dédiées, hiérarchie claire, fond sombre uniforme et statuts exploitables.'),
     ),
-    h(View, { style: styles.coverBody },
-      h(View, { style: styles.scorePanel },
-        h(View, { style: styles.scoreMain },
-          h(Text, { style: styles.scoreValue }, `${model.scores.global ?? '-'}`),
-          h(Text, { style: styles.scoreLabel }, `${getScoreLabel(model.scores.global)} / 100`)
+    e(Gauge, { label: 'Score global', value: model.scores.global, caption: 'Indice consolidé Webisafe basé sur les dimensions mesurées.' }),
+    e(View, { style: styles.cols },
+      e(View, { style: styles.half }, e(Panel, { title: 'Scores par catégorie' }, ...model.cover.categoryScores.map((item, index) => e(MiniScore, { key: index, item })))),
+      e(View, { style: styles.half }, e(Panel, { title: 'Résumé exécutif' }, ...model.narrative.paragraphs.map((item, index) => e(Text, { key: index, style: styles.p }, item)))),
+    ),
+    e(Panel, { title: 'Métadonnées du scan' }, e(DataTable, { columns: ['Élément', 'Valeur'], rows: model.cover.metadata, widths: ['34%', '66%'], maxRows: 6, statusColumn: -1 })),
+  );
+}
+
+function PerformancePage({ model }) {
+  const section = model.sections.performance;
+  const serverRows = compact([
+    section.serverLocation.city ? ['Ville', section.serverLocation.city] : null,
+    section.serverLocation.country ? ['Pays', section.serverLocation.country] : null,
+    section.serverLocation.isp ? ['Hébergeur', section.serverLocation.isp] : null,
+    section.serverLocation.ip ? ['IP', section.serverLocation.ip] : null,
+    section.serverLocation.message ? ['Latence', section.serverLocation.message] : null,
+    section.serverLocation.recommendation ? ['Recommandation', section.serverLocation.recommendation] : null,
+  ]);
+  return e(PageShell, { model, title: 'Performance' },
+    e(SectionHeading, { eyebrow: 'Section 01', title: 'Performance', subtitle: 'Vitesse perçue, stabilité visuelle, poids de page et opportunités d’optimisation.' }),
+    e(Gauge, { label: 'Score performance', value: section.score, caption: 'Une vitesse faible pénalise directement la conversion, surtout sur mobile.' }),
+    e(MetricGrid, { metrics: section.metrics }),
+    e(View, { style: styles.cols },
+      e(View, { style: styles.half }, e(Panel, { title: 'Localisation serveur' }, e(DataTable, { columns: ['Signal', 'Valeur'], rows: serverRows, widths: ['36%', '64%'], maxRows: 6, statusColumn: -1 }))),
+      e(View, { style: styles.half }, e(Panel, { title: 'Optimisations prioritaires' }, e(DataTable, { columns: ['Optimisation', 'Détail', 'Gain'], rows: section.opportunities.map((item) => [item.title, item.description, item.savings]), widths: ['34%', '48%', '18%'], maxRows: 5, statusColumn: -1 }))),
+    ),
+  );
+}
+
+function SecurityPage({ model }) {
+  const section = model.sections.security;
+  const sensitiveRows = compact([
+    section.sensitiveFiles.alert_message ? ['Alerte', section.sensitiveFiles.alert_message, section.sensitiveFiles.critical ? 'Critique' : 'Avertissement'] : null,
+    ...section.sensitiveFiles.exposed_files.map((file) => ['Fichier exposé', file, 'Critique']),
+  ]);
+  return e(PageShell, { model, title: 'Sécurité' },
+    e(SectionHeading, { eyebrow: 'Section 02', title: 'Sécurité', subtitle: 'HTTPS, SSL, malware, headers, cookies et fichiers sensibles accessibles.' }),
+    e(Gauge, { label: 'Score sécurité', value: section.score, caption: 'Les signaux critiques sont priorisés pour réduire le risque client.' }),
+    e(MetricGrid, { metrics: section.metrics }),
+    e(View, { style: styles.cols },
+      e(View, { style: styles.half }, e(Panel, { title: 'Headers manquants' }, e(DataTable, { columns: ['Header', 'Message', 'Statut'], rows: section.missingHeaders.map((item) => [item.header, item.message, item.severity]), widths: ['30%', '50%', '20%'], maxRows: 6 }))),
+      e(View, { style: styles.half }, e(Panel, { title: 'Cookies et fichiers sensibles' }, e(DataTable, { columns: ['Élément', 'Détail', 'Statut'], rows: [...section.cookieIssues.map((item) => ['Cookie', item, 'Avertissement']), ...sensitiveRows], widths: ['28%', '52%', '20%'], maxRows: 7 }))),
+    ),
+  );
+}
+
+function AdvancedSecurityPage({ model }) {
+  const section = model.sections.advancedSecurity;
+  const emailRows = compact([
+    section.email.spf ? ['SPF', section.email.spf, section.email.spf === 'Présent' ? 'OK' : 'Avertissement'] : null,
+    section.email.dmarc ? ['DMARC', section.email.dmarc, section.email.dmarc === 'Présent' ? 'OK' : 'Avertissement'] : null,
+    section.email.dkim ? ['DKIM', section.email.dkim, section.email.dkim === 'Présent' ? 'OK' : 'Avertissement'] : null,
+    section.email.missing.length ? ['Manquants', section.email.missing.join(', '), 'Avertissement'] : null,
+  ]);
+  return e(PageShell, { model, title: 'Sécurité avancée' },
+    e(SectionHeading, { eyebrow: 'Section 03', title: 'Sécurité avancée', subtitle: 'WAF, sous-domaines, takeover, supply chain, email, typosquatting et contrôles étendus.' }),
+    section.score !== null
+      ? e(Gauge, { label: 'Score sécurité avancée', value: section.score, caption: 'Ce score agrège uniquement les checks avancés disponibles.' })
+      : e(Panel, { title: 'Score sécurité avancée' }, e(Text, { style: styles.empty }, 'Score global non mesuré : certains checks avancés peuvent être indisponibles, sans que cela signifie une faille critique.')),
+    e(View, { style: styles.cols },
+      e(View, { style: styles.half }, e(Panel, { title: 'Checks principaux' }, e(DataTable, { columns: ['Check', 'Résultat', 'Statut'], rows: section.summaryRows, widths: ['35%', '45%', '20%'], maxRows: 6 }))),
+      e(View, { style: styles.half }, e(Panel, { title: 'Sécurité email' }, e(DataTable, { columns: ['Élément', 'Résultat', 'Statut'], rows: emailRows, widths: ['30%', '50%', '20%'], maxRows: 5 }))),
+    ),
+    e(Panel, { title: 'Détail des checks étendus' }, e(DataTable, { columns: ['Check', 'Détail', 'Statut'], rows: section.checks.map((item) => [item.name, item.detail, item.status]), widths: ['30%', '50%', '20%'], maxRows: 7 })),
+  );
+}
+
+function SeoPage({ model }) {
+  const section = model.sections.seo;
+  return e(PageShell, { model, title: 'SEO' },
+    e(SectionHeading, { eyebrow: 'Section 04', title: 'SEO', subtitle: 'Structure de page, indexabilité, métadonnées et signaux de partage.' }),
+    e(Gauge, { label: 'Score SEO', value: section.score, caption: 'Un SEO technique propre améliore la visibilité et la qualité du trafic organique.' }),
+    e(MetricGrid, { metrics: section.metrics }),
+    e(View, { style: styles.cols },
+      e(View, { style: styles.half }, e(Panel, { title: 'Signaux complémentaires' }, e(DataTable, { columns: ['Critère', 'Valeur', 'Statut'], rows: section.extraRows, widths: ['34%', '44%', '22%'], maxRows: 5 }))),
+      e(View, { style: styles.half }, e(Panel, { title: 'Lecture SEO' }, e(Text, { style: styles.p }, 'Les absences critiques doivent être corrigées avant les optimisations éditoriales. La priorité est de rendre les pages lisibles, indexables et correctement présentées dans les moteurs.'))),
+    ),
+  );
+}
+
+function UxPage({ model }) {
+  const section = model.sections.ux;
+  return e(PageShell, { model, title: 'UX Mobile' },
+    e(SectionHeading, { eyebrow: 'Section 05', title: 'UX Mobile', subtitle: 'Accessibilité, confort tactile, zoom mobile, médias et obstacles à la conversion.' }),
+    e(Gauge, { label: 'Score UX mobile', value: section.score, caption: 'La qualité mobile influence la confiance, le taux de rebond et les demandes entrantes.' }),
+    e(MetricGrid, { metrics: [...section.metrics, section.tapTargets] }),
+    e(Panel, { title: 'Problèmes UX détectés' }, e(DataTable, { columns: ['Problème', 'Impact', 'Statut'], rows: section.issues.map((item) => [item.message, item.impact || item.type, item.severity]), widths: ['42%', '40%', '18%'], maxRows: 8 })),
+  );
+}
+
+function ActionCard({ item }) {
+  const color = item.rank === 1 ? COLORS.red : item.rank === 2 ? COLORS.orange : COLORS.cyan;
+  return e(View, { style: [styles.action, { borderColor: color }], wrap: false },
+    e(Text, { style: [styles.actionMeta, { color }] }, `${item.priority} — ${item.category}`),
+    e(Text, { style: styles.actionTitle }, item.title),
+    item.description ? e(Text, { style: styles.p }, item.description) : null,
+    item.action ? e(Text, { style: styles.p }, `Action : ${item.action}`) : null,
+    item.impactBusiness ? e(Text, { style: styles.p }, `Impact business : ${item.impactBusiness}`) : null,
+    item.time || item.difficulty ? e(Text, { style: [styles.p, { color: COLORS.quiet }] }, compact([item.difficulty, item.time]).join(' • ')) : null,
+  );
+}
+
+function ActionGroup({ title, items }) {
+  return e(View, { style: styles.half, wrap: false },
+    e(Text, { style: styles.panelTitle }, title),
+    items.slice(0, 2).length ? items.slice(0, 2).map((item, index) => e(ActionCard, { key: index, item })) : e(View, { style: styles.panel }, e(Text, { style: styles.empty }, 'Aucune action dans cette catégorie.')),
+  );
+}
+
+function Actions({ model }) {
+  const g = model.recommendationsByPriority;
+  return e(PageShell, { model, title: 'Plan d’action' },
+    e(SectionHeading, { eyebrow: 'Section 06', title: 'Plan d’action', subtitle: 'Priorités de correction classées pour transformer le rapport en feuille de route.' }),
+    e(Panel, { title: 'Alertes à surveiller' }, e(DataTable, { columns: ['Alerte', 'Détail', 'Statut'], rows: model.criticalAlerts.map((item) => [item.title, item.message || item.recommendation, item.severity]), widths: ['32%', '48%', '20%'], maxRows: 3 })),
+    e(View, { style: styles.cols }, e(ActionGroup, { title: 'Urgentes', items: g.urgent }), e(ActionGroup, { title: 'Importantes', items: g.important })),
+    e(View, { style: styles.cols },
+      e(ActionGroup, { title: 'Améliorations', items: g.improvement }),
+      e(View, { style: styles.half }, e(Panel, { title: 'Méthode de correction' }, e(Text, { style: styles.p }, 'Traiter d’abord les risques critiques, puis les freins business importants, avant les améliorations de confort et de visibilité.'))),
+    ),
+  );
+}
+
+function Cta({ model }) {
+  return e(PageShell, { model, title: 'CTA' },
+    e(SectionHeading, { eyebrow: 'Section 07', title: 'Prochaine étape', subtitle: 'Transformer ce rapport en corrections concrètes, priorisées et mesurables.' }),
+    e(View, { style: [styles.hero, { minHeight: 220 }], wrap: false },
+      e(Text, { style: styles.eyebrow }, 'Accompagnement Webisafe'),
+      e(Text, { style: styles.heroTitle }, 'Corriger les points critiques'),
+      e(Text, { style: styles.heroDomain }, model.domain),
+      e(Text, { style: styles.p }, 'Ce rapport identifie les risques et les opportunités. L’étape suivante consiste à corriger les problèmes qui impactent directement la confiance, la sécurité, la vitesse et la conversion.'),
+      e(Text, { style: styles.p }, 'Webisafe peut vous accompagner sur les corrections techniques, la sécurisation, l’optimisation mobile, le SEO technique et le suivi post-correction.'),
+    ),
+    e(View, { style: styles.cols },
+      e(View, { style: styles.half },
+        e(Panel, { title: 'Ce que nous pouvons corriger' },
+          e(DataTable, { columns: ['Priorité', 'Objectif', 'Statut'], rows: [['Sécurité', 'Réduire les failles et expositions', 'Critique'], ['Performance', 'Accélérer le chargement mobile', 'Avertissement'], ['SEO', 'Améliorer les signaux techniques', 'Avertissement'], ['UX Mobile', 'Réduire les freins de conversion', 'Avertissement']], widths: ['30%', '50%', '20%'], maxRows: 4 }),
         ),
-        h(View, { style: styles.scoreGrid },
-          ...cards.map(([label, score]) => h(View, { key: label, style: styles.darkCard },
-            h(Text, { style: styles.darkCardLabel }, label),
-            h(Text, { style: styles.darkCardValue }, score != null ? `${score}/100` : 'N/A')
-          ))
-        )
       ),
-      h(ExecutiveSummaryCard, { model }),
-      h(View, { style: [styles.summaryDark, { marginTop: 12 }] },
-        h(Text, { style: styles.summaryTitleDark }, 'Informations du scan'),
-        ...scanRows.map((row) => h(Text, { key: row, style: styles.summaryTextDark }, row))
-      )
+      e(View, { style: styles.half },
+        e(View, { style: styles.cta, wrap: false },
+          e(Text, { style: styles.ctaTitle }, 'Voir les packs de correction'),
+          e(Text, { style: styles.p }, 'Consultez les packs Webisafe pour choisir le niveau d’intervention adapté à votre site.'),
+          e(Text, { style: [styles.p, { color: COLORS.cyan, fontWeight: 700 }] }, 'webisafe.ci'),
+        ),
+        e(Panel, { title: 'Livrable attendu' },
+          e(Text, { style: styles.p }, 'Après correction : risques réduits, priorités traitées et rapport exploitable pour mesurer les progrès.'),
+        ),
+      ),
     ),
-    h(PageFooter, { model })
   );
 }
 
-function PerformanceSecurityPage({ model }) {
-  const perf = model.sections.performance;
-  const security = model.sections.security;
-  return h(ReportPage, { model, title: 'Performance et securite' },
-    h(Text, { style: styles.sectionTitle }, '1. Performance'),
-    h(Text, { style: styles.sectionIntro }, "Vitesse de chargement, poids des ressources et bonnes pratiques d'optimisation identifiees lors du scan."),
-    h(MetricsGrid, { metrics: [
-      { label: 'Temps de chargement', value: perf.loadTime != null ? `${perf.loadTime}s` : 'N/A', status: statusFromScore((1 - (perf.loadTime || 0) / 5) * 100) },
-      { label: 'Taille de page', value: perf.pageSize != null ? `${(perf.pageSize / 1024).toFixed(1)} Mo` : 'N/A', status: statusFromScore((1 - (perf.pageSize || 0) / 3e6) * 100) },
-      { label: 'Requetes HTTP', value: perf.requests != null ? `${perf.requests}` : 'N/A', status: perf.requests != null && perf.requests > 80 ? 'A ameliorer' : 'OK' },
-      { label: 'Score Performance', value: model.scores.performance != null ? `${model.scores.performance}/100` : 'N/A', status: getScoreLabel(model.scores.performance) },
-    ] }),
-    perf.resources.length > 0
-      ? h(DataTable, { columns: ['Ressource', 'Type', 'Taille'], rows: perf.resources.slice(0, 18).map(r => [t(r.name || r.url || r.path || 'Fichier'), t(r.type || 'Inconnu'), r.size != null ? `${(r.size / 1024).toFixed(1)} ko` : 'N/A']), widths: ['45%', '25%', '30%'] })
-      : h(InfoCard, { title: 'Ressources analysees' }, "Les metriques globales de performance sont evaluees mais aucun detail de ressource n'a ete fourni dans ce scan."),
-
-    h(Text, { style: [styles.sectionTitle, { marginTop: 18 }] }, '2. Securite'),
-    h(Text, { style: styles.sectionIntro }, "Protections HTTPS, headers de securite et eventuelles failles ou mauvaises configurations detectees."),
-    h(MetricsGrid, { metrics: [
-      { label: 'Score Securite', value: model.scores.security != null ? `${model.scores.security}/100` : 'N/A', status: getScoreLabel(model.scores.security) },
-      { label: 'HTTPS', value: boolLabel(security.https), status: security.https ? 'OK' : 'Critique' },
-      { label: 'HSTS', value: boolLabel(security.hsts), status: security.hsts ? 'OK' : 'A ameliorer' },
-      { label: 'X-Frame-Options', value: boolLabel(security.xframe), status: security.xframe ? 'OK' : 'A ameliorer' },
-    ] }),
-    h(InfoCard, { title: 'Headers de securite' }, `HTTPS : ${boolLabel(security.https)}  |  HSTS : ${boolLabel(security.hsts)}  |  X-Frame-Options : ${boolLabel(security.xframe)}  |  X-Content-Type-Options : ${boolLabel(security.xcontent)}`),
-    security.issues.length > 0
-      ? h(DataTable, { columns: ['Probleme', 'Severite'], rows: security.issues.slice(0, 12).map(iss => [t(iss.title || iss.name || iss.message || iss), t(iss.severity || iss.priority || 'Info')]), widths: ['70%', '30%'] })
-      : h(InfoCard, { title: 'Vulnerabilites detectees' }, "Aucune vulnerabilite majeure n'a ete detectee dans la configuration actuelle.")
+function PdfReport({ model }) {
+  return e(Document, { title: `Rapport Webisafe - ${model.domain}`, author: 'Webisafe', creator: 'Webisafe' },
+    e(CoverPage, { model }),
+    e(PerformancePage, { model }),
+    e(SecurityPage, { model }),
+    e(AdvancedSecurityPage, { model }),
+    e(SeoPage, { model }),
+    e(UxPage, { model }),
+    e(Actions, { model }),
+    e(Cta, { model }),
   );
 }
 
-function SeoUxPage({ model }) {
-  const seo = model.sections.seo;
-  const ux = model.sections.ux;
-  return h(ReportPage, { model, title: 'SEO et UX mobile' },
-    h(Text, { style: styles.sectionTitle }, '3. Referencement SEO'),
-    h(Text, { style: styles.sectionIntro }, "Balises, structure Hn, donnees de partage et signaux techniques utilises par Google pour indexer la page."),
-    h(MetricsGrid, { metrics: [
-      { label: 'Score SEO', value: model.scores.seo != null ? `${model.scores.seo}/100` : 'N/A', status: getScoreLabel(model.scores.seo) },
-      { label: 'Balise title', value: seo.title.length > 0 && seo.title !== 'Non defini' ? `${seo.title.length} car.` : 'Manquante', status: seo.title === 'Non defini' ? 'Critique' : 'OK' },
-      { label: 'Meta description', value: seo.description.length > 0 && seo.description !== 'Non definie' ? `${seo.description.length} car.` : 'Manquante', status: seo.description === 'Non definie' ? 'A ameliorer' : 'OK' },
-      { label: 'Sitemap.xml', value: boolLabel(seo.sitemap), status: seo.sitemap ? 'OK' : 'A ameliorer' },
-    ] }),
-    h(InfoCard, { title: 'Balise title' }, seo.title),
-    h(InfoCard, { title: 'Meta description' }, seo.description),
-    h(InfoCard, { title: 'Signaux techniques' }, `Canonical : ${boolLabel(seo.canonical)}  |  Robots.txt : ${boolLabel(seo.robots)}  |  Open Graph : ${seo.ogTags.length}  |  Schema.org : ${boolLabel(seo.schema)}  |  Analytics : ${boolLabel(seo.analytics)}`),
-
-    h(Text, { style: [styles.sectionTitle, { marginTop: 18 }] }, '4. UX mobile'),
-    h(Text, { style: styles.sectionIntro }, "Adaptation mobile, viewport, lisibilite et zones cliquables pour les visiteurs sur smartphone."),
-    h(MetricsGrid, { metrics: [
-      { label: 'Score UX', value: model.scores.ux != null ? `${model.scores.ux}/100` : 'N/A', status: getScoreLabel(model.scores.ux) },
-      { label: 'Responsive', value: boolLabel(ux.responsive), status: ux.responsive ? 'OK' : 'Critique' },
-      { label: 'Viewport', value: ux.viewport.length > 24 ? 'Configure' : ux.viewport, status: 'OK' },
-      { label: 'Tap targets', value: ux.tapTargets.slice(0, 18), status: 'A verifier' },
-    ] }),
-    h(InfoCard, { title: 'Police de texte' }, ux.fontSize),
-    h(InfoCard, { title: 'Configuration viewport' }, ux.viewport)
-  );
-}
-
-function ServerInfoPage({ model }) {
-  const server = model.sections.server;
-  return h(ReportPage, { model, title: 'Infrastructure et certificat' },
-    h(Text, { style: styles.sectionTitle }, '5. Infrastructure technique'),
-    h(Text, { style: styles.sectionIntro }, "CMS, technologies, hebergement et certificat SSL identifies sur le site."),
-    h(DataTable, { columns: ['Element', 'Valeur'], rows: [
-      ['CMS / plateforme', server.cms],
-      ['Serveur HTTP', server.server],
-      ['Hebergeur', server.location.provider],
-      ['Localisation', `${server.location.city}, ${server.location.country}`],
-      ['IP', server.location.ip],
-      ['Note serveur', String(server.grade)],
-      ['SSL valide', server.ssl.valid],
-      ['Emetteur SSL', server.ssl.issuer],
-      ['Expiration SSL', server.ssl.expiry],
-      ['Cookies detectes', server.cookies != null ? String(server.cookies) : 'N/A'],
-      ['Bandeau cookies', server.cookieConsent],
-    ], widths: ['38%', '62%'] }),
-    server.technologies.length > 0
-      ? h(InfoCard, { title: 'Technologies detectees' }, server.technologies.map(t1 => t(t1.name || t1)).join(', '))
-      : null
-  );
-}
-
-function RecommendationCard({ rec, index }) {
-  const isCritical = rec.priority.toLowerCase().includes('critique') || rec.priority.toLowerCase().includes('urgent');
-  const isImprovement = rec.priority.toLowerCase().includes('amelior');
-  const color = isCritical ? C.danger : isImprovement ? C.success : C.warning;
-  const label = isCritical ? 'URGENT' : isImprovement ? 'AMELIORATION' : 'IMPORTANT';
-  const body = buildRecommendationBody(rec);
-  return h(View, { style: [styles.recCard, { borderLeftColor: color }], wrap: false },
-    h(View, { style: styles.recTop },
-      h(Text, { style: styles.recTitle }, `${index + 1}. ${t(rec.title, '')}`),
-      h(Text, { style: [styles.recPriority, { color }] }, label)
-    ),
-    body.intro ? h(Text, { style: styles.recIntro }, body.intro) : null,
-    h(Text, { style: styles.recCorrection }, body.resolution),
-    h(Text, { style: styles.recMeta }, `${t(rec.category || 'general')} - ${t(rec.time || '30 minutes')} - ${t(rec.difficulty || 'Intermediaire')}`)
-  );
-}
-
-function RecommendationsPage({ model }) {
-  if (model.recommendations.length === 0) {
-    return h(ReportPage, { model, title: "Plan d'action" },
-      h(Text, { style: styles.sectionTitle }, "Plan d'action recommande"),
-      h(InfoCard, { title: 'Aucune action critique requise' }, "Le site respecte globalement les standards professionnels attendus. Continuez a surveiller la performance et la securite regulierement.")
-    );
-  }
-  return h(ReportPage, { model, title: "Plan d'action" },
-    h(Text, { style: styles.sectionTitle }, "Plan d'action recommande"),
-    h(Text, { style: styles.sectionIntro }, `${model.recommendations.length} recommandation(s) priorisee(s) pour corriger les points identifies durant le scan.`),
-    ...model.recommendations.map((rec, i) => h(RecommendationCard, { key: i, rec, index: i }))
-  );
-}
-
-function CtaPage({ model }) {
-  return h(Page, { size: 'A4', style: styles.ctaPage },
-    h(View, { style: styles.ctaCard },
-      h(Text, { style: styles.ctaEyebrow }, 'PASSER A L\'ACTION'),
-      h(Text, { style: styles.ctaTitle }, 'Faites corriger votre site par Webisafe'),
-      h(Text, { style: styles.ctaText }, "Ce rapport identifie les points a corriger sur " + model.domain + ". Confiez la mise en conformite a notre equipe : audit complet, corrections techniques, controle final et mise en production."),
-      h(View, { style: styles.ctaButtons },
-        h(Link, { src: CORRECTION_URL, style: styles.ctaButton }, 'Demander une correction'),
-        h(Link, { src: WHATSAPP_URL, style: styles.ctaButtonLight }, `WhatsApp ${REPORT_FIX_PHONE}`)
-      )
-    ),
-    h(PageFooter, { model })
-  );
-}
-
-function WebisafePdfDocument({ model }) {
-  return h(Document, { author: 'Webisafe', title: `Audit ${model.domain}`, subject: 'Rapport audit web Webisafe' },
-    h(CoverPage, { model }),
-    h(PerformanceSecurityPage, { model }),
-    h(SeoUxPage, { model }),
-    h(ServerInfoPage, { model }),
-    h(RecommendationsPage, { model }),
-    h(CtaPage, { model })
-  );
-}
-
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-export function createPDFBlob(reportData) {
+export async function generatePDF(reportData) {
   const model = buildPdfAuditModel(reportData);
-  return pdf(h(WebisafePdfDocument, { model })).toBlob();
-}
-
-export function generatePDF(reportData) {
-  const model = buildPdfAuditModel(reportData);
-  const filename = buildPdfFilename({ domain: model.domain, scanDate: model.scanDate });
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    createPDFBlob(reportData)
-      .then((blob) => downloadBlob(blob, filename))
-      .catch((error) => {
-        console.error('Erreur PDF:', error);
-      });
+  const blob = await pdf(e(PdfReport, { model })).toBlob();
+  if (typeof document !== 'undefined' && typeof URL !== 'undefined') {
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = buildPdfFilename(reportData);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
-  return filename;
+  return blob;
 }

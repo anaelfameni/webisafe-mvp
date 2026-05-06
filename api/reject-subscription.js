@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { json, readJsonBody, sendResendEmail, setCorsHeaders, requireAdmin } from './_utils.js';
+import { json, readJsonBody, sendResendEmail, setCorsHeaders, requireAdmin, escapeHtml } from './_utils.js';
 
 const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
   ? createClient(
@@ -46,8 +46,8 @@ export default async function handler(req, res) {
         html: `<!DOCTYPE html>
 <html><body style="background:#0A0F1E;color:#fff;font-family:Arial,sans-serif;padding:32px;">
   <div style="max-width:600px;margin:0 auto;background:#111827;border-radius:16px;padding:32px;border:1px solid #3B1515;">
-    <p>Malheureusement, votre demande d'abonnement Protect Basic pour <strong>${sub.site_url}</strong> n'a pas pu être confirmée.</p>
-    ${rejection_reason ? `<p style="color:#94A3B8;">Raison : ${rejection_reason}</p>` : ''}
+    <p>Malheureusement, votre demande d'abonnement Protect Basic pour <strong>${escapeHtml(sub.site_url)}</strong> n'a pas pu être confirmée.</p>
+    ${rejection_reason ? `<p style="color:#94A3B8;">Raison : ${escapeHtml(rejection_reason)}</p>` : ''}
     <p>Si vous avez effectué le virement Wave, contactez-nous à <a href="mailto:webisafe@gmail.com" style="color:#1566F0;">webisafe@gmail.com</a>.</p>
   </div>
 </body></html>`,

@@ -1,15 +1,13 @@
 // Vercel Serverless Function — Uptime check toutes les 6h
 // Schedule: 0 */6 * * *
 
+import { requireCronSecret } from '../_utils.js';
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const CRON_SECRET = process.env.CRON_SECRET;
 
 export default async function handler(req, res) {
-  const secret = req.headers['x-cron-secret'] || req.query.secret;
-  if (secret !== CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (!requireCronSecret(req, res)) return;
 
   try {
     const subsRes = await fetch(`${SUPABASE_URL}/rest/v1/subscriptions?status=eq.active&select=*`, {
@@ -25,19 +23,20 @@ export default async function handler(req, res) {
     const results = [];
 
     for (const sub of subscriptions) {
-      if (!sub.url) continue;
+      const siteUrl = sub.site_url || sub.url;
+      if (!siteUrl) continue;
       try {
         const start = Date.now();
-        const response = await fetch(sub.url, { method: 'HEAD', redirect: 'follow' });
+        const response = await fetch(siteUrl, { method: 'HEAD', redirect: 'follow' });
         const latency = Date.now() - start;
         results.push({
-          url: sub.url,
+          url: siteUrl,
           status: response.status,
           up: response.ok,
           latency_ms: latency,
         });
       } catch (e) {
-        results.push({ url: sub.url, up: false, error: e.message });
+        results.push({ url: siteUrl, up: false, error: e.message });
       }
     }
 

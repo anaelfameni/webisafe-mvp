@@ -1,3 +1,5 @@
+import { buildPerformanceMetricsFromPageSpeed } from './pageSpeedScanner.js';
+
 // server/scanners/performanceScanner.js
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -207,12 +209,12 @@ export async function getServerLocation(domain) {
 }
 
 // ── Scanner principal ─────────────────────────────────────────────────────────
-export async function scanPerformance(url, apiKey) {
+export async function scanPerformance(url, apiKey, pageSpeedData = null) {
   const domain = new URL(url).hostname;
 
   // Lance PageSpeed + géolocalisation en parallèle
   const [psResult, geoResult] = await Promise.allSettled([
-    runPageSpeed(url, apiKey),
+    pageSpeedData ? Promise.resolve(buildPerformanceMetricsFromPageSpeed(pageSpeedData)) : runPageSpeed(url, apiKey),
     getServerLocation(domain),
   ]);
 

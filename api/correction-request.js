@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { json, readJsonBody, sendResendEmail, setCorsHeaders, requireAdmin } from './_utils.js';
+import { json, readJsonBody, sendResendEmail, setCorsHeaders, requireAdmin, escapeHtml } from './_utils.js';
 
 const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
   ? createClient(
@@ -37,16 +37,16 @@ export default async function handler(req, res) {
     // Envoi email admin (non bloquant)
     const emailPromise = sendResendEmail({
       to: 'admin@webisafe.ci',
-      subject: `🔧 Nouvelle demande de correction — ${payload.pack}`,
+      subject: `🔧 Nouvelle demande de correction — ${payload.pack.replace(/[\r\n]+/g, ' ')}`,
       html: `
         <h2>Nouvelle demande de correction WebiSafe</h2>
         <ul>
-          <li><strong>Nom :</strong> ${payload.name}</li>
-          <li><strong>Email :</strong> ${payload.email}</li>
-          <li><strong>Téléphone :</strong> ${payload.phone || 'N/A'}</li>
-          <li><strong>Site :</strong> ${payload.url}</li>
-          <li><strong>Pack :</strong> ${payload.pack}</li>
-          <li><strong>Message :</strong> ${payload.message || 'Aucun'}</li>
+          <li><strong>Nom :</strong> ${escapeHtml(payload.name)}</li>
+          <li><strong>Email :</strong> ${escapeHtml(payload.email)}</li>
+          <li><strong>Téléphone :</strong> ${escapeHtml(payload.phone || 'N/A')}</li>
+          <li><strong>Site :</strong> ${escapeHtml(payload.url)}</li>
+          <li><strong>Pack :</strong> ${escapeHtml(payload.pack)}</li>
+          <li><strong>Message :</strong> ${escapeHtml(payload.message || 'Aucun')}</li>
           <li><strong>Date :</strong> ${new Date().toLocaleString('fr-FR')}</li>
         </ul>
         <p>Connectez-vous au panel admin pour traiter cette demande.</p>

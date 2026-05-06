@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Copy, Loader2, ShieldCheck, Smartphone } from 'lucide-react';
 import ToastMessage from '../components/ToastMessage';
 import { useScans } from '../hooks/useScans';
-import { createPaymentRequest, fetchLatestPaymentRequest, markScanPaid, notifyAdmin, updatePaymentRequest } from '../utils/paymentApi';
+import { fetchLatestPaymentRequest, reportPayment, unlockScanAsAdmin } from '../utils/paymentApi';
 import { isValidEmail, normalizeURL } from '../utils/validators';
 import { WAVE_PAYMENT_AMOUNT, WAVE_PAYMENT_TOTAL, WAVE_PHONE_DISPLAY, formatFcfa, generateWavePaymentCode, getWaveBusinessLink } from '../utils/wavePayment';
 
@@ -131,40 +131,19 @@ export default function Payment({ user }) {
     try {
       let currentRequest = paymentRequest;
 
-      if (!currentRequest.id) {
-        // Création dans la base UNIQUEMENT au clic sur 'J'ai payé'
-        currentRequest = await createPaymentRequest({
-          payment_code: currentRequest.payment_code,
-          scan_id: scanId,
-          user_email: email,
-          url_to_audit: urlToAudit,
-          amount: WAVE_PAYMENT_TOTAL,
-          status: 'waiting_validation',
-          wave_phone: wavePhone,
-        });
-      } else {
-        currentRequest =
-          (await updatePaymentRequest(currentRequest.id, {
-            wave_phone: wavePhone,
-            user_email: email,
-            status: 'waiting_validation',
-          })) || currentRequest;
-      }
+      // Création dans la base UNIQUEMENT au clic sur 'J'ai payé'
+      // Notification admin envoyée UNIQUEMENT au clic sur 'J'ai payé'
+      currentRequest = await reportPayment({
+        id: currentRequest.id,
+        payment_code: currentRequest.payment_code,
+        scan_id: scanId,
+        user_email: email,
+        url_to_audit: urlToAudit,
+        amount: WAVE_PAYMENT_TOTAL,
+        wave_phone: wavePhone,
+      });
 
       setPaymentRequest(currentRequest);
-
-      // Notification admin envoyée UNIQUEMENT au clic sur 'J'ai payé'
-      try {
-        await notifyAdmin({
-          payment_code: currentRequest.payment_code,
-          user_email: email,
-          url_to_audit: urlToAudit,
-          wave_phone: wavePhone,
-          scan_id: scanId,
-        });
-      } catch {
-        // Échec silencieux de la notification admin
-      }
 
       setSubmitted(true);
     } catch {
@@ -232,7 +211,13 @@ export default function Payment({ user }) {
             <p className="text-sm text-white/70 mb-4">Accédez directement à l'audit premium sans paiement.</p>
             <button
               onClick={async () => {
-                await markScanPaid(scanId);
+                try {
+                  await unlockScanAsAdmin({ scan_id: scanId });
+                } catch (error) {
+                  // L'API peut échouer si le rôle n'est pas encore synchronisé,
+                  // mais le bypass admin fonctionne grâce à location.state
+                  console.warn('[admin bypass] unlockScanAsAdmin a échoué:', error);
+                }
                 markAsPaid(scanId);
                 navigate(`/rapport/${scanId}`, { state: { adminBypass: true } });
               }}

@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useLiveStats } from '../hooks/useLiveStats';
-import { supabase } from '../lib/supabaseClient';
 import { Zap, Shield, Search, Smartphone, ArrowRight, TrendingDown, Eye, Activity, Globe, Radio, Clock } from 'lucide-react';
 import { SUPPORT_PHONE } from '../config/brand';
 import toast from 'react-hot-toast';
@@ -11,6 +10,7 @@ import URLInput from '../components/URLInput';
 import PricingSection from '../components/PricingSection';
 import FAQAccordion from '../components/FAQAccordion';
 import ScoreGaugeChart from '../components/ScoreGaugeChart';
+import { buildFreeScanUrl } from '../utils/scanNavigation';
 
 function timeAgo(dateStr) {
   const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
@@ -64,19 +64,20 @@ export default function Home() {
     }
     if (email) {
       try {
-        await supabase.from('leads').upsert({
-          email,
-          url_scanned: normalized,
-          source: 'scan_gratuit',
-          created_at: new Date().toISOString()
-        }, { onConflict: 'email,url_scanned' });
+        await fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            url_scanned: normalized,
+            source: 'scan_gratuit',
+          }),
+        });
       } catch (_) {
         // Silencieux — ne bloque pas le scan
       }
     }
-    const params = new URLSearchParams({ url: normalized });
-    if (email) params.set('email', email);
-    navigate(`/analyse?${params.toString()}`);
+    navigate(buildFreeScanUrl({ url: normalized, email }));
   };
 
   const problemCards = [

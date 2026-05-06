@@ -8,6 +8,8 @@ export default function PremiumScoreCard({ score, domain, ctaButton, onClose, co
     year: 'numeric',
   });
 
+  const isNull = score === null;
+
   return (
     <div className={`relative w-full ${compact ? 'max-w-2xl' : 'max-w-4xl'} mx-auto mb-12`}>
       <div
@@ -21,57 +23,70 @@ export default function PremiumScoreCard({ score, domain, ctaButton, onClose, co
 
           {!compact && (
             <div className="flex flex-col gap-2.5 w-full md:w-1/2 z-10">
-              {[
-                { range: '0-30', label: 'CRITIQUE', desc: 'Action urgente requise', color: '#ef4444', glowColor: 'rgba(239, 68, 68, 0.4)' },
-                { range: '30-50', label: 'MAUVAIS', desc: 'Corrections nécessaires', color: '#f97316', glowColor: 'rgba(249, 115, 22, 0.4)' },
-                { range: '50-70', label: 'ACCEPTABLE', desc: 'Améliorations recommandées', color: '#eab308', glowColor: 'rgba(234, 179, 8, 0.4)' },
-                { range: '70-90', label: 'BON', desc: 'Optimisations mineures', color: '#22c55e', glowColor: 'rgba(34, 197, 94, 0.4)' },
-                { range: '90-100', label: 'EXCELLENT', desc: 'Site très bien protégé', color: '#3b82f6', glowColor: 'rgba(59, 130, 246, 0.4)' },
-              ].map((seg) => {
-                const isActive =
-                  (score >= 0 && score < 30 && seg.label === 'CRITIQUE') ||
-                  (score >= 30 && score < 50 && seg.label === 'MAUVAIS') ||
-                  (score >= 50 && score < 70 && seg.label === 'ACCEPTABLE') ||
-                  (score >= 70 && score < 90 && seg.label === 'BON') ||
-                  (score >= 90 && score <= 100 && seg.label === 'EXCELLENT');
-
-                return (
-                  <div
-                    key={seg.label}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive
-                      ? 'scale-[1.02]'
-                      : 'hover:bg-white/[0.06] hover:border-white/10 hover:translate-x-1 bg-white/[0.03] border-white/[0.05]'
-                      }`}
-                    style={
-                      isActive
-                        ? {
-                          backgroundColor: `${seg.color}20`,
-                          borderColor: `${seg.color}50`,
-                          boxShadow: `0 0 15px ${seg.glowColor}`,
-                        }
-                        : {}
-                    }
-                  >
-                    <div
-                      className="w-3 h-3 rounded shrink-0"
-                      style={{
-                        backgroundColor: seg.color,
-                        opacity: isActive ? 1 : 0.5,
-                        boxShadow: isActive ? `0 0 8px ${seg.glowColor}` : 'none',
-                      }}
-                    />
-                    <span className={`text-xs font-medium w-[52px] shrink-0 tabular-nums ${isActive ? 'text-white/80' : 'text-white'}`}>
-                      {seg.range}
-                    </span>
-                    <span className={`text-[13px] font-bold flex-1 tracking-wide ${isActive ? 'text-white' : 'text-white/75'}`}>
-                      {seg.label}
-                    </span>
-                    <span className={`text-[11px] text-right hidden sm:block ${isActive ? 'text-white/70 font-medium' : 'text-white'}`}>
-                      {seg.desc}
-                    </span>
+              {isNull ? (
+                <div className="flex items-center gap-3 px-4 py-6 rounded-xl border bg-yellow-500/5 border-yellow-500/20">
+                  <span className="text-xl">⚠️</span>
+                  <div>
+                    <p className="text-sm font-bold text-yellow-200">Score global partiel</p>
+                    <p className="text-xs text-white/60 mt-1">
+                      Une protection anti-bot a empêché l'analyse complète de ce site.
+                      Les scores affichés peuvent être incomplets.
+                    </p>
                   </div>
-                );
-              })}
+                </div>
+              ) : (
+                [
+                  { range: '0-30', label: 'CRITIQUE', desc: 'Action urgente requise', color: '#ef4444', glowColor: 'rgba(239, 68, 68, 0.4)' },
+                  { range: '30-50', label: 'MAUVAIS', desc: 'Corrections nécessaires', color: '#f97316', glowColor: 'rgba(249, 115, 22, 0.4)' },
+                  { range: '50-70', label: 'ACCEPTABLE', desc: 'Améliorations recommandées', color: '#eab308', glowColor: 'rgba(234, 179, 8, 0.4)' },
+                  { range: '70-90', label: 'BON', desc: 'Optimisations mineures', color: '#22c55e', glowColor: 'rgba(34, 197, 94, 0.4)' },
+                  { range: '90-100', label: 'EXCELLENT', desc: 'Site très bien protégé', color: '#3b82f6', glowColor: 'rgba(59, 130, 246, 0.4)' },
+                ].map((seg) => {
+                  const isActive =
+                    (score >= 0 && score < 30 && seg.label === 'CRITIQUE') ||
+                    (score >= 30 && score < 50 && seg.label === 'MAUVAIS') ||
+                    (score >= 50 && score < 70 && seg.label === 'ACCEPTABLE') ||
+                    (score >= 70 && score < 90 && seg.label === 'BON') ||
+                    (score >= 90 && score <= 100 && seg.label === 'EXCELLENT');
+
+                  return (
+                    <div
+                      key={seg.label}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isActive
+                        ? 'scale-[1.02]'
+                        : 'hover:bg-white/[0.06] hover:border-white/10 hover:translate-x-1 bg-white/[0.03] border-white/[0.05]'
+                        }`}
+                      style={
+                        isActive
+                          ? {
+                            backgroundColor: `${seg.color}20`,
+                            borderColor: `${seg.color}50`,
+                            boxShadow: `0 0 15px ${seg.glowColor}`,
+                          }
+                          : {}
+                      }
+                    >
+                      <div
+                        className="w-3 h-3 rounded shrink-0"
+                        style={{
+                          backgroundColor: seg.color,
+                          opacity: isActive ? 1 : 0.5,
+                          boxShadow: isActive ? `0 0 8px ${seg.glowColor}` : 'none',
+                        }}
+                      />
+                      <span className={`text-xs font-medium w-[52px] shrink-0 tabular-nums ${isActive ? 'text-white/80' : 'text-white'}`}>
+                        {seg.range}
+                      </span>
+                      <span className={`text-[13px] font-bold flex-1 tracking-wide ${isActive ? 'text-white' : 'text-white/75'}`}>
+                        {seg.label}
+                      </span>
+                      <span className={`text-[11px] text-right hidden sm:block ${isActive ? 'text-white/70 font-medium' : 'text-white'}`}>
+                        {seg.desc}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
         </div>
@@ -79,7 +94,7 @@ export default function PremiumScoreCard({ score, domain, ctaButton, onClose, co
         <div className="w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent z-10 mt-4 mb-4" />
 
         <div className="flex items-center justify-between w-full z-10">
-          <span className="text-xs text-white">Analyse complète</span>
+          <span className="text-xs text-white">{isNull ? 'Analyse partielle' : 'Analyse complète'}</span>
           <span className="text-xs text-white">Analysé le {formattedDate}</span>
         </div>
 

@@ -71,6 +71,26 @@ export function checkRateLimit(req, maxRequests = 10, windowMs = RATE_LIMIT_WIND
   return { allowed: true };
 }
 
+export function getSupabaseAdminClient() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+}
+
+export function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ── Admin Auth ────────────────────────────────────────────────────────────────
 export async function requireAdmin(req, res) {
   const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
@@ -81,15 +101,12 @@ export async function requireAdmin(req, res) {
     return null;
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || null;
+  const supabase = getSupabaseAdminClient();
 
-  if (!supabaseUrl || !supabaseKey) {
+  if (!supabase) {
     json(res, 500, { error: 'Configuration serveur manquante' });
     return null;
   }
-
-  const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
 
   const { data: { user }, error } = await supabase.auth.getUser(token);
 
@@ -98,13 +115,13 @@ export async function requireAdmin(req, res) {
     return null;
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
+  const { data: publicUser } = await supabase
+    .from('users')
     .select('role')
     .eq('id', user.id)
     .single();
 
-  if (profile?.role !== 'admin') {
+  if (publicUser?.role !== 'admin') {
     json(res, 403, { error: 'Accès refusé' });
     return null;
   }
@@ -112,8 +129,52 @@ export async function requireAdmin(req, res) {
   return user;
 }
 
+export async function requireAuthenticatedUser(req, res) {
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  if (!token) {
+    json(res, 401, { error: 'Authentification requise' });
+    return null;
+  }
+
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    json(res, 500, { error: 'Configuration serveur manquante' });
+    return null;
+  }
+
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
+    json(res, 401, { error: 'Token invalide' });
+    return null;
+  }
+
+  return user;
+}
+
+export function requireCronSecret(req, res) {
+  const configuredSecret = process.env.CRON_SECRET;
+  const providedSecret = req.headers['x-cron-secret'] || req.query?.secret || '';
+  const authHeader = req.headers.authorization || '';
+
+  if (!configuredSecret) {
+    json(res, 500, { error: 'CRON_SECRET manquant' });
+    return false;
+  }
+
+  if (providedSecret === configuredSecret || authHeader === `Bearer ${configuredSecret}`) {
+    return true;
+  }
+
+  json(res, 401, { error: 'Unauthorized' });
+  return false;
+}
+
 export async function sendResendEmail({ to, subject, html }) {
-  const apiKey = process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY;
+  const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     throw new Error('RESEND_API_KEY manquant');
   }

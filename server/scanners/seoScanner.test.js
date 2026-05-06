@@ -1,5 +1,5 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+﻿import assert from 'node:assert/strict';
+import { afterEach, test } from 'vitest';
 import { scanSEO } from './seoScanner.js';
 
 const GOOGLE_LIKE_HTML = `
@@ -22,13 +22,14 @@ function createResponse({ ok = true, status = 200, text = '', json = null } = {}
   };
 }
 
-test('scanSEO uses the PageSpeed SEO score when a PageSpeed key is provided', async (t) => {
-  const originalFetch = globalThis.fetch;
-  const calls = [];
+const originalFetch = globalThis.fetch;
 
-  t.after(() => {
-    globalThis.fetch = originalFetch;
-  });
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
+
+test('scanSEO uses the PageSpeed SEO score when a PageSpeed key is provided', async () => {
+  const calls = [];
 
   globalThis.fetch = async (url) => {
     calls.push(String(url));
@@ -58,13 +59,7 @@ test('scanSEO uses the PageSpeed SEO score when a PageSpeed key is provided', as
   assert.match(calls[1], /category=seo/);
 });
 
-test('scanSEO keeps the local HTML score as fallback when PageSpeed SEO fails', async (t) => {
-  const originalFetch = globalThis.fetch;
-
-  t.after(() => {
-    globalThis.fetch = originalFetch;
-  });
-
+test('scanSEO keeps the local HTML score as fallback when PageSpeed SEO fails', async () => {
   globalThis.fetch = async (url) => {
     if (String(url).includes('pagespeedonline')) {
       return createResponse({ ok: false, status: 500, json: {} });
@@ -79,4 +74,27 @@ test('scanSEO keeps the local HTML score as fallback when PageSpeed SEO fails', 
   assert.equal(result.pageSpeed_score, null);
   assert.equal(result.score, 55);
   assert.equal(result.partial, true);
+});
+
+test('scanSEO reuses shared PageSpeed data without making a second PageSpeed request', async () => {
+  const calls = [];
+
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return createResponse({ text: GOOGLE_LIKE_HTML });
+  };
+
+  const result = await scanSEO('https://google.com/', 'psi-key', {
+    lighthouseResult: {
+      categories: {
+        seo: { score: 0.75 },
+      },
+      audits: {},
+    },
+  });
+
+  assert.equal(result.pageSpeed_score, 75);
+  assert.equal(result.score, 75);
+  assert.equal(calls.length, 1);
+  assert.doesNotMatch(calls[0], /pagespeedonline/);
 });

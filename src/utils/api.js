@@ -40,14 +40,20 @@ function safeRound(val) {
 }
 
 // ── Normalisation headers manquants ──────────────────────────────────────────
-function normalizeMissingHeaders(headersManquants) {
+function normalizeHeaderItems(headersManquants) {
   if (!Array.isArray(headersManquants)) return [];
   return headersManquants.map((h) => {
-    if (typeof h === 'string') return h;
-    if (h?.header) return h.header;
-    if (h?.label) return h.label;
-    return 'Header';
+    if (typeof h === 'string') return { header: h, severity: 'medium' };
+    return {
+      header: h?.header || h?.label || 'Header',
+      message: h?.message ?? null,
+      severity: h?.severity || 'medium',
+    };
   });
+}
+
+function normalizeMissingHeaders(headersManquants) {
+  return normalizeHeaderItems(headersManquants).map(h => h.header);
 }
 
 // ── Nettoyage texte : supprime les ** et les — ────────────────────────────────
@@ -59,55 +65,86 @@ function cleanText(text) {
     .trim();
 }
 
-// ── Plafonnement des scores côté frontend ─────────────────────────────────────
-// Sécurité double : même si le backend renvoie 100, on corrige ici.
-// Règle : 0 critère échoué → max 97, 1 → max 89, 2 → max 81, etc.
-function capScore(score, failedCount) {
+function capScoreByIssues(score, issues) {
   const n = safeScore(score);
-  if (n === null) return 0;
-  if (failedCount <= 0) return Math.min(n, 97);
-  const cap = Math.max(15, 89 - (failedCount - 1) * 8);
-  return Math.min(n, cap);
-}
+  if (n === null) return null;
 
-function getSeoFailedCount(seo) {
-  let count = 0;
-  if (seo.has_title === false) count++;
-  if (seo.has_description === false) count++;
-  if (seo.has_sitemap === false || seo.has_sitemap === undefined) count++;
-  if (seo.has_canonical === false) count++;
-  if (seo.has_open_graph === false) count++;
-  if (seo.is_indexable === false) count++;
-  if (seo.h1_count === 0) count++;
-  else if (seo.h1_count > 1) count++;
-  return count;
-}
+  const severities = Array.isArray(issues)
+    ? issues.map(i => i?.severity).filter(Boolean)
+    : [];
 
-function getSecurityFailedCount(sec) {
-  let count = 0;
-  if (sec.https === false) count++;
-  if (sec.malware_detected === true) count++;
-  const missing = normalizeMissingHeaders(sec.headers_manquants);
-  count += missing.length;
-  return count;
-}
-
-function getPerformanceFailedCount(perf) {
-  let count = 0;
-  if (perf.lcp != null && perf.lcp > 2500) count++;
-  if (perf.cls != null && perf.cls > 0.1) count++;
-  if (perf.fcp != null && perf.fcp > 3000) count++;
-  if (perf.page_weight_mb != null && perf.page_weight_mb > 3) count++;
-  return count;
-}
-
-function getUxFailedCount(ux, seo) {
-  let count = 0;
-  if (seo.has_viewport === false) count++;
-  if (Array.isArray(ux.issues)) {
-    count += ux.issues.filter(i => i.severity === 'high' || i.severity === 'medium').length;
+  let cap = 97;
+  if (severities.includes('critical')) cap = 49;
+  else if (severities.includes('high')) cap = 84;
+  else {
+    const mediumCount = severities.filter(s => s === 'medium').length;
+    const lowCount = severities.filter(s => s === 'low').length;
+    if (mediumCount >= 3) cap = 89;
+    else if (mediumCount > 0) cap = 94;
+    else if (lowCount >= 3) cap = 95;
   }
-  return count;
+
+  return Math.min(Math.round(n), cap);
+}
+
+function getSeoIssues(seo) {
+  if (seo.partial || seo.protection_detected?.detected) return [];
+  const issues = [];
+  if (seo.has_title === false) issues.push({ severity: 'medium' });
+  if (seo.has_description === false) issues.push({ severity: 'medium' });
+  if (seo.has_canonical === false) issues.push({ severity: 'low' });
+  if (seo.has_open_graph === false) issues.push({ severity: 'low' });
+  if (seo.is_indexable === false) issues.push({ severity: 'high' });
+  if (seo.h1_count === 0) issues.push({ severity: 'medium' });
+  else if (seo.h1_count > 1) issues.push({ severity: 'low' });
+  return issues;
+}
+
+function getSecurityIssues(sec) {
+  const issues = [];
+
+  // Vraies failles (cap fort)
+  if (sec.https === false) issues.push({ severity: 'critical' });
+  if (sec.malware_detected === true) issues.push({ severity: 'critical' });
+  if (sec.sensitive_files?.critical) issues.push({ severity: 'critical' });
+
+  // Best practices (headers) : ne pas double-pénaliser quand le site est sain.
+  // Le backend a déjà tenu compte des headers manquants dans le score.
+  // On les ajoute comme issues UNIQUEMENT si le site a déjà une faille fondamentale,
+  // pour éviter qu'un site HTTPS bien sécurisé voit son score plafonné à 84/89.
+  const hasFundamentalFlaw =
+    sec.https === false ||
+    sec.malware_detected === true ||
+    sec.sensitive_files?.critical;
+
+  if (hasFundamentalFlaw) {
+    issues.push(...normalizeHeaderItems(sec.headers_manquants));
+  }
+
+  return issues;
+}
+
+function getPerformanceIssues(perf) {
+  if (perf.partial) return [];
+  const issues = [];
+  if (perf.lcp != null && perf.lcp > 4000) issues.push({ severity: 'high' });
+  else if (perf.lcp != null && perf.lcp > 2500) issues.push({ severity: 'medium' });
+  if (perf.cls != null && perf.cls > 0.25) issues.push({ severity: 'high' });
+  else if (perf.cls != null && perf.cls > 0.1) issues.push({ severity: 'medium' });
+  if (perf.fcp != null && perf.fcp > 3000) issues.push({ severity: 'medium' });
+  if (perf.page_weight_mb != null && perf.page_weight_mb > 5) issues.push({ severity: 'medium' });
+  else if (perf.page_weight_mb != null && perf.page_weight_mb > 3) issues.push({ severity: 'low' });
+  return issues;
+}
+
+function getUxIssues(ux, seo) {
+  if (ux.partial || ux.protection_detected?.detected) return [];
+  const issues = [];
+  if (seo.has_viewport === false) issues.push({ severity: 'high' });
+  if (Array.isArray(ux.issues)) {
+    issues.push(...ux.issues.filter(i => i.severity === 'high' || i.severity === 'medium' || i.severity === 'low'));
+  }
+  return issues;
 }
 
 function normalizeAllScores(rawData) {
@@ -116,18 +153,13 @@ function normalizeAllScores(rawData) {
   const seo = rawData.metrics?.seo ?? {};
   const ux = rawData.metrics?.ux ?? {};
 
-  const seoFailed = getSeoFailedCount(seo);
-  const secFailed = getSecurityFailedCount(sec);
-  const perfFailed = getPerformanceFailedCount(perf);
-  const uxFailed = getUxFailedCount(ux, seo);
-
-  const cappedPerf = capScore(rawData.scores?.performance, perfFailed);
-  const cappedSec = capScore(rawData.scores?.security, secFailed);
-  const cappedSeo = capScore(rawData.scores?.seo, seoFailed);
-  const cappedUx = capScore(rawData.scores?.ux, uxFailed);
+  const cappedPerf = capScoreByIssues(rawData.scores?.performance, getPerformanceIssues(perf));
+  const cappedSec = capScoreByIssues(rawData.scores?.security, getSecurityIssues(sec));
+  const cappedSeo = capScoreByIssues(rawData.scores?.seo, getSeoIssues(seo));
+  const cappedUx = capScoreByIssues(rawData.scores?.ux, getUxIssues(ux, seo));
 
   // Recalcul score global pondéré
-  const weights = { perf: 0.30, sec: 0.30, seo: 0.25, ux: 0.15 };
+  const weights = { perf: 0.35, sec: 0.30, seo: 0.25, ux: 0.10 };
   let total = 0, totalW = 0;
   if (cappedPerf != null) { total += cappedPerf * weights.perf; totalW += weights.perf; }
   if (cappedSec != null) { total += cappedSec * weights.sec; totalW += weights.sec; }
@@ -316,7 +348,7 @@ function generateRecommendations(data) {
     });
   }
 
-  if (!seo.has_sitemap) {
+  if (seo.has_sitemap === false) {
     recs.push({
       priorite: 5, faultType: 'sitemap_missing',
       categorie: 'SEO',
@@ -618,13 +650,13 @@ function generateResume(data) {
   // SEO
   if (scores.seo != null) {
     const s = scores.seo;
-    const sitemapNote = !seo.has_sitemap
+    const sitemapNote = seo.has_sitemap === false
       ? ' Le sitemap (carte de votre site pour Google) est absent.'
       : '';
     const descNote = seo.has_description === false
       ? ' La description dans Google est vide.'
       : '';
-    const canonicalNote = !seo.has_canonical
+    const canonicalNote = seo.has_canonical === false
       ? ' La balise canonique est manquante.'
       : '';
 
@@ -745,6 +777,75 @@ export function filterWebisafeOnlyChecks(scanData, isAdmin) {
   return next;
 }
 
+function getHostFromInput(input) {
+  const hostPart = String(input || '').split(/[/?#]/, 1)[0];
+  return hostPart.split(':', 1)[0].toLowerCase();
+}
+
+function isLocalHost(hostname) {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0' || hostname === '::1';
+}
+
+function normalizeAnalysisRequestUrl(input) {
+  const trimmed = String(input || '').trim();
+  const withProtocol = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `${isLocalHost(getHostFromInput(trimmed)) ? 'http' : 'https'}://${trimmed}`;
+
+  try {
+    return new URL(withProtocol).href;
+  } catch {
+    return trimmed;
+  }
+}
+
+export function buildAnalysisRequestUrls(input) {
+  const normalized = normalizeAnalysisRequestUrl(input);
+  const urls = [normalized];
+
+  try {
+    const parsed = new URL(normalized);
+    if (!parsed.hostname.startsWith('www.') && !isLocalHost(parsed.hostname) && parsed.hostname.includes('.')) {
+      const wwwUrl = new URL(parsed.href);
+      wwwUrl.hostname = `www.${parsed.hostname}`;
+      urls.push(wwwUrl.href);
+    }
+  } catch {}
+
+  return Array.from(new Set(urls));
+}
+
+async function readScanError(response) {
+  let bodyText = '';
+  try { bodyText = await response.text(); } catch { bodyText = ''; }
+
+  try {
+    const parsed = JSON.parse(bodyText || '{}');
+    return {
+      status: response.status,
+      statusText: response.statusText,
+      type: parsed?.type || null,
+      message: parsed?.error || null,
+      bodyText,
+    };
+  } catch {
+    return {
+      status: response.status,
+      statusText: response.statusText,
+      type: null,
+      message: null,
+      bodyText,
+    };
+  }
+}
+
+function shouldRetryScanWithAlternateUrl(error) {
+  if (!error) return false;
+  if (error.type === 'SITE_UNREACHABLE') return true;
+  if (error.status === 422) return true;
+  return String(error.message || error.bodyText || '').toLowerCase().includes('impossible de joindre');
+}
+
 // ── Fonction principale ───────────────────────────────────────────────────────
 export async function runFullAnalysis(url, onProgress, email) {
   const TOTAL_STEPS = 6;
@@ -769,51 +870,63 @@ export async function runFullAnalysis(url, onProgress, email) {
 
     const effectiveEmail = email || storedAuth?.email || '';
 
-    const payload = { url, force_refresh: true };
-    if (effectiveEmail) payload.email = effectiveEmail;
+    const requestUrls = buildAnalysisRequestUrls(url);
+    const userId = (() => {
+      try {
+        return JSON.parse(localStorage.getItem('webisafe_auth') || '{}')?.id || '';
+      } catch {
+        return '';
+      }
+    })();
+    let rawData = null;
+    let lastScanError = null;
 
-    const response = await fetch('/api/scan', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Envoie l'id utilisateur au backend pour associer le scan au compte
-        'x-user-id': (() => {
-          try {
-            return JSON.parse(localStorage.getItem('webisafe_auth') || '{}')?.id || '';
-          } catch {
-            return '';
-          }
-        })(),
-      },
-      body: JSON.stringify(payload),
-    });
+    for (let attemptIndex = 0; attemptIndex < requestUrls.length; attemptIndex++) {
+      const payload = { url: requestUrls[attemptIndex], force_refresh: true };
+      if (effectiveEmail) payload.email = effectiveEmail;
+
+      const response = await fetch('/api/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Envoie l'id utilisateur au backend pour associer le scan au compte
+          'x-user-id': userId,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const scanError = await readScanError(response);
+        lastScanError = scanError;
+        if (attemptIndex < requestUrls.length - 1 && shouldRetryScanWithAlternateUrl(scanError)) {
+          continue;
+        }
+        if (scanError.message) throw new Error(scanError.message);
+        const truncated = (scanError.bodyText || '').toString().slice(0, 800).replace(/\n/g, ' ');
+        throw new Error(`HTTP ${scanError.status} ${scanError.statusText}${truncated ? ' - ' + truncated : ''}`);
+      }
+
+      rawData = await response.json();
+      if (!rawData.success) {
+        const scanError = {
+          type: rawData.type || null,
+          message: rawData.error || null,
+          bodyText: JSON.stringify(rawData),
+        };
+        lastScanError = scanError;
+        if (attemptIndex < requestUrls.length - 1 && shouldRetryScanWithAlternateUrl(scanError)) {
+          continue;
+        }
+        throw new Error(rawData.error || 'Analyse échouée');
+      }
+
+      break;
+    }
 
     clearInterval(progressInterval);
     onProgress?.({ step: TOTAL_STEPS });
 
-    if (!response.ok) {
-      // Try to extract helpful error information (JSON or plain text)
-      let bodyText = '';
-      try { bodyText = await response.text(); } catch (e) { bodyText = ''; }
-
-      // Attempt to parse JSON error
-      let parsedError = null;
-      try {
-        const parsed = JSON.parse(bodyText || '{}');
-        if (parsed && parsed.error) parsedError = parsed.error;
-      } catch (_) {
-        // not JSON, fall through
-      }
-
-      if (parsedError) {
-        throw new Error(parsedError);
-      }
-      const truncated = (bodyText || '').toString().slice(0, 800).replace(/\n/g, ' ');
-      throw new Error(`HTTP ${response.status} ${response.statusText}${truncated ? ' - ' + truncated : ''}`);
-    }
-
-    const rawData = await response.json();
-    if (!rawData.success) throw new Error(rawData.error || 'Analyse échouée');
+    if (!rawData) throw new Error(lastScanError?.message || 'Analyse échouée');
 
     /**
      * Sécurité frontend :
@@ -822,11 +935,12 @@ export async function runFullAnalysis(url, onProgress, email) {
      * Un score de 100/100 est impossible ici.
      */
     const normalizedScores = normalizeAllScores(rawData);
+    const resolvedGlobalScore = normalizedScores.global ?? rawData.global_score ?? null;
 
     // On fusionne les données brutes avec les scores corrigés
     const data = {
       ...rawData,
-      global_score: normalizedScores.global,
+      global_score: resolvedGlobalScore,
       scores: {
         ...rawData.scores,
         performance: normalizedScores.performance,
@@ -854,7 +968,7 @@ export async function runFullAnalysis(url, onProgress, email) {
       scores: {
         ...data.scores,
         ux_mobile: uxScore,
-        global: normalizedScores.global,
+        global: resolvedGlobalScore,
       },
     });
 
@@ -864,25 +978,23 @@ export async function runFullAnalysis(url, onProgress, email) {
 
       // Champs corrigés explicitement
       url: data.url ?? url,
-      global_score: normalizedScores.global,
+      global_score: resolvedGlobalScore,
       grade: data.grade ?? null,
       metrics: data.metrics ?? {},
       critical_alerts: Array.isArray(data.critical_alerts) ? data.critical_alerts : [],
+      detected_technology: data.detected_technology ?? null,
+      scan_confidence: data.scan_confidence ?? 'high',
+      protection_detected: data.protection_detected ?? null,
 
       // Format UI — scores plafonnés, jamais 100
       success: true,
       scores: {
-        global: normalizedScores.global,
-        performance: normalizedScores.performance ?? 0,
-        security: normalizedScores.security ?? 0,
-        seo: normalizedScores.seo ?? 0,
-        ux_mobile: uxScore ?? 0,
-        ux: uxScore ?? 0,
-      },
-
-      // Résumé UI : utiliser la valeur fournie par le backend si présente
-      summary: {
-        https_enabled: rawData?.summary?.https_enabled ?? String(data.url || '').startsWith('https'),
+        global: resolvedGlobalScore,
+        performance: normalizedScores.performance,
+        security: normalizedScores.security,
+        seo: normalizedScores.seo,
+        ux_mobile: uxScore,
+        ux: uxScore,
       },
 
       performance: {
@@ -907,30 +1019,33 @@ export async function runFullAnalysis(url, onProgress, email) {
         advanced_checks: Array.isArray(sec.advanced_checks) ? sec.advanced_checks : [],
         extended_checks: Array.isArray(sec.extended_checks) ? sec.extended_checks : Array.isArray(sec.advanced_checks) ? sec.advanced_checks : [],
         advanced_security_score: sec.advanced_security_score ?? null,
-        extended_security_score: sec.extended_security_score ?? sec.advanced_security_score ?? null,
+        extended_security_score: sec.extended_security_score ?? sec.advanced_security_score ?? data.scores?.security ?? null,
         advanced_counts: sec.advanced_counts ?? null,
       },
 
       seo: {
         indexed: true,
-        sitemap_present: seo.has_sitemap ?? false,
-        meta_tags_ok: Boolean(seo.has_title && seo.has_description),
-        open_graph: seo.has_open_graph ?? false,
+        sitemap_present: seo.has_sitemap ?? null,
+        meta_tags_ok: seo.has_title === null || seo.has_description === null ? null : Boolean(seo.has_title && seo.has_description),
+        open_graph: seo.has_open_graph ?? null,
         h1_count: seo.h1_count ?? null,
+        partial: seo.partial ?? false,
+        protection_detected: seo.protection_detected ?? null,
       },
 
       ux: {
         responsive: seo.has_viewport ?? null,
         taille_texte_px: 16,
         elements_tactiles_ok: ux.tap_targets_ok ?? null,
-        vitesse_mobile: uxScore ?? 0,
+        vitesse_mobile: uxScore,
         partial: ux.partial ?? false,
+        protection_detected: ux.protection_detected ?? null,
         issues: ux.issues ?? [],
         grade: ux.grade ?? null,
       },
 
       summary: {
-        https_enabled: String(data.url || '').startsWith('https'),
+        https_enabled: rawData?.summary?.https_enabled ?? String(data.url || '').startsWith('https'),
         resume_executif: resume,
       },
 

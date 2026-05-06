@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 test('scans localhost without requiring a PageSpeed key in local development', async () => {
@@ -77,6 +77,11 @@ test('scans localhost without requiring a PageSpeed key in local development', a
     assert.equal(statusCode, 200);
     assert.equal(payload.success, true);
     assert.equal(payload.url, 'http://localhost:5173/');
+    assert.equal(typeof payload.grade, 'string');
+    assert.ok(Array.isArray(payload.metrics.security.advanced_checks));
+    assert.ok(payload.metrics.security.advanced_checks.length > 0);
+    assert.ok(Array.isArray(payload.metrics.security.extended_checks));
+    assert.ok(payload.metrics.security.extended_checks.length > 0);
     assert.notEqual(payload.type, 'CONFIG_ERROR');
   } finally {
     globalThis.fetch = originalFetch;
