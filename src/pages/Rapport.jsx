@@ -353,9 +353,10 @@ export default function Rapport() {
   const [scan, setScan] = useState(null);
   const [paymentRequest, setPaymentRequest] = useState(null);
   const [activeSection, setActiveSection] = useState('overview');
-  const [copied, setCopied] = useState(false);
-  const [shareTooltip, setShareTooltip] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [showFixPitch, setShowFixPitch] = useState(false);
+  const [fixPitchDismissed, setFixPitchDismissed] = useState(false);
+  const [startingFixFlow, setStartingFixFlow] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [isRescanning, setIsRescanning] = useState(false);
 
   useEffect(() => {
@@ -536,11 +537,18 @@ export default function Rapport() {
     );
   }
 
-  const handleDownloadPDF = () => {
-    if (!pdfScan) return;
+  const handleDownloadPDF = async () => {
+    if (!pdfScan || downloadingPdf) return;
     trackClarityEvent('pdf_downloaded', id);
-    try { generatePDF(pdfScan); }
-    catch (error) { console.error('Erreur PDF:', error); }
+    setDownloadingPdf(true);
+    try {
+      await generatePDF(pdfScan);
+    } catch (error) {
+      console.error('Erreur PDF:', error);
+      alert(error?.message || 'Impossible de générer le PDF pour le moment.');
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const handleShare = () => {
@@ -632,10 +640,11 @@ export default function Rapport() {
 
             <button
               onClick={handleDownloadPDF}
-              className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl font-medium text-sm transition-all btn-glow"
+              disabled={downloadingPdf}
+              className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl font-medium text-sm transition-all btn-glow disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Download size={16} />
-              Télécharger PDF
+              {downloadingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              {downloadingPdf ? 'Génération...' : 'Télécharger PDF'}
             </button>
             <button
               onClick={handleShare}
