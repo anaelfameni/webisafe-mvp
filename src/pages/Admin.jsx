@@ -198,7 +198,15 @@ export default function Admin({ user }) {
 
   const openPremiumScan = (scan) => {
     if (!scan?.paid || !scan?.id) return;
-    navigate(`/rapport/${encodeURIComponent(scan.id)}`, { state: { adminBypass: true } });
+    const resultData = scan.results_json || scan.data || {};
+    const adminScan = {
+      ...resultData,
+      ...scan,
+      id: scan.id,
+      url: scan.url || resultData.url || '',
+      paid: true,
+    };
+    navigate(`/rapport/${encodeURIComponent(scan.id)}`, { state: { adminBypass: true, adminScan } });
   };
 
   if (!isAuthorized) return null;

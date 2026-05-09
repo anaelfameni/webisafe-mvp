@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     success: true,
     stats: {
       name: affiliateRes.data.name || 'Affilié',
-      link: `https://webisafe.ci/?ref=${refCode}`,
+      link: `https://webisafe.vercel.app/?ref=${refCode}`,
       clicks,
       conversions: conversionsCount,
       totalCommission,

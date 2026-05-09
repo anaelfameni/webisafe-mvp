@@ -19,7 +19,7 @@ function createEmailShell({ title, body, footer, appUrl }) {
         <div style="padding:32px">${body}</div>
         <div style="padding:18px 32px;border-top:1px solid rgba(148,163,184,0.12);font-size:13px;color:#94a3b8">
           ${footer}
-          ${appUrl ? `&nbsp;&nbsp;•&nbsp;&nbsp;<a href="${escapeHtml(appUrl)}" style="color:#7fb0ff;text-decoration:none">webisafe.ci</a>` : ''}
+          ${appUrl ? `&nbsp;&nbsp;•&nbsp;&nbsp;<a href="${escapeHtml(appUrl)}" style="color:#7fb0ff;text-decoration:none">webisafe.vercel.app</a>` : ''}
         </div>
       </div>
     </div>

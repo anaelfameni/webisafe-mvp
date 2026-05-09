@@ -2,7 +2,7 @@
 
 **Premier SaaS d'audit et de correction web pour les PME africaines**
 
-> Version : Mai 2026 | Contact : support@webisafe.ci | +225 01 70 90 77 80
+> Version : Mai 2026 | Contact : webisafe@gmail.com | +225 01 70 90 77 80
 
 ---
 
@@ -506,7 +506,7 @@ Zéro budget publicitaire payant. Toute acquisition repose sur des canaux gratui
 ### Contacts et Liens
 
 - **Site** : https://webisafe.vercel.app
-- **Email** : support@webisafe.ci
+- **Email** : webisafe@gmail.com
 - **WhatsApp** : +225 01 70 90 77 80
 - **GitHub** : Privé (propriétaire)
 - **Stack** : React 19, Vite, TailwindCSS, Supabase, Vercel Serverless

@@ -1,24 +1,24 @@
-# Audit Complet — Webisafe.ci
+﻿# Audit Complet â€” Webisafe.vercel.app
 
 > **Date** : 4 mai 2026  
 > **Auditeur** : Expert produit & technique  
-> **Scope** : Toutes les pages, le business model, l'UX, la tech stack, la sécurité et le SEO de l'application elle-même.
+> **Scope** : Toutes les pages, le business model, l'UX, la tech stack, la sÃ©curitÃ© et le SEO de l'application elle-mÃªme.
 
 ---
 
-## 1. Résumé Exécutif
+## 1. RÃ©sumÃ© ExÃ©cutif
 
 | Domaine | Note /100 | Verdict |
 |---------|-----------|---------|
 | **Produit & UX** | 72 | Bon MVP, friction inutile sur le parcours de paiement |
-| **Business Model** | 68 | Pricing clair mais freins de conversion non traités |
+| **Business Model** | 68 | Pricing clair mais freins de conversion non traitÃ©s |
 | **Code & Architecture** | 65 | Bonnes pratiques React, dette technique sur l'auth et le scan |
-| **Sécurité de l'app** | 58 | Headers sécurité absents, tokens exposés potentiellement |
+| **SÃ©curitÃ© de l'app** | 58 | Headers sÃ©curitÃ© absents, tokens exposÃ©s potentiellement |
 | **SEO de Webisafe** | 45 | SPA sans SSR = Google ne voit pas le contenu |
-| **Fiabilité scanner** | 62 | Faux positifs SPA (H1) corrigés, mais d'autres biais persistants |
+| **FiabilitÃ© scanner** | 62 | Faux positifs SPA (H1) corrigÃ©s, mais d'autres biais persistants |
 | **Performance frontend** | 70 | Bundle lourd, pas de lazy loading exhaustif |
 
-**Note globale Webisafe** : **62/100** — *"Bon MVP avec traction possible, mais des fondations techniques à consolider avant de scaler à des clients payants."*
+**Note globale Webisafe** : **62/100** â€” *"Bon MVP avec traction possible, mais des fondations techniques Ã  consolider avant de scaler Ã  des clients payants."*
 
 ---
 
@@ -27,39 +27,39 @@
 ### 2.1 Home (`/`)
 
 **Ce qui est bon :**
-- H1 visible impactant + H1 sr-only pour SEO (après correction)
-- Social proof (live stats, "+3 200 sites audités")
-- Scan immédiat dans le hero — bon CTA
+- H1 visible impactant + H1 sr-only pour SEO (aprÃ¨s correction)
+- Social proof (live stats, "+3 200 sites auditÃ©s")
+- Scan immÃ©diat dans le hero â€” bon CTA
 - Animations Framer Motion fluides
 
-**Problèmes :**
+**ProblÃ¨mes :**
 - **SEO critique** : SPA React sans SSR. Googlebot voit `<div id="root"></div>` vide. Tout le texte marketing est invisible pour l'indexation.
 - Pas de meta description dynamique
 - Pas de schema.org / JSON-LD
-- Pas de Open Graph images spécifiques
-- Le H2 "Fonctionnalités" existe mais pas de structure sémantique H2→H3 cohérente
-- Le bouton "Scanner gratuitement" ne gère pas le state de loading pendant le routage vers `/analyse`
+- Pas de Open Graph images spÃ©cifiques
+- Le H2 "FonctionnalitÃ©s" existe mais pas de structure sÃ©mantique H2â†’H3 cohÃ©rente
+- Le bouton "Scanner gratuitement" ne gÃ¨re pas le state de loading pendant le routage vers `/analyse`
 
-**Recommandation :** Déployer du SSR (Next.js) ou au minimum un service de prerendering (Prerender.io, Rendertron) pour que Google indexe le contenu.
+**Recommandation :** DÃ©ployer du SSR (Next.js) ou au minimum un service de prerendering (Prerender.io, Rendertron) pour que Google indexe le contenu.
 
 ---
 
 ### 2.2 Analyse (`/analyse`)
 
 **Ce qui est bon :**
-- Progression visuelle du scan avec étapes claires
-- Score gauge animé — bon feedback
-- Alertes critiques en haut si détectées
-- Bouton "Télécharger PDF" + "Partager" présents
+- Progression visuelle du scan avec Ã©tapes claires
+- Score gauge animÃ© â€” bon feedback
+- Alertes critiques en haut si dÃ©tectÃ©es
+- Bouton "TÃ©lÃ©charger PDF" + "Partager" prÃ©sents
 
-**Problèmes :**
-- Le scan peut durer 30-60s sans possibilité de quitter/reprendre
-- Pas de numéro de scan / preuve de travail affiché avant le paywall
-- Le paywall (FreemiumGate) apparaît brutalement — pas de teasing du contenu premium
+**ProblÃ¨mes :**
+- Le scan peut durer 30-60s sans possibilitÃ© de quitter/reprendre
+- Pas de numÃ©ro de scan / preuve de travail affichÃ© avant le paywall
+- Le paywall (FreemiumGate) apparaÃ®t brutalement â€” pas de teasing du contenu premium
 - Pas de "save" automatique du scan gratuit dans le dashboard
-- Si l'API retourne 500, le message d'erreur est générique ("Erreur d'analyse")
+- Si l'API retourne 500, le message d'erreur est gÃ©nÃ©rique ("Erreur d'analyse")
 
-**Recommandation :** Montrer un aperçu partiel du rapport premium (blur/fade sur les sections verrouillées) pour créer du désir avant le paywall.
+**Recommandation :** Montrer un aperÃ§u partiel du rapport premium (blur/fade sur les sections verrouillÃ©es) pour crÃ©er du dÃ©sir avant le paywall.
 
 ---
 
@@ -67,18 +67,18 @@
 
 **Ce qui est bon :**
 - Design professionnel, structure claire
-- Score gauge premium très visuelle
-- Narrative intelligente ("Ce que révèle votre audit")
-- Bouton WhatsApp pour contacter Webisafe — bon funnel de conversion
+- Score gauge premium trÃ¨s visuelle
+- Narrative intelligente ("Ce que rÃ©vÃ¨le votre audit")
+- Bouton WhatsApp pour contacter Webisafe â€” bon funnel de conversion
 
-**Problèmes :**
-- Si le scan n'est pas payé, l'écran d'attente est trop passif ("rechargera toutes les 30s")
-- Pas de notification email quand le paiement est validé
-- Le rescan peut être cliqué même si le scan est gratuit — confusion
-- Pas de comparaison "avant/après" pour les rescans
+**ProblÃ¨mes :**
+- Si le scan n'est pas payÃ©, l'Ã©cran d'attente est trop passif ("rechargera toutes les 30s")
+- Pas de notification email quand le paiement est validÃ©
+- Le rescan peut Ãªtre cliquÃ© mÃªme si le scan est gratuit â€” confusion
+- Pas de comparaison "avant/aprÃ¨s" pour les rescans
 - Le PDF ne mentionne pas la date du rescan vs. date originale
 
-**Recommandation :** Ajouter un webhook pour notifier le client par email dès validation du paiement.
+**Recommandation :** Ajouter un webhook pour notifier le client par email dÃ¨s validation du paiement.
 
 ---
 
@@ -86,16 +86,16 @@
 
 **Ce qui est bon :**
 - Sidebar responsive
-- KPI cards (dernier scan, moyenne, évolution)
-- Graphique d'évolution des scores
-- Historique des scans avec statut payé/non payé
+- KPI cards (dernier scan, moyenne, Ã©volution)
+- Graphique d'Ã©volution des scores
+- Historique des scans avec statut payÃ©/non payÃ©
 
-**Problèmes :**
-- Le bouton "Retour à l'accueil" utilise `navigate('/')` (corrigé) mais le wording prête à confusion avec "déconnexion"
+**ProblÃ¨mes :**
+- Le bouton "Retour Ã  l'accueil" utilise `navigate('/')` (corrigÃ©) mais le wording prÃªte Ã  confusion avec "dÃ©connexion"
 - Pas de onboarding pour les nouveaux utilisateurs
 - Pas de notifications in-app
-- Le graphique d'évolution est vide si l'utilisateur n'a qu'un scan
-- Pas d'alertes personnalisées (ex: "Votre score a baissé de 15pts")
+- Le graphique d'Ã©volution est vide si l'utilisateur n'a qu'un scan
+- Pas d'alertes personnalisÃ©es (ex: "Votre score a baissÃ© de 15pts")
 
 **Recommandation :** Ajouter un walkthrough tooltip pour les nouveaux users. Ajouter des alertes in-app sur les changements de score.
 
@@ -104,17 +104,17 @@
 ### 2.5 Admin (`/admin`)
 
 **Ce qui est bon :**
-- Interface dédiée avec KPIs (paiements, revenus, scans)
-- Système de validation/refus de paiements Wave manuel
+- Interface dÃ©diÃ©e avec KPIs (paiements, revenus, scans)
+- SystÃ¨me de validation/refus de paiements Wave manuel
 - Graphiques de revenus
 
-**Problèmes :**
-- Accès par `?token=ADMIN_TOKEN` — le token est dans le code source (`utils/wavePayment.js`) = **sécurité critique**
+**ProblÃ¨mes :**
+- AccÃ¨s par `?token=ADMIN_TOKEN` â€” le token est dans le code source (`utils/wavePayment.js`) = **sÃ©curitÃ© critique**
 - Pas de rate limiting sur les endpoints admin
-- Pas de logs d'audit (qui a validé quel paiement ?)
-- Le `ADMIN_TOKEN` en dur dans le JS bundle est accessible à tout le monde via `grep` sur le bundle
+- Pas de logs d'audit (qui a validÃ© quel paiement ?)
+- Le `ADMIN_TOKEN` en dur dans le JS bundle est accessible Ã  tout le monde via `grep` sur le bundle
 
-**Recommandation :** Déplacer l'authentification admin côté serveur (cookie HTTP-only + session). Ne JAMAIS mettre de token admin dans le bundle client.
+**Recommandation :** DÃ©placer l'authentification admin cÃ´tÃ© serveur (cookie HTTP-only + session). Ne JAMAIS mettre de token admin dans le bundle client.
 
 ---
 
@@ -122,17 +122,17 @@
 
 **Ce qui est bon :**
 - Pricing transparent en FCFA
-- 4 plans bien différenciés
-- FAQ spécifique tarifs
+- 4 plans bien diffÃ©renciÃ©s
+- FAQ spÃ©cifique tarifs
 - Badge "Le plus populaire" sur Premium
 
-**Problèmes :**
-- Le plan "Protect" indique "Offre mai 2026" — contenu daté à maintenir manuellement
-- Pas de calcul ROI ("35 000 FCFA = le coût d'une heure de développeur" ou "1 conversion sauvée = amorti")
-- Pas de témoignages clients sur cette page
-- Pas de garantie satisfait/remboursé (ou explicite : "aucun remboursement")
+**ProblÃ¨mes :**
+- Le plan "Protect" indique "Offre mai 2026" â€” contenu datÃ© Ã  maintenir manuellement
+- Pas de calcul ROI ("35 000 FCFA = le coÃ»t d'une heure de dÃ©veloppeur" ou "1 conversion sauvÃ©e = amorti")
+- Pas de tÃ©moignages clients sur cette page
+- Pas de garantie satisfait/remboursÃ© (ou explicite : "aucun remboursement")
 
-**Recommandation :** Ajouter un calculateur ROI ("Si votre site a X visiteurs/mois, une amélioration de Y% = Z FCFA de revenus en plus").
+**Recommandation :** Ajouter un calculateur ROI ("Si votre site a X visiteurs/mois, une amÃ©lioration de Y% = Z FCFA de revenus en plus").
 
 ---
 
@@ -143,10 +143,10 @@
 - WhatsApp CTA bien visible
 - Map + email + horaires
 
-**Problèmes :**
-- Le formulaire envoie vers `/api/contact` mais pas de feedback de succès visuel riche (juste un texte)
+**ProblÃ¨mes :**
+- Le formulaire envoie vers `/api/contact` mais pas de feedback de succÃ¨s visuel riche (juste un texte)
 - Pas de CAPTCHA / protection anti-spam
-- L'email `webisafe@gmail.com` manque de professionnalisme (utiliser `contact@webisafe.ci`)
+- L'email `webisafe@gmail.com` manque de professionnalisme (utiliser `webisafe@gmail.com`)
 
 **Recommandation :** Ajouter hCaptcha ou Cloudflare Turnstile. Changer l'email pour un domaine propre.
 
@@ -156,29 +156,29 @@
 
 **Ce qui est bon :**
 - Programme d'affiliation avec commission 17 500 FCFA/vente (50%)
-- Dashboard affilié basique (`/affiliate-dashboard`)
+- Dashboard affiliÃ© basique (`/affiliate-dashboard`)
 - Inscription simple
 
-**Problèmes :**
-- Le dashboard affilié est accessible publiquement via `?code=XXX` — n'importe qui peut voir les stats d'un autre affilié s'il connaît son code
-- Pas de génération de lien avec UTM tracking automatique
-- Pas de matériel marketing (bannières, copy, posts réseaux sociaux prêts à l'emploi)
-- Pas de seuil de paiement minimum affiché
+**ProblÃ¨mes :**
+- Le dashboard affiliÃ© est accessible publiquement via `?code=XXX` â€” n'importe qui peut voir les stats d'un autre affiliÃ© s'il connaÃ®t son code
+- Pas de gÃ©nÃ©ration de lien avec UTM tracking automatique
+- Pas de matÃ©riel marketing (banniÃ¨res, copy, posts rÃ©seaux sociaux prÃªts Ã  l'emploi)
+- Pas de seuil de paiement minimum affichÃ©
 
-**Recommandation :** Sécuriser le dashboard affilié (PIN ou email). Fournir un kit marketing (bannières 1080x1080, copy WhatsApp, posts LinkedIn).
+**Recommandation :** SÃ©curiser le dashboard affiliÃ© (PIN ou email). Fournir un kit marketing (banniÃ¨res 1080x1080, copy WhatsApp, posts LinkedIn).
 
 ---
 
 ### 2.9 Protect (`/protect`)
 
 **Ce qui est bon :**
-- Page dédiée bien designée pour le SaaS récurrent
-- Features listées clairement (monitoring, SSL, scan mensuel)
-- Badge "Sécurisé par Webisafe" — bon viral loop
+- Page dÃ©diÃ©e bien designÃ©e pour le SaaS rÃ©current
+- Features listÃ©es clairement (monitoring, SSL, scan mensuel)
+- Badge "SÃ©curisÃ© par Webisafe" â€” bon viral loop
 
-**Problèmes :**
-- Le pricing dit "Offre mai 2026 : audit initial offert" — encore une date hardcodée
-- Pas de page de checkout intégrée — redirection vers Wave manuel
+**ProblÃ¨mes :**
+- Le pricing dit "Offre mai 2026 : audit initial offert" â€” encore une date hardcodÃ©e
+- Pas de page de checkout intÃ©grÃ©e â€” redirection vers Wave manuel
 - Pas de free trial / demo du monitoring
 - Pas de page de status publique pour les clients Protect
 
@@ -186,18 +186,18 @@
 
 ---
 
-### 2.10 À Propos (`/a-propos`)
+### 2.10 Ã€ Propos (`/a-propos`)
 
 **Ce qui est bon :**
-- Storytelling local ("Fait à Abidjan, pour l'Afrique")
+- Storytelling local ("Fait Ã  Abidjan, pour l'Afrique")
 - Contact direct
 
-**Problèmes :**
-- Trop minimaliste — pas de photos, pas de team, pas de timeline
-- Pas de témoignages presse ou partenaires
+**ProblÃ¨mes :**
+- Trop minimaliste â€” pas de photos, pas de team, pas de timeline
+- Pas de tÃ©moignages presse ou partenaires
 - Lien vers LinkedIn du fondateur absent
 
-**Recommandation :** Ajouter une vidéo de 60s ou une timeline du projet.
+**Recommandation :** Ajouter une vidÃ©o de 60s ou une timeline du projet.
 
 ---
 
@@ -207,20 +207,20 @@
 | Source | Prix | Friction |
 |--------|------|----------|
 | Audit Premium unique | 35 000 FCFA | Paiement Wave manuel + validation manuelle admin |
-| Protect (mensuel) | 15 000 FCFA | Même friction + pas de prélèvement auto |
+| Protect (mensuel) | 15 000 FCFA | MÃªme friction + pas de prÃ©lÃ¨vement auto |
 | Affiliation | 17 500 FCFA/vente | Paiement manuel sur Wave |
 
-### Problèmes de conversion
-1. **Paiement Wave manuel** : L'utilisateur doit ouvrir Wave, payer, puis revenir sur le site pour signaler son paiement. C'est **3 étapes** vs. 1 étape pour un paiement intégré.
-2. **Pas de paiement mobile money** : Côte d'Ivoire = Orange Money, MTN MoMo. Wave n'est pas universel.
+### ProblÃ¨mes de conversion
+1. **Paiement Wave manuel** : L'utilisateur doit ouvrir Wave, payer, puis revenir sur le site pour signaler son paiement. C'est **3 Ã©tapes** vs. 1 Ã©tape pour un paiement intÃ©grÃ©.
+2. **Pas de paiement mobile money** : CÃ´te d'Ivoire = Orange Money, MTN MoMo. Wave n'est pas universel.
 3. **Validation manuelle** : Le client attend que l'admin valide. Temps de latence = churn.
-4. **Pas de upsell automatique** : Après un scan gratuit, pas de séquence email nurture.
-5. **Pas d'abonnement annuel** : 15 000/mois × 12 = 180 000. Un plan annuel à 150 000 (2 mois offerts) augmenterait le LTV.
+4. **Pas de upsell automatique** : AprÃ¨s un scan gratuit, pas de sÃ©quence email nurture.
+5. **Pas d'abonnement annuel** : 15 000/mois Ã— 12 = 180 000. Un plan annuel Ã  150 000 (2 mois offerts) augmenterait le LTV.
 
-### Opportunités de revenus manquées
-- **White Label** : Mentionné dans le code (`white-label.js`) mais pas de page dédiée
-- **API publique** : Le scanner pourrait être vendu en API à d'autres outils/agences
-- **Correction service** : "Vous avez un score de 42 — Webisafe peut corriger tout ça pour 150 000 FCFA"
+### OpportunitÃ©s de revenus manquÃ©es
+- **White Label** : MentionnÃ© dans le code (`white-label.js`) mais pas de page dÃ©diÃ©e
+- **API publique** : Le scanner pourrait Ãªtre vendu en API Ã  d'autres outils/agences
+- **Correction service** : "Vous avez un score de 42 â€” Webisafe peut corriger tout Ã§a pour 150 000 FCFA"
 
 ---
 
@@ -234,7 +234,7 @@
 - **Monitoring** : UptimeRobot (externe)
 
 ### Points forts
-- Code modulaire, composants réutilisables
+- Code modulaire, composants rÃ©utilisables
 - Lazy loading des routes
 - Context API pour l'auth
 - Scan API robuste avec fallbacks (PageSpeed, VirusTotal, etc.)
@@ -242,43 +242,43 @@
 ### Dette technique critique
 
 #### 4.1 Auth hybride (Supabase + localStorage)
-- Deux systèmes d'auth coexistent : Supabase Auth et `localStorage` legacy
-- Le `client@test.com` était cassé à cause de cette dualité
-- **Risque** : Un utilisateur peut être connecté en local mais pas sur Supabase = états incohérents
+- Deux systÃ¨mes d'auth coexistent : Supabase Auth et `localStorage` legacy
+- Le `client@test.com` Ã©tait cassÃ© Ã  cause de cette dualitÃ©
+- **Risque** : Un utilisateur peut Ãªtre connectÃ© en local mais pas sur Supabase = Ã©tats incohÃ©rents
 
-#### 4.2 Tokens exposés
-- `ADMIN_TOKEN` dans `src/utils/wavePayment.js` → visible dans le bundle
-- `RESEND_API_KEY` pourrait être exposée côté client si utilisée dans le frontend
+#### 4.2 Tokens exposÃ©s
+- `ADMIN_TOKEN` dans `src/utils/wavePayment.js` â†’ visible dans le bundle
+- `RESEND_API_KEY` pourrait Ãªtre exposÃ©e cÃ´tÃ© client si utilisÃ©e dans le frontend
 
 #### 4.3 Pas de rate limiting
-- L'API scan peut être appelée en boucle sans limites
+- L'API scan peut Ãªtre appelÃ©e en boucle sans limites
 - Pas de protection anti-DDoS sur les endpoints
 
 #### 4.4 Pas de tests
-- Zéro test unitaire / E2E détecté
+- ZÃ©ro test unitaire / E2E dÃ©tectÃ©
 - Pas de CI/CD (pas de GitHub Actions)
 
 #### 4.5 Gestion d'erreurs
-- Erreurs API parfois affichées brute à l'utilisateur
+- Erreurs API parfois affichÃ©es brute Ã  l'utilisateur
 - Pas de Sentry / Datadog / LogRocket pour le tracking d'erreurs
 
 ---
 
-## 5. Sécurité de Webisafe (l'application)
+## 5. SÃ©curitÃ© de Webisafe (l'application)
 
-| Check | Statut | Sévérité |
+| Check | Statut | SÃ©vÃ©ritÃ© |
 |-------|--------|----------|
-| HTTPS | ✅ | — |
-| CSP (Content-Security-Policy) | ❌ Absent | **Critique** |
-| X-Frame-Options | ❌ Absent | Haute |
-| HSTS | ❌ Absent | Haute |
-| X-Content-Type-Options | ❌ Absent | Moyenne |
-| Referrer-Policy | ❌ Absent | Moyenne |
-| Rate Limiting API | ❌ Absent | **Critique** |
-| Input sanitization | ⚠️ Partielle | Moyenne |
-| Admin token exposé | ❌ Oui | **Critique** |
+| HTTPS | âœ… | â€” |
+| CSP (Content-Security-Policy) | âŒ Absent | **Critique** |
+| X-Frame-Options | âŒ Absent | Haute |
+| HSTS | âŒ Absent | Haute |
+| X-Content-Type-Options | âŒ Absent | Moyenne |
+| Referrer-Policy | âŒ Absent | Moyenne |
+| Rate Limiting API | âŒ Absent | **Critique** |
+| Input sanitization | âš ï¸ Partielle | Moyenne |
+| Admin token exposÃ© | âŒ Oui | **Critique** |
 
-**Verdict** : Webisafe fait des audits de sécurité mais n'applique pas ses propres recommandations. C'est un argument de vente faible.
+**Verdict** : Webisafe fait des audits de sÃ©curitÃ© mais n'applique pas ses propres recommandations. C'est un argument de vente faible.
 
 ---
 
@@ -286,32 +286,32 @@
 
 | Check | Statut | Impact |
 |-------|--------|--------|
-| SSR / Prerendering | ❌ Non | **Critique** — Google ne voit rien |
-| Sitemap.xml | ✅ Oui | — |
-| Robots.txt | ✅ Oui | — |
-| Meta descriptions | ⚠️ Partielles | Moyen |
-| Open Graph | ⚠️ Basiques | Moyen |
-| Structured data (JSON-LD) | ❌ Non | Haut |
-| H1 unique par page | ✅ Oui | — |
-| Core Web Vitals | ⚠️ Bundle lourd | Moyen |
-| Backlinks / Content marketing | ❌ Non | Haut |
+| SSR / Prerendering | âŒ Non | **Critique** â€” Google ne voit rien |
+| Sitemap.xml | âœ… Oui | â€” |
+| Robots.txt | âœ… Oui | â€” |
+| Meta descriptions | âš ï¸ Partielles | Moyen |
+| Open Graph | âš ï¸ Basiques | Moyen |
+| Structured data (JSON-LD) | âŒ Non | Haut |
+| H1 unique par page | âœ… Oui | â€” |
+| Core Web Vitals | âš ï¸ Bundle lourd | Moyen |
+| Backlinks / Content marketing | âŒ Non | Haut |
 
-**Verdict** : Avec une SPA sans prerendering, Webisafe ne sera jamais bien indexée. Tout le contenu marketing ("Premier outil d'audit d'Afrique", etc.) est invisible pour Google.
+**Verdict** : Avec une SPA sans prerendering, Webisafe ne sera jamais bien indexÃ©e. Tout le contenu marketing ("Premier outil d'audit d'Afrique", etc.) est invisible pour Google.
 
 ---
 
 ## 7. Performance Frontend
 
-| Métrique | Estimation | Seuil Google |
+| MÃ©trique | Estimation | Seuil Google |
 |----------|------------|--------------|
 | LCP | ~2.5s | 2.5s |
 | FID/INP | ~200ms | 200ms |
 | CLS | ~0.05 | 0.1 |
 | TBT | ~350ms | 200ms |
-| Bundle JS | ~450KB gzippé | — |
+| Bundle JS | ~450KB gzippÃ© | â€” |
 
-**Problèmes :**
-- Framer Motion chargé sur toutes les pages même statiques
+**ProblÃ¨mes :**
+- Framer Motion chargÃ© sur toutes les pages mÃªme statiques
 - Lucide icons : import de tout le package au lieu de tree-shaking optimal
 - Pas de service worker / PWA
 - Pas de prefetching des routes critiques
@@ -320,51 +320,51 @@
 
 ## 8. Recommandations Prioritaires
 
-### 🔴 Critique (à faire cette semaine)
+### ðŸ”´ Critique (Ã  faire cette semaine)
 
-1. **Sécuriser l'admin** : Déplacer `ADMIN_TOKEN` côté serveur. Remplacer l'accès par `?token=` par un cookie HTTP-only + session server-side.
-2. **Ajouter rate limiting** : Sur `/api/scan`, `/api/contact`, max 10 requêtes/minute par IP.
-3. **Headers sécurité** : Ajouter CSP, HSTS, X-Frame-Options, etc. sur Vercel (`vercel.json`).
-4. **Prerendering / SSR** : Implémenter au minimum un `vercel.json` avec `prerender` ou migrer vers Next.js pour l'indexation Google.
+1. **SÃ©curiser l'admin** : DÃ©placer `ADMIN_TOKEN` cÃ´tÃ© serveur. Remplacer l'accÃ¨s par `?token=` par un cookie HTTP-only + session server-side.
+2. **Ajouter rate limiting** : Sur `/api/scan`, `/api/contact`, max 10 requÃªtes/minute par IP.
+3. **Headers sÃ©curitÃ©** : Ajouter CSP, HSTS, X-Frame-Options, etc. sur Vercel (`vercel.json`).
+4. **Prerendering / SSR** : ImplÃ©menter au minimum un `vercel.json` avec `prerender` ou migrer vers Next.js pour l'indexation Google.
 
-### 🟠 Haute (à faire ce mois)
+### ðŸŸ  Haute (Ã  faire ce mois)
 
-5. **Intégrer Orange Money / MTN MoMo** : Utiliser une passerelle comme CinetPay, PayDunya ou une API Wave business pour des paiements automatisés.
+5. **IntÃ©grer Orange Money / MTN MoMo** : Utiliser une passerelle comme CinetPay, PayDunya ou une API Wave business pour des paiements automatisÃ©s.
 6. **Webhook paiement** : Automatiser la validation des paiements (plus de validation manuelle admin).
-7. **Tests E2E** : Cypress ou Playwright sur les parcours critiques (scan → paywall → paiement → rapport).
-8. **Kit marketing affiliation** : Bannières, copy WhatsApp, posts LinkedIn prêts à copier-coller.
+7. **Tests E2E** : Cypress ou Playwright sur les parcours critiques (scan â†’ paywall â†’ paiement â†’ rapport).
+8. **Kit marketing affiliation** : BanniÃ¨res, copy WhatsApp, posts LinkedIn prÃªts Ã  copier-coller.
 
-### 🟡 Moyenne (à faire dans 2-3 mois)
+### ðŸŸ¡ Moyenne (Ã  faire dans 2-3 mois)
 
-9. **Calculateur ROI** : "Combien de visiteurs/mois ? → Voici le coût d'une seconde de chargement en FCFA"
-10. **Séquence email post-scan** : Drip campaign après scan gratuit (jour 1: résumé, jour 3: alertes critiques, jour 7: offre premium -20%).
-11. **Page de status publique** : Pour les clients Protect (`status.webisafe.ci`).
-12. **Migration Next.js** : Pour le SSR, le SSG des pages statiques, et les API routes intégrées.
+9. **Calculateur ROI** : "Combien de visiteurs/mois ? â†’ Voici le coÃ»t d'une seconde de chargement en FCFA"
+10. **SÃ©quence email post-scan** : Drip campaign aprÃ¨s scan gratuit (jour 1: rÃ©sumÃ©, jour 3: alertes critiques, jour 7: offre premium -20%).
+11. **Page de status publique** : Pour les clients Protect (`status.webisafe.vercel.app`).
+12. **Migration Next.js** : Pour le SSR, le SSG des pages statiques, et les API routes intÃ©grÃ©es.
 13. **Sentry / LogRocket** : Tracking d'erreurs et replay de sessions.
-14. **Multi-langue** : FR par défaut, EN pour l'expansion Afrique anglophone (Ghana, Nigeria).
+14. **Multi-langue** : FR par dÃ©faut, EN pour l'expansion Afrique anglophone (Ghana, Nigeria).
 
 ---
 
-## 9. Faux Positifs Scanner à Anticiper
+## 9. Faux Positifs Scanner Ã  Anticiper
 
-| Faux Positif | Cause | Fix Déjà Appliqué ? |
+| Faux Positif | Cause | Fix DÃ©jÃ  AppliquÃ© ? |
 |--------------|-------|---------------------|
-| H1 manquant sur SPA | Contenu rendu côté client | ✅ Corrigé (détection SPA) |
-| Fichiers sensibles sur Vercel | Catch-all renvoie index.html | ✅ Corrigé (inspection contenu) |
-| Panel admin exposé | Même cause | ✅ Corrigé |
-| Open Graph manquant | SPA sans prerendering | ❌ — Webisafe elle-même a ce problème |
-| Sitemap manquant | Certains sites n'en ont pas besoin | ⚠️ Ponderation à ajuster |
-| TBT élevé sur SPA | Google PageSpeed mesure le shell HTML | ❌ — Compliqué à corriger sans SSR |
+| H1 manquant sur SPA | Contenu rendu cÃ´tÃ© client | âœ… CorrigÃ© (dÃ©tection SPA) |
+| Fichiers sensibles sur Vercel | Catch-all renvoie index.html | âœ… CorrigÃ© (inspection contenu) |
+| Panel admin exposÃ© | MÃªme cause | âœ… CorrigÃ© |
+| Open Graph manquant | SPA sans prerendering | âŒ â€” Webisafe elle-mÃªme a ce problÃ¨me |
+| Sitemap manquant | Certains sites n'en ont pas besoin | âš ï¸ Ponderation Ã  ajuster |
+| TBT Ã©levÃ© sur SPA | Google PageSpeed mesure le shell HTML | âŒ â€” CompliquÃ© Ã  corriger sans SSR |
 
 ---
 
 ## 10. Conclusion
 
-**Webisafe est un bon MVP** avec un positionnement fort ("Premier outil d'audit d'Afrique francophone"), un pricing adapté au marché local, et un design professionnel.
+**Webisafe est un bon MVP** avec un positionnement fort ("Premier outil d'audit d'Afrique francophone"), un pricing adaptÃ© au marchÃ© local, et un design professionnel.
 
 **Les 3 blocages actuels au scaling :**
-1. **SEO invisible** — personne ne trouve Webisafe sur Google sans pub payante
-2. **Paiement manuel** — friction de conversion trop élevée pour un produit numérique
-3. **Sécurité interne faible** — l'outil audit la sécurité mais n'est pas sécurisé lui-même = crédibilité affaiblie
+1. **SEO invisible** â€” personne ne trouve Webisafe sur Google sans pub payante
+2. **Paiement manuel** â€” friction de conversion trop Ã©levÃ©e pour un produit numÃ©rique
+3. **SÃ©curitÃ© interne faible** â€” l'outil audit la sÃ©curitÃ© mais n'est pas sÃ©curisÃ© lui-mÃªme = crÃ©dibilitÃ© affaiblie
 
-**Si ces 3 points sont résolus, Webisafe peut passer de MVP à produit mature en 3-6 mois.**
+**Si ces 3 points sont rÃ©solus, Webisafe peut passer de MVP Ã  produit mature en 3-6 mois.**

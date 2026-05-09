@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
     // Envoi email admin (non bloquant)
     const emailPromise = sendResendEmail({
-      to: 'admin@webisafe.ci',
+      to: 'webisafe@gmail.com',
       subject: `🔧 Nouvelle demande de correction — ${payload.pack.replace(/[\r\n]+/g, ' ')}`,
       html: `
         <h2>Nouvelle demande de correction WebiSafe</h2>

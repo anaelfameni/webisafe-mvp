@@ -106,7 +106,7 @@ export const organizationJsonLd = {
     '@type': 'ContactPoint',
     telephone: '+225-01-70-90-77-80',
     contactType: 'customer service',
-    email: 'support@webisafe.ci',
+    email: 'webisafe@gmail.com',
     areaServed: ['CI', 'SN', 'ML', 'BF', 'GN', 'TG', 'BJ', 'NE', 'CM', 'GH', 'NG'],
     availableLanguage: ['French'],
   },

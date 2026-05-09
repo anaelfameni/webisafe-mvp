@@ -265,7 +265,7 @@ Les contributions sont priorisées selon :
 
 Pour toute question :
 - Ouvrez une issue sur GitHub
-- Contactez : support@webisafe.ci
+- Contactez : webisafe@gmail.com
 - Discord : [lien vers serveur Discord]
 
 ---

@@ -7,7 +7,7 @@ export const supabase = createClient(
         auth: {
             flowType: 'pkce',
             detectSessionInUrl: true,
-            persistSession: true,
+            persistSession: !import.meta.env.DEV,
             autoRefreshToken: true,
         },
     }

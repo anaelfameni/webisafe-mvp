@@ -354,39 +354,18 @@ export default function Analyse() {
   const conclusionRef = useRef(null);
   const freemiumTriggeredRef = useRef(false);
 
-  // Affiche FreemiumGate après scroll sur ScoreCards + conclusion OU 30s
+  // Affiche FreemiumGate 15s après l'affichage des résultats
   useEffect(() => {
     if (scanState !== 'results' || !scanData || isUnlocked || hasPaid) return;
 
-    // Fallback 30s
-    const fallbackTimer = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (!freemiumTriggeredRef.current) {
         freemiumTriggeredRef.current = true;
         setShowFreemiumGate(true);
       }
-    }, 30000);
+    }, 15000);
 
-    // Scroll-based : déclenche quand la conclusion a été vue (après ScoreCards)
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && !freemiumTriggeredRef.current) {
-            freemiumTriggeredRef.current = true;
-            setShowFreemiumGate(true);
-          }
-        });
-      },
-      { threshold: 0.3 }
-    );
-
-    if (conclusionRef.current) {
-      observer.observe(conclusionRef.current);
-    }
-
-    return () => {
-      clearTimeout(fallbackTimer);
-      observer.disconnect();
-    };
+    return () => clearTimeout(timer);
   }, [scanState, scanData, isUnlocked, hasPaid]);
 
   // Pré-remplit l'email avec celui du compte connecté si disponible

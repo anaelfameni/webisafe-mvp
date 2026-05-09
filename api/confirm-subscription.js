@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       <li>✓ Alertes SSL proactives activées</li>
     </ul>
     <div style="text-align:center;margin-top:24px;">
-      <a href="https://webisafe.ci/dashboard" style="background:#1566F0;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Voir mon tableau de bord →</a>
+      <a href="https://webisafe.vercel.app/dashboard" style="background:#1566F0;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Voir mon tableau de bord →</a>
     </div>
   </div>
 </body></html>`,

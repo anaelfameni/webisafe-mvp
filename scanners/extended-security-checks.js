@@ -1,5 +1,5 @@
 // api/scanners/extended-security-checks.js
-const UA='Mozilla/5.0 (compatible; WebisafeScanner/1.0; +https://webisafe.ci)';
+const UA='Mozilla/5.0 (compatible; WebisafeScanner/1.0; +https://webisafe.vercel.app)';
 function n(c,r=''){return{check_name:c,status:'error',score_impact:0,criticality:'minor',title:'Indisponible',description:r||'Check non disponible',recommendation:'Réessayez plus tard.',technical_detail:r||'',difficulty:'—',time_estimate:'—'};}
 async function ft(url,opts={}){const r=await fetch(url,{headers:{'User-Agent':UA},signal:AbortSignal.timeout(opts.timeout||5000),redirect:opts.redirect??'follow',...opts});return{status:r.status,headers:r.headers,text:await r.text()};}
 async function doh(name,type){const r=await fetch(`https://1.1.1.1/dns-query?name=${encodeURIComponent(name)}&type=${type}`,{headers:{Accept:'application/dns-json'},signal:AbortSignal.timeout(5000)});if(!r.ok)throw new Error('DoH');return(await r.json()).Answer||[];}

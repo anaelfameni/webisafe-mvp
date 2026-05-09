@@ -344,3 +344,184 @@ it('buildPdfAuditModel keeps all important UI report metrics and explanations', 
 
 });
 
+it('buildPdfAuditModel creates a premium executive audit model with calibrated priorities', () => {
+  const model = buildPdfAuditModel({
+    url: 'https://jumia.ci',
+    scanDate: '2026-05-09T00:45:00.000Z',
+    score: 77,
+    scores: {
+      performance: 50,
+      security: 92,
+      advanced_security: 74,
+      seo: 89,
+      ux: 94,
+    },
+    metrics: {
+      performance: {
+        score: 50,
+        partial: true,
+        partial_reason: 'Core Web Vitals indisponibles pendant le scan.',
+        server_location: {
+          city: 'Montreal',
+          country: 'Canada',
+          isp: 'Cloudflare, Inc.',
+          latency_warning: {
+            message: 'Serveur hébergé au Canada, latence estimée +150 ms pour vos visiteurs africains',
+            impact: 'Risque d’abandon plus élevé sur mobile',
+            recommendation: 'Tester un CDN proche de la Côte d’Ivoire',
+          },
+        },
+      },
+      security: {
+        score: 92,
+        https_enabled: true,
+        ssl_grade: 'A',
+        malware_detected: undefined,
+        headers_manquants: [
+          { header: 'HSTS', message: 'Strict-Transport-Security manquant', severity: 'critical' },
+          { header: 'CSP', message: 'Content-Security-Policy manquant', severity: 'critical' },
+          { header: 'Permissions-Policy', message: 'Permissions-Policy manquant' },
+        ],
+        extended_security_score: 74,
+        advanced_checks: [
+          {
+            key: 'security_txt',
+            name: 'security.txt',
+            status: 'missing',
+            description: 'security.txt manquant',
+          },
+          {
+            key: 'cors',
+            name: 'CORS mal configuré',
+            status: 'critical',
+            description: 'Access-Control-Allow-Origin trop permissif sur une réponse testée.',
+          },
+          {
+            key: 'email_advanced',
+            name: 'Sécurité email incomplète',
+            status: 'critical',
+            description: 'SPF, DMARC et DKIM manquants.',
+            data: {
+              spf: [],
+              dmarc: [],
+              dkim: [],
+              missing: ['SPF', 'DMARC', 'DKIM'],
+            },
+          },
+        ],
+      },
+      seo: {
+        score: 89,
+        has_title: true,
+        has_description: true,
+        h1_count: 1,
+        has_viewport: true,
+        has_open_graph: true,
+        has_sitemap: false,
+      },
+      ux: {
+        score: 94,
+        grade: 'A+',
+        images_without_alt: 6,
+        links_without_text: 30,
+        tap_targets_ok: true,
+        user_zoom_blocked: false,
+        issues: [
+          {
+            message: '30 lien(s) sans texte visible',
+            impact: 'Confort réduit pour les utilisateurs et les moteurs de recherche',
+            severity: 'low',
+          },
+        ],
+      },
+    },
+  });
+
+  assert.equal(model.report.id, 'WSF-JUMIA-CI-20260509');
+  assert.equal(model.report.scanType, 'Scan passif non intrusif');
+  assert.match(model.executive.verdict, /jumia\.ci/);
+  assert.match(model.executive.businessSummary, /performance mobile|sécurité avancée/);
+  assert.equal(model.executive.scanConfidence.label, 'Moyenne');
+  assert.equal(model.sections.ux.metrics.find((item) => item.label === 'Grade UX').status, 'OK');
+  assert.equal(model.sections.advancedSecurity.summaryRows.find((item) => item[0] === 'security.txt')[2], 'À corriger');
+  assert.equal(model.sections.security.score, 92);
+  assert.equal(model.sections.advancedSecurity.score, 74);
+  assert.equal(model.cover.categoryScores.find((item) => item.label === 'Sécurité').score, 92);
+  assert.equal(model.cover.categoryScores.find((item) => item.label === 'Sécurité avancée').score, 74);
+  assert.equal(model.scorecard.find((item) => item.label === 'Sécurité').score, 92);
+  assert.equal(model.scorecard.find((item) => item.label === 'Sécurité avancée').score, 74);
+  assert.equal(model.sections.security.metrics.find((item) => item.label === 'Score sécurité').status, 'À corriger');
+  assert.equal(model.scorecard.find((item) => item.label === 'Sécurité').status, 'À corriger');
+  assert.equal(model.scorecard.find((item) => item.label === 'Sécurité avancée').status, 'À corriger');
+  assert.ok(model.topRisks.length >= 5);
+  assert.equal(model.topRisks[0].severity, 'Critique');
+  assert.ok(model.topRisks.some((risk) => /HSTS|CSP/.test(risk.title)));
+  assert.ok(model.topRisks.some((risk) => /email/i.test(risk.title)));
+  assert.ok(model.actionPlan.now.length > 0);
+  assert.ok(model.actionPlan.next.length > 0);
+  assert.ok(model.actionPlan.later.length > 0);
+  assert.deepEqual(
+    model.scorecard.map((item) => item.label),
+    ['Performance', 'Sécurité', 'Sécurité avancée', 'SEO', 'UX Mobile']
+  );
+  assert.ok(model.methodology.limitations.some((item) => /Non mesuré|indisponible|partiel/i.test(item)));
+});
+
+it('buildPdfAuditModel keeps official security scores when missing headers are warnings', () => {
+  const model = buildPdfAuditModel({
+    url: 'https://cybastiontech.com',
+    scanDate: '2026-05-09T03:40:00.000Z',
+    score: 85,
+    scores: {
+      performance: 69,
+      security: 90,
+      advanced_security: 76,
+      seo: 97,
+      ux: 94,
+    },
+    metrics: {
+      security: {
+        score: 90,
+        https_enabled: true,
+        ssl_grade: 'A',
+        headers_manquants: [
+          { header: 'HSTS', message: 'HSTS manquant', status: 'Avertissement' },
+          { header: 'CSP', message: 'CSP manquant', status: 'Avertissement' },
+          { header: 'X-Frame-Options', message: 'X-Frame-Options manquant', status: 'Avertissement' },
+          { header: 'X-Content-Type-Options', message: 'X-Content-Type-Options manquant', status: 'Avertissement' },
+          { header: 'Referrer-Policy', message: 'Referrer-Policy manquant', status: 'Avertissement' },
+          { header: 'Permissions-Policy', message: 'Permissions-Policy manquant', status: 'Avertissement' },
+        ],
+        advanced_security_score: 76,
+        advanced_checks: [
+          { key: 'waf', name: 'Aucun WAF détecté', status: 'Avertissement' },
+          { key: 'subdomains', name: 'Sous-domaines', status: 'not_run', description: 'Contrôle bloqué par un bot anti-scan' },
+          { key: 'security_txt', name: 'security.txt manquant', status: 'missing' },
+          { key: 'cors', name: 'CORS correctement configuré', status: 'OK' },
+          {
+            key: 'email_advanced',
+            name: 'Sécurité email incomplète',
+            status: 'critical',
+            data: {
+              spf: ['v=spf1 include:_spf.google.com ~all'],
+              dmarc: [],
+              dkim: [],
+              missing: ['DMARC', 'DKIM'],
+            },
+          },
+        ],
+      },
+    },
+  });
+
+  assert.equal(model.sections.security.score, 90);
+  assert.equal(model.cover.categoryScores.find((item) => item.label === 'Sécurité').score, 90);
+  assert.equal(model.scorecard.find((item) => item.label === 'Sécurité').score, 90);
+  assert.equal(model.sections.advancedSecurity.score, 76);
+  assert.equal(model.cover.categoryScores.find((item) => item.label === 'Sécurité avancée').status, 'À corriger');
+  assert.equal(model.scorecard.find((item) => item.label === 'Sécurité avancée').status, 'À corriger');
+  assert.notEqual(model.risk.label, 'Élevé');
+  assert.doesNotMatch(model.executive.potentialImpact, /critique/i);
+  assert.ok(model.methodology.limitations.some((item) => /non scann|bloqu|bot/i.test(item)));
+});
+

@@ -69,7 +69,7 @@ export async function scanSEO(url, apiKey, pageSpeedData = null) {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0; +https://webisafe.ci)',
+        'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0; +https://webisafe.vercel.app)',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
       redirect: 'follow',

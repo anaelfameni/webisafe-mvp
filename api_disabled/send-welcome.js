@@ -50,7 +50,7 @@ export default async function handler(req, res) {
 
   const issueList = issues.map(i => `<li style="margin-bottom:8px;padding-left:24px;position:relative"><span style="position:absolute;left:0;color:#ef4444">●</span>${escapeHtml(i)}</li>`).join('');
 
-  const rapportUrl = `https://webisafe.ci/rapport/${result.scan_id ?? ''}`;
+  const rapportUrl = `https://webisafe.vercel.app/rapport/${result.scan_id ?? ''}`;
 
   try {
     await sendResendEmail({
@@ -80,7 +80,7 @@ export default async function handler(req, res) {
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/>
 
             <p style="color:#64748b;font-size:14px;margin:0 0 8px">Besoin d'aide pour corriger ces problèmes ?</p>
-            <a href="https://webisafe.ci/tarifs" style="color:#1566f0;font-weight:600;text-decoration:none">Voir l'offre Audit+Fix — 75 000 FCFA</a>
+            <a href="https://webisafe.vercel.app/tarifs" style="color:#1566f0;font-weight:600;text-decoration:none">Voir l'offre Audit+Fix — 75 000 FCFA</a>
 
             <p style="color:#94a3b8;font-size:12px;margin-top:24px">Webisafe · Abidjan · CI</p>
           </div>

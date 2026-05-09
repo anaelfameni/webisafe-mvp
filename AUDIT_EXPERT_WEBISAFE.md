@@ -236,7 +236,7 @@ La subscription Realtime écoute **tous** les `INSERT` sur `scan_events`. Si la 
 ---
 
 ### 🟢 **P3 — Amélioration (Nice-to-have)**
-
+ :  
 #### 5.4.1 Améliorer le storytelling des rapports
 Les résumés exécutifs actuels (`buildSmartNarrative`, `buildPremiumExplanationParagraphs`) sont très bons mais restent génériques. Pour différencier Webisafe d'un simple Lighthouse wrapper, il faudrait :
 - Benchmarks sectoriels ("Votre score de 45 est inférieur à 78% des sites e-commerce en Afrique de l'Ouest")

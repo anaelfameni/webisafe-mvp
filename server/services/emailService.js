@@ -126,7 +126,7 @@ export async function sendPaymentConfirmationEmail(to, scanData) {
   const resend = getResend();
   if (!resend) return { success: false, error: 'Resend non configuré' };
 
-  const frontendUrl = process.env.FRONTEND_URL || process.env.VITE_APP_URL || 'https://webisafe.tech';
+  const frontendUrl = process.env.FRONTEND_URL || process.env.VITE_APP_URL || 'https://webisafe.vercel.app';
   const domain = (() => { try { return new URL(scanData.url).hostname; } catch { return scanData.url; } })();
 
   const html = `

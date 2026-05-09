@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const ALLOWED_ORIGINS = [
   'https://webisafe.vercel.app',
-  'https://webisafe.ci',
+  'https://webisafe.vercel.app',
   ...(process.env.NODE_ENV === 'development' ? ['http://localhost:5173'] : [])
 ];
 

@@ -42,7 +42,7 @@ export async function capturePageSnapshot(url: string, timeoutMs = 8_000): Promi
       url,
       {
         headers: {
-          'user-agent': 'WebisafeBot/1.0 (+https://webisafe.ci)',
+          'user-agent': 'WebisafeBot/1.0 (+https://webisafe.vercel.app)',
           accept: 'text/html,application/xhtml+xml',
         },
       },

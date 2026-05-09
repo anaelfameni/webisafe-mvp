@@ -3,7 +3,7 @@
 // Chaque check retourne UN OBJET (ou un TABLEAU d'objets) au format standard documenté.
 // Compatible Vercel Serverless : utilise uniquement fetch() natif et AbortSignal.timeout().
 
-const UA = 'Mozilla/5.0 (compatible; WebisafeScanner/1.0; +https://webisafe.ci)';
+const UA = 'Mozilla/5.0 (compatible; WebisafeScanner/1.0; +https://webisafe.vercel.app)';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

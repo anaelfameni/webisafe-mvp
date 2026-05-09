@@ -87,7 +87,7 @@ export default async function handler(req, res) {
 
   try {
     await sendResendEmail({
-      to: 'admin@webisafe.ci',
+      to: 'webisafe@gmail.com',
       subject: `🆕 Nouveau Protect Basic — ${String(user_email).replace(/[\r\n]+/g, ' ')}`,
       html: `<p><strong>Nouveau Protect Basic</strong></p><p>User : ${escapeHtml(user_email)}</p><p>Site : ${escapeHtml(site_url)}</p><p>Montant : ${PROTECT_BASIC_PRICE.toLocaleString('fr-FR')} FCFA/mois</p><p>Wave : ${escapeHtml(wave_phone || 'N/A')}</p><p>Code : ${escapeHtml(payment_code || 'N/A')}</p>`,
     });

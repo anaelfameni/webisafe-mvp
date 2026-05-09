@@ -67,11 +67,11 @@ export default function ErrorPage({
               Le problème persiste ? Contactez notre équipe :
             </p>
             <a
-              href="mailto:support@webisafe.ci"
+              href="mailto:webisafe@gmail.com"
               className="inline-flex items-center gap-2 text-primary hover:underline text-sm"
             >
               <Mail className="w-4 h-4" />
-              support@webisafe.ci
+              webisafe@gmail.com
             </a>
           </div>
 

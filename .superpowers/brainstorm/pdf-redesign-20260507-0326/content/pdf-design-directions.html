@@ -1,0 +1,94 @@
+<style>
+  .pdf-board { display: grid; gap: 22px; }
+  .pdf-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .pdf-card { border: 1px solid rgba(59,130,246,.35); border-radius: 20px; overflow: hidden; background: #07101f; cursor: pointer; transition: transform .18s ease, border-color .18s ease; }
+  .pdf-card:hover { transform: translateY(-3px); border-color: #3B82F6; }
+  .pdf-preview { aspect-ratio: 0.72; background: #0A0F1E; padding: 18px; color: #F8FAFC; font-family: Inter, system-ui, sans-serif; position: relative; overflow: hidden; }
+  .pdf-preview::before { content: ''; position: absolute; inset: 0; opacity: .22; pointer-events: none; }
+  .pdf-card[data-choice='a'] .pdf-preview::before { background: radial-gradient(circle at 20% 10%, #1566F0, transparent 34%), radial-gradient(circle at 86% 80%, #22C55E, transparent 24%); }
+  .pdf-card[data-choice='b'] .pdf-preview::before { background: linear-gradient(135deg, rgba(21,102,240,.45), transparent 34%); }
+  .pdf-card[data-choice='c'] .pdf-preview::before { background: radial-gradient(circle at 80% 8%, #3B82F6, transparent 22%), linear-gradient(160deg, rgba(34,197,94,.18), transparent 50%); }
+  .pdf-top, .pdf-body, .pdf-footer { position: relative; z-index: 2; }
+  .pdf-top { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(148,163,184,.25); padding-bottom: 10px; font-size: 9px; color: #94A3B8; letter-spacing: .12em; text-transform: uppercase; }
+  .logo { display: flex; align-items: center; gap: 6px; color: white; font-weight: 900; }
+  .logo span { width: 10px; height: 10px; border-radius: 3px; background: #1566F0; }
+  .pdf-body { padding-top: 18px; }
+  .kicker { color: #3B82F6; font-size: 8px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }
+  .title { margin: 6px 0 8px; font-size: 24px; line-height: .98; letter-spacing: -.06em; font-weight: 900; }
+  .sub { color: #94A3B8; font-size: 9px; line-height: 1.5; max-width: 250px; }
+  .score { margin: 18px 0; display: flex; align-items: end; gap: 8px; }
+  .score strong { font-size: 40px; line-height: .8; color: #22C55E; }
+  .score span { color: #94A3B8; font-weight: 800; }
+  .pill-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; }
+  .pill { border: 1px solid rgba(51,65,85,.9); background: rgba(30,41,59,.82); border-radius: 12px; padding: 9px; }
+  .pill b { display: block; color: white; font-size: 14px; }
+  .pill small { color: #94A3B8; font-size: 7px; text-transform: uppercase; }
+  .panel { margin-top: 12px; border: 1px solid rgba(51,65,85,.9); background: rgba(15,23,42,.9); border-radius: 14px; padding: 12px; }
+  .panel h4 { margin: 0 0 8px; font-size: 10px; }
+  .line { height: 7px; border-radius: 999px; background: #1E293B; margin: 7px 0; overflow: hidden; }
+  .line i { display: block; height: 100%; background: #1566F0; }
+  .badge-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .tiny-badge { font-size: 7px; border-radius: 999px; padding: 4px 7px; background: rgba(21,102,240,.16); color: #BFDBFE; border: 1px solid rgba(59,130,246,.3); }
+  .pdf-footer { position: absolute; left: 18px; right: 18px; bottom: 16px; padding-top: 9px; border-top: 1px solid rgba(148,163,184,.2); color: #64748B; font-size: 8px; display: flex; justify-content: space-between; }
+  .pdf-card .card-body { padding: 16px; }
+  .pdf-card h3 { margin: 0 0 7px; color: white; }
+  .pdf-card p { color: #94A3B8; font-size: 13px; line-height: 1.5; }
+  .recommendation { border-left: 3px solid #22C55E; padding-left: 10px; margin-top: 12px; color: #CBD5E1; font-size: 9px; line-height: 1.4; }
+  @media (max-width: 1000px) { .pdf-options { grid-template-columns: 1fr; } }
+</style>
+
+<div class="pdf-board">
+  <div>
+    <h2>Quelle direction pour le PDF premium Webisafe ?</h2>
+    <p class="subtitle">Clique une option si tu veux. Mon choix recommandé est C : plus premium, plus structuré, sans réintroduire les éléments lourds qui faisaient buguer le PDF.</p>
+  </div>
+
+  <div class="pdf-options">
+    <div class="pdf-card" data-choice="a" onclick="toggleSelect(this)">
+      <div class="pdf-preview">
+        <div class="pdf-top"><div class="logo"><span></span>WEBISAFE</div><div>Résumé exécutif</div></div>
+        <div class="pdf-body">
+          <div class="kicker">Audit premium</div>
+          <div class="title">Vision claire<br>du risque</div>
+          <div class="sub">Grande couverture, score fort, blocs courts, lecture très simple.</div>
+          <div class="score"><strong>65</strong><span>/100 · BON</span></div>
+          <div class="pill-row"><div class="pill"><b>94</b><small>Sécurité</small></div><div class="pill"><b>67</b><small>Perf</small></div></div>
+          <div class="panel"><h4>Synthèse</h4><div class="line"><i style="width:65%"></i></div><div class="line"><i style="width:82%"></i></div></div>
+        </div>
+        <div class="pdf-footer"><span>Confidentiel</span><span>webisafe</span></div>
+      </div>
+      <div class="card-body"><h3>A · Executive clean</h3><p>Très lisible, corporate, moins spectaculaire. Idéal si tu veux un rapport simple et sérieux.</p></div>
+    </div>
+
+    <div class="pdf-card" data-choice="b" onclick="toggleSelect(this)">
+      <div class="pdf-preview">
+        <div class="pdf-top"><div class="logo"><span></span>WEBISAFE</div><div>Section 01</div></div>
+        <div class="pdf-body">
+          <div class="kicker">Performance</div>
+          <div class="title">Diagnostic<br>structuré</div>
+          <div class="sub">Chaque section est organisée en score, preuves, risques et actions.</div>
+          <div class="panel"><h4>Score performance</h4><div class="score"><strong style="font-size:32px;color:#F97316">67</strong><span>/100</span></div><div class="line"><i style="width:67%;background:#F97316"></i></div></div>
+          <div class="panel"><h4>Optimisations</h4><div class="badge-strip"><span class="tiny-badge">Cache</span><span class="tiny-badge">JS</span><span class="tiny-badge">Images</span></div></div>
+        </div>
+        <div class="pdf-footer"><span>Confidentiel</span><span>webisafe</span></div>
+      </div>
+      <div class="card-body"><h3>B · Technical report</h3><p>Très structuré et audit-friendly. Plus technique, mais un peu moins “waouh”.</p></div>
+    </div>
+
+    <div class="pdf-card" data-choice="c" onclick="toggleSelect(this)">
+      <div class="pdf-preview">
+        <div class="pdf-top"><div class="logo"><span></span>WEBISAFE</div><div>Plan d'action</div></div>
+        <div class="pdf-body">
+          <div class="kicker">Audit Webisafe Premium</div>
+          <div class="title">Rapport<br>stunning pro</div>
+          <div class="sub">Hero premium, cartes hiérarchisées, statuts clairs, meilleure respiration visuelle.</div>
+          <div class="score"><strong>65</strong><span>/100 · BON</span></div>
+          <div class="pill-row"><div class="pill"><b style="color:#22C55E">OK</b><small>Conforme</small></div><div class="pill"><b style="color:#F97316">À corriger</b><small>Priorité</small></div></div>
+          <div class="recommendation">→ Structure recommandée : score, constats, preuve, impact business, action suivante.</div>
+        </div>
+        <div class="pdf-footer"><span>webisafe.vercel.app</span><span>Confidentiel</span></div>
+      </div>
+      <div class="card-body"><h3>C · Premium stunning</h3><p>Le meilleur équilibre : visuel premium, sérieux, moderne, mais toujours léger et fluide.</p></div>
+    </div>
+  </div>
+</div>

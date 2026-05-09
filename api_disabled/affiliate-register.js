@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   }
   if (error) return res.status(500).json({ error: 'Erreur serveur' })
 
-  const affiliateLink = `https://webisafe.ci/?ref=${refCode}`
+  const affiliateLink = `https://webisafe.vercel.app/?ref=${refCode}`
 
   // Email de confirmation avec le lien unique
   await sendResendEmail({
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       <p>Votre code : <strong>${escapeHtml(refCode)}</strong></p>
       <p>Commission : <strong>20% sur chaque vente</strong> générée via votre lien.</p>
       <p>Suivez vos stats en temps réel : 
-        <a href="https://webisafe.ci/affiliate/dashboard?code=${encodeURIComponent(refCode)}">
+        <a href="https://webisafe.vercel.app/affiliate/dashboard?code=${encodeURIComponent(refCode)}">
           Votre tableau de bord
         </a>
       </p>

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient.js';
 
 const AUTH_KEY = 'webisafe_auth';
 const AUTH_EVENT = 'webisafe-auth-change';
+const SHOULD_PERSIST_AUTH = !import.meta.env.DEV;
 
 let authUser = null;
 let authLoaded = false;
@@ -27,6 +28,10 @@ function normalizeEmail(email) {
 
 function readStoredAuth() {
   if (!isBrowser()) return null;
+  if (!SHOULD_PERSIST_AUTH) {
+    clearBrowserAuthStorage();
+    return null;
+  }
 
   const stored = localStorage.getItem(AUTH_KEY);
   if (!stored) return null;
@@ -70,7 +75,7 @@ function setGlobalUser(user) {
   authLoaded = true;
 
   if (isBrowser()) {
-    if (authUser) {
+    if (authUser && SHOULD_PERSIST_AUTH) {
       localStorage.setItem(AUTH_KEY, JSON.stringify(authUser));
     } else {
       localStorage.removeItem(AUTH_KEY);
@@ -205,7 +210,7 @@ export function useAuth() {
 
     const { data: subscriptionData } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        const profile = await getProfile(session.user.email);
+        const profile = await getProfile(session.access_token);
         setGlobalUser(buildSafeUserFromAuthUser(session.user, profile));
       } else {
         setGlobalUser(null);

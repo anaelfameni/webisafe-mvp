@@ -144,8 +144,8 @@ VITE_CLARITY_PROJECT_ID=your-clarity-project-id
 GA_MEASUREMENT_ID=your-ga-measurement-id
 
 # Contact (Optionnel)
-CONTACT_ADMIN_EMAIL=admin@webisafe.ci
-CONTACT_FROM_EMAIL=noreply@webisafe.ci
+CONTACT_ADMIN_EMAIL=webisafe@gmail.com
+CONTACT_FROM_EMAIL=webisafe@gmail.com
 
 # UptimeRobot (Optionnel)
 UPTIMEROBOT_API_KEY=your-uptimerobot-api-key
@@ -354,6 +354,6 @@ Ce projet est sous licence propriétaire. Contactez l'équipe Webisafe pour plus
 
 ## 📞 Support
 
-- Email : support@webisafe.ci
+- Email : webisafe@gmail.com
 - Site : https://webisafe.vercel.app
 - WhatsApp : +225 01 70 90 77 80

@@ -31,7 +31,7 @@ export default async function handler(req, res) {
           <h2 style="font-size:16px;margin:16px 0 8px">Priorités</h2>
           <ul style="padding-left:20px">${issues.map(i => `<li>${escapeHtml(i.title)}</li>`).join('')}</ul>
           <div style="text-align:center;margin:20px 0">
-            <a href="https://webisafe.ci/tarifs" style="background:#1566f0;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none">Voir l'offre Audit+Fix</a>
+            <a href="https://webisafe.vercel.app/tarifs" style="background:#1566f0;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none">Voir l'offre Audit+Fix</a>
           </div>
         </div>
       </div>`

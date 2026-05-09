@@ -19,7 +19,7 @@ function PaymentStep({ icon, text }) {
 export default function Payment({ user }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { getScan, markAsPaid } = useScans();
+  const { getScan, markAsPaid, saveScan } = useScans();
 
   const scanId = searchParams.get('scan_id') || '';
   const urlToAudit = normalizeURL(searchParams.get('url') || '');
@@ -219,7 +219,15 @@ export default function Payment({ user }) {
                   console.warn('[admin bypass] unlockScanAsAdmin a échoué:', error);
                 }
                 markAsPaid(scanId);
-                navigate(`/rapport/${scanId}`, { state: { adminBypass: true } });
+                const adminScan = {
+                  ...(scan || {}),
+                  id: scanId,
+                  url: scan?.url || urlToAudit,
+                  paid: true,
+                  user_email: scan?.user_email || scan?.email || user?.email || null,
+                };
+                saveScan(adminScan);
+                navigate(`/rapport/${encodeURIComponent(scanId)}`, { state: { adminBypass: true, adminScan } });
               }}
               className="inline-flex items-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600 px-6 py-3 text-sm font-bold text-white transition"
             >

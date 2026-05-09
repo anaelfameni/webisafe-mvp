@@ -351,12 +351,15 @@ export default function Rapport() {
   const isAdmin = user?.role === 'admin' || location.state?.adminBypass === true;
 
   const [scan, setScan] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [paymentRequest, setPaymentRequest] = useState(null);
   const [activeSection, setActiveSection] = useState('overview');
   const [showFixPitch, setShowFixPitch] = useState(false);
   const [fixPitchDismissed, setFixPitchDismissed] = useState(false);
   const [startingFixFlow, setStartingFixFlow] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [shareTooltip, setShareTooltip] = useState(false);
   const [isRescanning, setIsRescanning] = useState(false);
 
   useEffect(() => {
@@ -365,10 +368,15 @@ export default function Rapport() {
 
     async function bootstrap() {
       setLoading(true);
-      const localScan = getScan(id);
+      const stateScan =
+        location.state?.adminScan && location.state.adminScan.id === id
+          ? location.state.adminScan
+          : null;
+      const localScan = getScan(id) || stateScan;
 
       if (localScan && active) {
         setScan({ ...localScan, paid: Boolean(localScan.paid) });
+        if (stateScan) saveScan(stateScan);
       }
 
       try {

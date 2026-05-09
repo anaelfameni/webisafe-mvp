@@ -101,8 +101,8 @@ export class ErrorBoundary extends Component {
 
             <p className="text-xs text-text-secondary mt-6">
               Si le problème persiste, contactez-nous à{' '}
-              <a href="mailto:support@webisafe.ci" className="text-primary hover:underline">
-                support@webisafe.ci
+              <a href="mailto:webisafe@gmail.com" className="text-primary hover:underline">
+                webisafe@gmail.com
               </a>
             </p>
           </div>
