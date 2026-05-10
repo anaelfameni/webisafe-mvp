@@ -64,6 +64,24 @@ function MetricRow({ label, value, status, hint }) {
   );
 }
 
+function checkStatusToMetricStatus(status) {
+  if (status === 'pass') return 'pass';
+  if (status === 'fail') return 'fail';
+  if (status === 'warning' || status === 'error') return 'warn';
+  return 'unknown';
+}
+
+function checkValue(check, fallback = 'Non mesuré') {
+  if (!check) return fallback;
+  if (check.value !== undefined && check.value !== null && check.value !== '') return String(check.value);
+  if (check.message) return check.message;
+  return fallback;
+}
+
+function findCheck(checks, name) {
+  return Array.isArray(checks) ? checks.find((check) => check?.check_name === name) : null;
+}
+
 // Renvoie une explication brève pour les checks de sécurité avancée
 // selon le nom du check et son statut (pourquoi c'est Indisponible / fail / pass)
 function getCheckHint(checkName, status, check) {
@@ -349,6 +367,7 @@ export default function Rapport() {
   const { getScan, saveScan } = useScans();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || location.state?.adminBypass === true;
+  const isAgencyBypass = location.state?.agencyBypass === true;
 
   const [scan, setScan] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -371,6 +390,8 @@ export default function Rapport() {
       const stateScan =
         location.state?.adminScan && location.state.adminScan.id === id
           ? location.state.adminScan
+          : location.state?.agencyScan && location.state.agencyScan.id === id
+          ? location.state.agencyScan
           : null;
       const localScan = getScan(id) || stateScan;
 
@@ -393,6 +414,7 @@ export default function Rapport() {
 
         const unlocked =
           isAdmin ||
+          isAgencyBypass ||
           Boolean(resolvedScan.paid) ||
           latestPayment?.status === 'validated';
 
@@ -408,11 +430,11 @@ export default function Rapport() {
 
     bootstrap();
     return () => { active = false; };
-  }, [getScan, id, navigate, saveScan, isAdmin]);
+  }, [getScan, id, navigate, saveScan, isAdmin, isAgencyBypass]);
 
   // Polling paiement (source de vérité = serveur)
   useEffect(() => {
-    if (!scan || scan.paid || isAdmin) return undefined;
+    if (!scan || scan.paid || isAdmin || isAgencyBypass) return undefined;
 
     const interval = window.setInterval(async () => {
       try {
@@ -423,6 +445,7 @@ export default function Rapport() {
         if (latestPayment) setPaymentRequest(latestPayment);
         const unlocked =
           isAdmin ||
+          isAgencyBypass ||
           Boolean(remoteScan?.paid) ||
           latestPayment?.status === 'validated';
         if (unlocked && (remoteScan || scan)) {
@@ -433,7 +456,7 @@ export default function Rapport() {
       } catch { /* silencieux */ }
     }, 30000);
     return () => window.clearInterval(interval);
-  }, [id, saveScan, scan, isAdmin]);
+  }, [id, saveScan, scan, isAdmin, isAgencyBypass]);
 
   // ── Rescan ────────────────────────────────────────────────────────────────
   const handleRescan = useCallback(async () => {
@@ -496,7 +519,7 @@ export default function Rapport() {
   }
 
   // Non payé → écran d'attente
-  if (!isAdmin && !scan.paid) {
+  if (!isAdmin && !isAgencyBypass && !scan.paid) {
     return (
       <div className="min-h-screen px-4 pt-24 pb-20">
         <div className="max-w-2xl mx-auto rounded-[28px] border border-primary/20 bg-card-bg p-8 text-center">
@@ -591,6 +614,20 @@ export default function Rapport() {
   const secM = norm?.metrics?.security ?? {};
   const seoM = norm?.metrics?.seo ?? {};
   const uxM = norm?.metrics?.ux ?? {};
+  const seoTechnicalChecks = seoM?.technical_checks ?? {};
+  const aiVisibility = seoM?.ai_visibility ?? null;
+  const seoBusinessRecommendations = Array.isArray(seoM?.business_recommendations) ? seoM.business_recommendations : [];
+  const getExtendedCheck = (name) => findCheck(norm?.extendedChecks, name);
+  const cspQuality = secM?.csp_quality ?? getExtendedCheck('csp_quality')?.data ?? null;
+  const httpMethods = secM?.http_methods ?? getExtendedCheck('http_methods')?.data ?? null;
+  const dnssec = secM?.dnssec ?? getExtendedCheck('dnssec')?.data ?? null;
+  const cmsDetection = secM?.cms_detection ?? getExtendedCheck('tech_and_dependencies')?.data?.cms_detection ?? null;
+  const wordpressSecurity = secM?.wordpress_security ?? getExtendedCheck('wordpress_security')?.data ?? null;
+  const jsLibraries = secM?.js_libraries ?? getExtendedCheck('js_libraries')?.data ?? getExtendedCheck('tech_and_dependencies')?.data?.js_libraries ?? null;
+  const sri = secM?.sri ?? getExtendedCheck('sri')?.data ?? getExtendedCheck('tech_and_dependencies')?.data?.sri ?? null;
+  const complianceBadges = Array.isArray(secM?.compliance_badges)
+    ? secM.compliance_badges
+    : getExtendedCheck('compliance_preparation')?.data?.badges ?? [];
 
   return (
     <div className="min-h-screen pt-24 pb-20 px-4">
@@ -892,6 +929,71 @@ export default function Rapport() {
               status={secM?.https ? 'pass' : 'fail'}
             />
 
+            {(cspQuality || cmsDetection || jsLibraries || sri || dnssec || httpMethods || complianceBadges.length > 0) && (
+              <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/60 p-5">
+                <p className="text-white font-semibold text-sm mb-3">
+                  Signaux sécurité renforcés
+                </p>
+                <MetricRow
+                  label="Qualité CSP"
+                  value={cspQuality ? `${cspQuality.score ?? 0}/100` : 'Non mesuré'}
+                  status={checkStatusToMetricStatus(cspQuality?.status)}
+                  hint={cspQuality?.issues?.length ? `À corriger : ${cspQuality.issues.join(', ')}` : 'Politique de contenu navigateur.'}
+                />
+                <MetricRow
+                  label="Méthodes HTTP sensibles"
+                  value={httpMethods?.risky?.length ? `${httpMethods.risky.length} à vérifier` : httpMethods ? 'Aucune exposée' : 'Non mesuré'}
+                  status={checkStatusToMetricStatus(httpMethods?.status)}
+                  hint="TRACE, PUT, DELETE et PROPFIND doivent rester désactivées sauf besoin explicite."
+                />
+                <MetricRow
+                  label="DNSSEC"
+                  value={dnssec?.ds_records_found != null ? `${dnssec.ds_records_found} DS détecté(s)` : 'Non mesuré'}
+                  status={checkStatusToMetricStatus(dnssec?.status)}
+                  hint={dnssec?.recommendation || 'Protège la résolution DNS contre certaines falsifications.'}
+                />
+                <MetricRow
+                  label="CMS détecté"
+                  value={cmsDetection?.primary || 'Non détecté'}
+                  status={cmsDetection?.primary ? 'pass' : 'unknown'}
+                  hint={cmsDetection?.evidence?.join(' · ')}
+                />
+                <MetricRow
+                  label="Librairies JavaScript"
+                  value={jsLibraries?.outdated_or_risky?.length ? `${jsLibraries.outdated_or_risky.length} à mettre à jour` : jsLibraries?.detected?.length ? `${jsLibraries.detected.length} détectée(s)` : 'Non mesuré'}
+                  status={checkStatusToMetricStatus(jsLibraries?.status)}
+                  hint={jsLibraries?.outdated_or_risky?.map(item => `${item.name}${item.version ? ` ${item.version}` : ''}`).join(', ')}
+                />
+                <MetricRow
+                  label="Subresource Integrity"
+                  value={sri?.external_scripts_count != null ? `${sri.missing_integrity_count ?? 0}/${sri.external_scripts_count} sans integrity` : 'Non mesuré'}
+                  status={checkStatusToMetricStatus(sri?.status)}
+                  hint="SRI limite le risque de compromission via CDN tiers."
+                />
+                <MetricRow
+                  label="WordPress"
+                  value={wordpressSecurity?.applicable === false ? 'Non applicable' : wordpressSecurity?.checks?.length ? `${wordpressSecurity.checks.length} point(s) à vérifier` : 'Non mesuré'}
+                  status={checkStatusToMetricStatus(wordpressSecurity?.status)}
+                  hint="Contrôle wp-login, XML-RPC, API utilisateurs et fichiers publics."
+                />
+                {complianceBadges.length > 0 && (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {complianceBadges.map((badge) => (
+                      <div key={badge.key} className="rounded-xl border border-white/10 bg-card-bg/30 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-white text-xs font-semibold">{badge.label}</p>
+                          <span className={`text-xs ${badge.status === 'pass' ? 'text-green-300' : 'text-yellow-300'}`}>
+                            {badge.status === 'pass' ? 'Prêt' : 'À préparer'}
+                          </span>
+                        </div>
+                        <p className="text-white/45 text-[11px] mt-1">{badge.explanation}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Fichiers sensibles */}
             {norm?.sensitiveFiles?.critical && (
               <div className="mt-6 rounded-2xl border border-red-500/25 bg-red-500/10 p-5">
@@ -1156,6 +1258,77 @@ export default function Rapport() {
               value={seoM?.is_indexable ? 'Oui' : 'Bloqué (noindex)'}
               status={seoM?.is_indexable ? 'pass' : 'fail'}
             />
+
+            {Object.keys(seoTechnicalChecks).length > 0 && (
+              <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/60 p-5">
+                <p className="text-white font-semibold text-sm mb-3">
+                  Contrôles SEO avancés
+                </p>
+                <MetricRow label="Longueur title" value={checkValue(seoTechnicalChecks.title_length)} status={checkStatusToMetricStatus(seoTechnicalChecks.title_length?.status)} hint={seoTechnicalChecks.title_length?.ideal} />
+                <MetricRow label="Longueur meta description" value={checkValue(seoTechnicalChecks.meta_description_length)} status={checkStatusToMetricStatus(seoTechnicalChecks.meta_description_length?.status)} hint={seoTechnicalChecks.meta_description_length?.ideal} />
+                <MetricRow label="H1 unique" value={checkValue(seoTechnicalChecks.h1_unique)} status={checkStatusToMetricStatus(seoTechnicalChecks.h1_unique?.status)} hint={seoTechnicalChecks.h1_unique?.message} />
+                <MetricRow label="Structure H2/H3" value={`H2 ${seoTechnicalChecks.headings_structure?.h2_count ?? seoM?.h2_count ?? 0} · H3 ${seoTechnicalChecks.headings_structure?.h3_count ?? seoM?.h3_count ?? 0}`} status={checkStatusToMetricStatus(seoTechnicalChecks.headings_structure?.status)} hint={seoTechnicalChecks.headings_structure?.message} />
+                <MetricRow label="Images avec alt" value={seoTechnicalChecks.images_alt ? `${seoTechnicalChecks.images_alt.total - seoTechnicalChecks.images_alt.missing_count}/${seoTechnicalChecks.images_alt.total}` : seoM?.images_without_alt != null ? `${seoM.images_without_alt} sans alt` : 'Non mesuré'} status={checkStatusToMetricStatus(seoTechnicalChecks.images_alt?.status)} hint={seoTechnicalChecks.images_alt?.message} />
+                <MetricRow label="Langue HTML" value={checkValue(seoTechnicalChecks.lang_attribute)} status={checkStatusToMetricStatus(seoTechnicalChecks.lang_attribute?.status)} />
+                <MetricRow label="Robots.txt" value={checkValue(seoTechnicalChecks.robots_txt)} status={checkStatusToMetricStatus(seoTechnicalChecks.robots_txt?.status)} hint={seoTechnicalChecks.robots_txt?.message} />
+                <MetricRow label="Sitemap XML" value={checkValue(seoTechnicalChecks.sitemap_xml)} status={checkStatusToMetricStatus(seoTechnicalChecks.sitemap_xml?.status)} hint={seoTechnicalChecks.sitemap_xml?.message} />
+                <MetricRow label="Données structurées" value={seoTechnicalChecks.structured_data?.types?.length ? seoTechnicalChecks.structured_data.types.join(', ') : checkValue(seoTechnicalChecks.structured_data)} status={checkStatusToMetricStatus(seoTechnicalChecks.structured_data?.status)} />
+                <MetricRow label="Twitter Cards" value={checkValue(seoTechnicalChecks.twitter_cards)} status={checkStatusToMetricStatus(seoTechnicalChecks.twitter_cards?.status)} hint={seoTechnicalChecks.twitter_cards?.message} />
+                <MetricRow label="Favicon" value={checkValue(seoTechnicalChecks.favicon)} status={checkStatusToMetricStatus(seoTechnicalChecks.favicon?.status)} />
+              </div>
+            )}
+
+            {aiVisibility?.checks?.length > 0 && (
+              <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/10 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-white font-semibold text-sm">Crédibilité IA & moteurs</p>
+                    <p className="text-white/55 text-xs mt-1">
+                      Signaux qui aident Google, les assistants IA et les prospects à comprendre la marque.
+                    </p>
+                  </div>
+                  <span className="text-primary text-sm font-bold">{aiVisibility.score}/100</span>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {aiVisibility.checks.map((check) => (
+                    <div key={check.key} className="rounded-xl border border-white/10 bg-card-bg/30 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-white text-xs font-semibold">{check.label}</p>
+                        <span className={`text-xs ${check.status === 'pass' ? 'text-green-300' : 'text-yellow-300'}`}>
+                          {check.status === 'pass' ? 'OK' : 'À renforcer'}
+                        </span>
+                      </div>
+                      <p className="text-white/40 text-[11px] mt-1">Signal : {check.evidence}</p>
+                      <p className="text-white/50 text-[11px] mt-1">{check.business_impact}</p>
+                      {check.status !== 'pass' && (
+                        <p className="text-primary/90 text-[11px] mt-2">💡 {check.recommendation}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {seoBusinessRecommendations.length > 0 && (
+              <div className="mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
+                <p className="text-white font-semibold text-sm mb-3">
+                  Recommandations SEO orientées business
+                </p>
+                <div className="space-y-3">
+                  {seoBusinessRecommendations.slice(0, 5).map((item, index) => (
+                    <div key={`${item.problem}-${index}`} className="rounded-xl border border-white/10 bg-card-bg/30 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-white text-sm font-semibold">{item.problem}</p>
+                        <span className="text-primary text-xs font-semibold">{item.priority}</span>
+                      </div>
+                      <p className="text-white/60 text-xs mt-1">Impact : {item.impact_business}</p>
+                      <p className="text-white/45 text-xs mt-2">Correction : {item.correction}</p>
+                      <p className="text-emerald-200/80 text-[11px] mt-2">Effort estimé : {item.effort}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

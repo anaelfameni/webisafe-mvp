@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Loader2, RefreshCw, ShieldAlert, LayoutDashboard, CreditCard,
@@ -12,6 +12,7 @@ import { fetchCorrectionRequests } from '../utils/correctionApi';
 import { mergeAdminScans, readLegacyScans } from '../utils/adminScanHistory';
 import { computePaymentStats, formatFcfa, getRelativeTimeLabel, isPendingPaymentStatus } from '../utils/wavePayment';
 import { supabase } from '../lib/supabaseClient';
+import { getDashboardAccessState } from '../utils/agencyAccess';
 
 function AdminKpiCard({ value, label, tone, icon }) {
   const toneClasses = {
@@ -43,11 +44,10 @@ const ADMIN_NAV = [
   { id: 'settings', label: 'Paramètres', icon: <Settings size={18} /> },
 ];
 
-export default function Admin({ user }) {
+export default function Admin({ user, authLoading = false }) {
   const navigate = useNavigate();
-  const location = useLocation();
-  const justLoggedIn = location.state?.justLoggedIn;
-  const isAuthorized = user?.role === 'admin';
+  const accessState = getDashboardAccessState(user, 'admin', { loading: authLoading });
+  const isAuthorized = accessState.status === 'allowed';
 
   const [payments, setPayments] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
@@ -64,7 +64,10 @@ export default function Admin({ user }) {
   const [activePage, setActivePage] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => { if (!justLoggedIn && !isAuthorized) navigate('/', { replace: true }); }, [justLoggedIn, isAuthorized, navigate]);
+  useEffect(() => {
+    if (accessState.status === 'unauthenticated') navigate('/', { replace: true });
+    if (accessState.status === 'redirect') navigate(accessState.redirectTo, { replace: true });
+  }, [accessState.redirectTo, accessState.status, navigate]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2800); return () => clearTimeout(t); }, [toast]);
 
   async function getAdminHeaders() {
@@ -209,33 +212,46 @@ export default function Admin({ user }) {
     navigate(`/rapport/${encodeURIComponent(scan.id)}`, { state: { adminBypass: true, adminScan } });
   };
 
+  if (accessState.status === 'loading' || accessState.status === 'redirect') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#030712] px-4">
+        <div className="rounded-3xl border border-orange-400/20 bg-slate-950/80 p-8 text-center shadow-[0_30px_120px_rgba(0,0,0,0.45)]">
+          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-orange-400 border-t-transparent" />
+          <p className="mt-4 text-sm font-semibold text-orange-100/70">
+            {accessState.status === 'redirect' ? 'Redirection vers votre espace dédié...' : 'Vérification des droits administrateur...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthorized) return null;
 
   const PAGE_TITLES = { overview: 'Vue d\'ensemble', payments: 'Paiements', subscriptions: 'Abonnements Protect', scans: 'Scans', corrections: 'Demandes de correction', revenue: 'Revenus', alerts: 'Alertes Système', settings: 'Paramètres' };
 
   return (
-    <div className="flex min-h-screen bg-[#0A0F1E]">
+    <div className="flex min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(21,102,240,0.16),transparent_32%),#030712]">
       <ToastMessage toast={toast} />
 
       {/* Mobile overlay */}
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar Admin */}
-      <aside className={`fixed top-0 left-0 h-full w-64 bg-[#060C1A] border-r border-white/10 flex flex-col z-40 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
-        <div className="p-5 border-b border-white/10">
+      <aside className={`fixed top-0 left-0 h-full w-72 bg-[#050816]/96 border-r border-orange-400/20 flex flex-col z-40 transition-transform duration-300 shadow-[18px_0_80px_rgba(0,0,0,0.35)] ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+        <div className="p-5 border-b border-orange-400/20">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center font-bold text-white text-sm">W</div>
+            <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-[0_0_28px_rgba(249,115,22,0.35)]">W</div>
             <span className="text-white font-bold">Webi<span className="text-primary">safe</span></span>
           </div>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/20 text-primary text-xs font-bold uppercase tracking-widest">
-            <ShieldAlert size={10} /> ADMIN
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-orange-500/15 text-orange-300 text-xs font-bold uppercase tracking-widest">
+            <ShieldAlert size={10} /> Command center
           </span>
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {ADMIN_NAV.map(item => (
             <button key={item.id} onClick={() => { setActivePage(item.id); setSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition relative ${activePage === item.id ? 'bg-primary/20 text-primary font-semibold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition relative ${activePage === item.id ? 'bg-orange-500/15 text-orange-200 font-semibold ring-1 ring-orange-400/20' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
               {item.icon} {item.label}
               {item.badge === 'payments' && pendingPayments.length > 0 && (
                 <span className="ml-auto bg-warning text-black text-xs font-bold px-1.5 py-0.5 rounded-full">{pendingPayments.length}</span>
@@ -259,11 +275,12 @@ export default function Admin({ user }) {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 lg:ml-64 flex flex-col">
+      <div className="flex-1 lg:ml-72 flex flex-col">
         {/* Admin Header */}
-        <header className="sticky top-0 z-30 bg-[#060C1A]/90 backdrop-blur-xl border-b border-white/10 px-4 lg:px-8 h-14 flex items-center gap-4">
+        <header className="sticky top-0 z-30 bg-[#030712]/80 backdrop-blur-xl border-b border-orange-400/15 px-4 lg:px-8 h-16 flex items-center gap-4">
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-white/60 hover:text-white"><Menu size={20} /></button>
           <div className="flex-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-300/70">Console administrateur</p>
             <p className="text-white font-semibold text-sm">{PAGE_TITLES[activePage]}</p>
           </div>
           <span className="text-white/40 text-xs hidden sm:block">Rafraîchi à {lastRefreshedAt.toLocaleTimeString('fr-FR')}</span>
@@ -280,6 +297,49 @@ export default function Admin({ user }) {
               {/* PAGE: Vue d'ensemble */}
               {activePage === 'overview' && (
                 <div className="space-y-8">
+                  <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                    <div className="relative overflow-hidden rounded-[36px] border border-orange-400/25 bg-gradient-to-br from-orange-500/18 via-slate-950/80 to-red-500/14 p-8 shadow-[0_30px_120px_rgba(0,0,0,0.34)]">
+                      <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-orange-500/20 blur-3xl" />
+                      <div className="relative">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-orange-200">
+                          <ShieldAlert size={14} /> Supervision plateforme
+                        </span>
+                        <h1 className="mt-5 max-w-4xl text-3xl font-black leading-tight text-white lg:text-5xl">Centre de contrôle Webisafe : paiements, abonnements, audits et incidents en temps réel.</h1>
+                        <p className="mt-4 max-w-2xl text-sm leading-7 text-white/62">Une vue opérateur pour prioriser les validations, sécuriser les livraisons premium et garder la plateforme sous surveillance.</p>
+                        <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                          <button onClick={() => setActivePage('payments')} className="rounded-2xl bg-orange-400 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_30px_rgba(251,146,60,0.35)]">Traiter les paiements</button>
+                          <button onClick={() => setActivePage('alerts')} className="rounded-2xl border border-white/15 bg-white/7 px-5 py-3 text-sm font-bold text-white">Voir les alertes système</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[36px] border border-red-400/20 bg-white/[0.055] p-6">
+                      <div className="mb-5 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-200/55">File opérateur</p>
+                          <h2 className="mt-2 text-2xl font-black text-white">{pendingPayments.length + pendingSubscriptions.length + correctionRequests.filter(c => c.status === 'pending').length} action(s)</h2>
+                        </div>
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-red-400/25 bg-red-500/10 text-red-200"><AlertTriangle size={22} /></div>
+                      </div>
+                      <div className="space-y-3">
+                        {[
+                          ['Paiements à valider', pendingPayments.length, 'text-orange-200'],
+                          ['Abonnements en attente', pendingSubscriptions.length, 'text-blue-200'],
+                          ['Corrections à traiter', correctionRequests.filter(c => c.status === 'pending').length, 'text-red-200'],
+                        ].map(([label, value, color]) => (
+                          <div key={label} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3">
+                            <span className="text-sm text-white/58">{label}</span>
+                            <span className={`text-sm font-black ${color}`}>{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
+                        <p className="flex items-center gap-2 font-black text-emerald-300"><CheckCircle2 size={16} /> Système opérationnel</p>
+                        <p className="mt-2 text-sm leading-6 text-white/52">Dernière synchronisation : {lastRefreshedAt.toLocaleTimeString('fr-FR')}</p>
+                      </div>
+                    </div>
+                  </section>
+
                   <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
                     <AdminKpiCard tone="orange" value={pendingPayments.length} label="Paiements en attente" icon={<CreditCard size={18} />} />
                     <AdminKpiCard tone="green" value={stats.validatedTodayCount} label="Validés aujourd'hui" icon={<CheckCircle2 size={18} />} />
@@ -287,41 +347,59 @@ export default function Admin({ user }) {
                     <AdminKpiCard tone="violet" value={stats.totalDelivered} label="Audits livrés" icon={<Activity size={18} />} />
                   </div>
 
-                  {pendingPayments.length > 0 && (
-                    <div className="bg-warning/10 border border-warning/30 rounded-2xl p-5">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-warning font-bold flex items-center gap-2"><AlertTriangle size={16} /> {pendingPayments.length} paiement(s) en attente</h3>
-                        <button onClick={() => setActivePage('payments')} className="text-warning text-xs hover:underline flex items-center gap-1">Voir tout <ArrowRight size={12} /></button>
+                  <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+                    <div className="rounded-[30px] border border-orange-400/20 bg-white/[0.045] p-6">
+                      <div className="mb-6 flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-2xl font-black text-white">Salle de validation</h3>
+                          <p className="mt-1 text-sm text-white/45">Paiements entrants à contrôler avant livraison premium.</p>
+                        </div>
+                        <button onClick={() => setActivePage('payments')} className="rounded-full border border-orange-400/25 bg-orange-500/10 px-4 py-2 text-xs font-black text-orange-200">Ouvrir</button>
                       </div>
-                      {pendingPayments.slice(0, 2).map(p => (
-                        <div key={p.id} className="flex items-center gap-3 py-2 border-t border-white/10 first:border-0">
-                          <span className="text-primary font-mono text-sm">{p.payment_code}</span>
-                          <span className="text-white/60 text-xs truncate flex-1">{p.url_to_audit}</span>
-                          <span className="text-white/40 text-xs">{getRelativeTimeLabel(p.created_at)}</span>
+                      {pendingPayments.length > 0 ? (
+                        <div className="space-y-3">
+                          {pendingPayments.slice(0, 4).map(p => (
+                            <div key={p.id} className="grid gap-3 rounded-3xl border border-white/10 bg-slate-950/55 p-4 md:grid-cols-[1fr_auto] md:items-center">
+                              <div className="min-w-0">
+                                <p className="font-mono text-sm font-black text-orange-200">{p.payment_code}</p>
+                                <p className="mt-1 truncate text-xs text-white/45">{p.url_to_audit}</p>
+                              </div>
+                              <span className="text-xs font-bold text-white/35">{getRelativeTimeLabel(p.created_at)}</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="rounded-3xl border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
+                          <CheckCircle2 className="mx-auto text-emerald-300" size={28} />
+                          <p className="mt-3 font-black text-white">Aucun paiement en attente</p>
+                          <p className="mt-1 text-sm text-white/45">La file de validation est vide.</p>
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  {/* Activité récente */}
-                  <div className="bg-[#111827] border border-white/10 rounded-2xl p-5">
-                    <h3 className="text-white font-bold mb-4">Activité récente</h3>
-                    <div className="space-y-3">
-                      {payments.slice(0, 8).map((p, i) => (
-                        <div key={i} className="flex items-start gap-3 text-sm">
-                          <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${p.status === 'validated' ? 'bg-success' : p.status === 'rejected' ? 'bg-danger' : 'bg-warning'}`} />
-                          <div className="flex-1 min-w-0">
-                            <span className="text-white/70">
-                              {p.status === 'validated' ? '✅ Audit livré à' : p.status === 'rejected' ? '❌ Paiement rejeté pour' : '⏳ Paiement reçu de'}
-                              {' '}<span className="text-white/50 text-xs">{p.user_email}</span>
-                            </span>
-                          </div>
-                          <span className="text-white/30 text-xs flex-shrink-0">{getRelativeTimeLabel(p.created_at)}</span>
+                    <div className="rounded-[30px] border border-white/10 bg-white/[0.045] p-6">
+                      <div className="mb-6 flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary"><Activity size={20} /></div>
+                        <div>
+                          <h3 className="text-2xl font-black text-white">Journal plateforme</h3>
+                          <p className="text-sm text-white/45">Flux récent des paiements, rejets et livraisons.</p>
                         </div>
-                      ))}
-                      {payments.length === 0 && <p className="text-white/30 text-sm">Aucune activité récente.</p>}
+                      </div>
+                      <div className="space-y-3">
+                        {payments.slice(0, 8).map((p, i) => (
+                          <div key={i} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3 text-sm">
+                            <span className={`mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full ${p.status === 'validated' ? 'bg-success' : p.status === 'rejected' ? 'bg-danger' : 'bg-warning'}`} />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-white/72">{p.status === 'validated' ? 'Audit livré' : p.status === 'rejected' ? 'Paiement rejeté' : 'Paiement reçu'}</p>
+                              <p className="mt-1 truncate text-xs text-white/38">{p.user_email}</p>
+                            </div>
+                            <span className="flex-shrink-0 text-xs text-white/30">{getRelativeTimeLabel(p.created_at)}</span>
+                          </div>
+                        ))}
+                        {payments.length === 0 && <p className="rounded-2xl border border-dashed border-white/15 p-6 text-center text-sm text-white/35">Aucune activité récente.</p>}
+                      </div>
                     </div>
-                  </div>
+                  </section>
                 </div>
               )}
 

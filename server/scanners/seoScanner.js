@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { analyzeSeoSignals, buildSeoBusinessRecommendations } from '../../lib/audit/seoSignals.js';
 import { detectProtectionPage } from '../utils/protectionDetection.js';
 import { getPageSpeedScore } from './pageSpeedScanner.js';
 
@@ -37,6 +38,65 @@ async function fetchPageSpeedSeoScore(url, apiKey) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchProbeText(url, timeoutMs = 3_500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0; +https://webisafe.vercel.app)',
+        'Accept': 'text/plain,text/html,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+    const text = await response.text().catch(() => '');
+    return { ok: response.ok, status: response.status, text, url };
+  } catch (error) {
+    return { ok: false, status: 0, text: '', url, error: error?.name || 'FETCH_ERROR' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function probeSeoResources(pageUrl) {
+  const origin = new URL(pageUrl).origin;
+  const robotsUrl = `${origin}/robots.txt`;
+  const robotsResponse = await fetchProbeText(robotsUrl);
+  const robotsText = robotsResponse.text || '';
+  const sitemapMatch = robotsText.match(/^\s*Sitemap:\s*(\S+)/im);
+  const sitemapCandidates = [sitemapMatch?.[1], `${origin}/sitemap.xml`].filter(Boolean);
+  let sitemap = { status: 'warning', url: null, discovered_from: null };
+
+  for (const candidate of sitemapCandidates) {
+    const sitemapResponse = await fetchProbeText(candidate);
+    if (sitemapResponse.ok && /<urlset|<sitemapindex/i.test(sitemapResponse.text)) {
+      sitemap = {
+        status: 'pass',
+        url: candidate,
+        discovered_from: candidate === sitemapMatch?.[1] ? 'robots' : 'common_path',
+      };
+      break;
+    }
+  }
+
+  const faviconUrl = `${origin}/favicon.ico`;
+  const faviconResponse = await fetchProbeText(faviconUrl);
+
+  return {
+    robots: {
+      status: robotsResponse.ok ? 'pass' : 'warning',
+      url: robotsResponse.ok ? robotsUrl : null,
+      blocking: /disallow:\s*\//i.test(robotsText) && !/allow:\s*\//i.test(robotsText),
+    },
+    sitemap,
+    favicon: {
+      status: faviconResponse.ok ? 'pass' : 'warning',
+      url: faviconResponse.ok ? faviconUrl : null,
+    },
+  };
 }
 
 /**
@@ -142,6 +202,13 @@ export async function scanSEO(url, apiKey, pageSpeedData = null) {
   }
 
   const $ = cheerio.load(html);
+  const seoProbes = await probeSeoResources(url).catch(() => ({
+    robots: { status: 'error', url: null, blocking: null },
+    sitemap: { status: 'error', url: null, discovered_from: null },
+    favicon: { status: 'error', url: null },
+  }));
+  const seoSignals = analyzeSeoSignals($, url, seoProbes);
+  const businessRecommendations = buildSeoBusinessRecommendations(seoSignals);
 
   // ── 1. Title (présence suffit — PageSpeed ne pénalise pas la longueur) ────
   const title = $('title').first().text().trim();
@@ -265,11 +332,23 @@ export async function scanSEO(url, apiKey, pageSpeedData = null) {
     title_length: title.length,
     has_description: hasDescription,
     desc_length: description.length,
+    description_length: description.length,
     h1_count: h1Count,
+    h2_count: seoSignals.technical_checks.headings_structure.h2_count,
+    h3_count: seoSignals.technical_checks.headings_structure.h3_count,
+    images_without_alt: seoSignals.technical_checks.images_alt.missing_count,
+    has_lang: seoSignals.technical_checks.lang_attribute.status === 'pass',
+    has_structured_data: seoSignals.technical_checks.structured_data.status === 'pass',
+    has_twitter_cards: seoSignals.technical_checks.twitter_cards.status === 'pass',
+    has_favicon: seoSignals.technical_checks.favicon.status === 'pass',
     has_viewport: hasViewport,
     has_open_graph: hasOpenGraph,
     has_canonical: hasCanonical,
     is_indexable: isIndexable,
+    has_sitemap: seoSignals.technical_checks.sitemap_xml.status === 'pass',
+    technical_checks: seoSignals.technical_checks,
+    ai_visibility: seoSignals.ai_visibility,
+    business_recommendations: businessRecommendations,
     crawlable_ratio: Math.round(crawlableRatio * 100),
     descriptive_ratio: Math.round(descriptiveRatio * 100),
     partial: pageSpeedScore === null && Boolean(apiKey),

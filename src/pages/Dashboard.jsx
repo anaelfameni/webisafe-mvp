@@ -17,6 +17,7 @@ import { fetchLatestPaymentRequest } from '../utils/paymentApi';
 import { buildValidatedPremiumMap } from '../utils/premiumAccess';
 import { supabase } from '../lib/supabaseClient';
 import { shouldShowDashboardWelcome } from '../utils/dashboardWelcome';
+import { getDashboardAccessState } from '../utils/agencyAccess';
 import ScoreEvolutionChart from '../components/ScoreEvolutionChart';
 import { generatePDF } from '../utils/generatePDF';
 
@@ -85,10 +86,17 @@ function PageOverview({ user, scans, isPaid, validatedPremiumMap, navigate, upti
   const mostRecentValidated = validatedScans.length > 0
     ? scans.find(s => s.id === validatedScans[validatedScans.length - 1])
     : null;
+  const siteLabel = lastScan ? extractDomain(lastScan.url) : 'Aucun site suivi';
+  const userFirstName = (user?.name || user?.email || 'Client').split(' ')[0];
+  const priorityAction = activeAlerts[0]?.title || (lastScan ? 'Relancer un scan après vos prochaines corrections.' : 'Lancer votre premier audit gratuit.');
+  const actionSteps = [
+    { label: '1. Scanner', title: lastScan ? 'Dernier audit disponible' : 'Premier scan à lancer', text: lastScan ? `${siteLabel} analysé le ${formatDate(lastScan.scanDate || lastScan.savedAt)}.` : 'Analysez votre domaine pour obtenir vos scores sécurité, performance, SEO et UX.' },
+    { label: '2. Comprendre', title: score != null ? `Score actuel ${score}/100` : 'Score à découvrir', text: activeAlerts.length > 0 ? `${activeAlerts.length} alerte(s) prioritaire(s) à traiter.` : 'Consultez les recommandations et points forts de votre site.' },
+    { label: '3. Corriger', title: 'Passer à l’action', text: priorityAction },
+  ];
 
   return (
     <div className="space-y-8">
-      {/* Banner scan premium validé */}
       {mostRecentValidated && (
         <motion.div
           initial={{ opacity: 0, y: -16, scale: 0.97 }}
@@ -112,102 +120,141 @@ function PageOverview({ user, scans, isPaid, validatedPremiumMap, navigate, upti
         </motion.div>
       )}
 
-      {/* Hero Score */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-card-bg border border-border-color rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-6">
-        <div className="flex-shrink-0">
-          {score != null ? <ScoreArc score={score} size={150} /> : <div className="w-36 h-20 flex items-center justify-center text-white/30 text-sm">Aucun scan</div>}
-        </div>
-        <div className="flex-1">
-          <p className="text-white/50 text-sm mb-1">Score global — dernier scan</p>
-          {lastScan ? (
-            <>
-              <p className="text-white font-bold text-lg mb-1">{extractDomain(lastScan.url)}</p>
-              <p className="text-white/40 text-xs mb-3">{formatDate(lastScan.scanDate || lastScan.savedAt)}</p>
-              {evolution != null && (
-                <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${evolution >= 0 ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
-                  {evolution >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                  {evolution >= 0 ? '+' : ''}{evolution} pts vs scan précédent
-                </span>
+      <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="relative overflow-hidden rounded-[36px] border border-primary/25 bg-gradient-to-br from-primary/22 via-slate-950/80 to-emerald-400/14 p-7 shadow-[0_30px_120px_rgba(2,6,23,0.32)]">
+          <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+          <div className="relative">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-emerald-200">
+              <User size={14} /> Mon espace personnel
+            </span>
+            <h1 className="mt-5 max-w-3xl text-3xl font-black leading-tight text-white lg:text-5xl">Bonjour {userFirstName}, pilotez la santé de votre site sans jargon technique.</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-white/62">Votre tableau de bord client transforme chaque scan en score, priorités et actions concrètes pour sécuriser, accélérer et améliorer votre présence web.</p>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <Link to="/" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-black text-white shadow-[0_0_26px_rgba(21,102,240,0.35)] transition hover:bg-primary-hover">
+                <Plus size={16} /> Nouveau scan
+              </Link>
+              {lastScan && (
+                <button onClick={() => navigate(`/rapport/${lastScan.id}`)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/7 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/10">
+                  <FileText size={16} /> Ouvrir mon dernier rapport
+                </button>
               )}
-            </>
-          ) : (
-            <p className="text-white/50 text-sm">Lancez votre premier scan pour voir votre score.</p>
-          )}
+            </div>
+          </div>
         </div>
-        <div>
-          <Link to="/" className="inline-flex items-center gap-2 px-5 py-3 bg-primary hover:bg-primary-hover text-white font-semibold rounded-xl transition text-sm">
-            <Plus size={16} /> Nouveau scan
-          </Link>
-        </div>
-      </motion.div>
 
-      {/* KPIs */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-[36px] border border-white/10 bg-white/[0.055] p-6">
+          <div className="flex items-center justify-between gap-5">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-white/38">Score personnel</p>
+              <h2 className="mt-2 text-2xl font-black text-white">{siteLabel}</h2>
+              <p className="mt-2 text-sm text-white/50">{lastScan ? formatDate(lastScan.scanDate || lastScan.savedAt) : 'Aucun scan lancé'}</p>
+            </div>
+            {score != null ? <ScoreArc score={score} size={160} /> : <div className="flex h-28 w-36 items-center justify-center rounded-3xl border border-dashed border-white/15 text-sm text-white/35">Aucun score</div>}
+          </div>
+          {evolution != null && (
+            <div className={`mt-5 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${evolution >= 0 ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+              {evolution >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+              {evolution >= 0 ? '+' : ''}{evolution} pts depuis le scan précédent
+            </div>
+          )}
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+              <p className="text-xs text-white/40">Rapports premium</p>
+              <p className="mt-1 text-2xl font-black text-white">{validatedScans.length}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+              <p className="text-xs text-white/40">Scans réalisés</p>
+              <p className="mt-1 text-2xl font-black text-white">{scans.length}</p>
+            </div>
+          </div>
+        </div>
+      </motion.section>
+
+      <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Sécurité" value={lastScan?.scores?.security != null ? `${lastScan.scores.security}/100` : null} icon={<Shield size={16} />} color="#EF4444" />
         <KpiCard label="Performance" value={lastScan?.scores?.performance != null ? `${lastScan.scores.performance}/100` : null} icon={<Zap size={16} />} color="#3B82F6" />
         <KpiCard label="SEO" value={lastScan?.scores?.seo != null ? `${lastScan.scores.seo}/100` : null} icon={<Search size={16} />} color="#22C55E" />
         <KpiCard label="UX Mobile" value={(lastScan?.scores?.ux_mobile ?? lastScan?.scores?.ux) != null ? `${lastScan.scores.ux_mobile ?? lastScan.scores.ux}/100` : null} icon={<Activity size={16} />} color="#A78BFA" />
-      </motion.div>
+      </motion.section>
 
-      {/* Uptime */}
-      {uptime && (
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-card-bg border border-border-color rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="flex items-center gap-3 flex-1">
-            <span className={`relative flex h-3 w-3 ${uptime.status === 'up' ? 'text-success' : 'text-danger'}`}>
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: uptime.status === 'up' ? '#22C55E' : '#EF4444' }} />
-              <span className="relative inline-flex rounded-full h-3 w-3" style={{ background: uptime.status === 'up' ? '#22C55E' : '#EF4444' }} />
-            </span>
+      <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }} className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-[30px] border border-white/10 bg-white/[0.045] p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-300/25 bg-emerald-300/10 text-emerald-200"><CheckCircle2 size={20} /></div>
             <div>
-              <p className="text-white font-semibold text-sm">Votre site est {uptime.status === 'up' ? 'EN LIGNE' : 'HORS LIGNE'}</p>
-              {uptime.site_url && <p className="text-white/40 text-xs">{uptime.site_url}</p>}
+              <h2 className="text-xl font-black text-white">Plan d’action client</h2>
+              <p className="text-sm text-white/45">Trois étapes simples pour avancer.</p>
             </div>
           </div>
-          {uptime.uptime_ratio != null && (
-            <div className="text-center">
-              <p className="text-white font-bold text-xl">{uptime.uptime_ratio.toFixed(1)}%</p>
-              <p className="text-white/40 text-xs">Uptime 30j</p>
-            </div>
-          )}
-          {uptime.response_time != null && (
-            <div className="text-center">
-              <p className="text-white font-bold text-xl">{uptime.response_time}ms</p>
-              <p className="text-white/40 text-xs">Temps réponse</p>
-            </div>
-          )}
-        </motion.div>
-      )}
+          <div className="space-y-3">
+            {actionSteps.map((step) => (
+              <div key={step.label} className="rounded-2xl border border-white/10 bg-slate-950/55 p-4">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">{step.label}</span>
+                <p className="mt-2 font-black text-white">{step.title}</p>
+                <p className="mt-1 text-sm leading-6 text-white/50">{step.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
 
-      {/* Alertes */}
-      {activeAlerts.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="space-y-2">
-          <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2"><AlertTriangle size={16} className="text-danger" /> Alertes actives</h3>
-          {activeAlerts.slice(0, 3).map((a, i) => (
-            <div key={i} className={`flex items-start gap-3 p-3 rounded-xl border ${a.severity === 'critical' ? 'bg-danger/10 border-danger/30' : 'bg-warning/10 border-warning/30'}`}>
-              <span className="text-sm">{a.severity === 'critical' ? '🔴' : '🟠'}</span>
-              <div>
-                <p className="text-white text-sm font-medium">{a.title}</p>
-                {a.message && <p className="text-white/50 text-xs">{a.message}</p>}
+        <div className="rounded-[30px] border border-white/10 bg-white/[0.045] p-6">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-black text-white">État de votre site</h2>
+              <p className="mt-1 text-sm text-white/45">Alertes, disponibilité et priorités visibles.</p>
+            </div>
+            {uptime && (
+              <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${uptime.status === 'up' ? 'border-success/30 bg-success/10 text-success' : 'border-danger/30 bg-danger/10 text-danger'}`}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: uptime.status === 'up' ? '#22C55E' : '#EF4444' }} />
+                {uptime.status === 'up' ? 'En ligne' : 'Hors ligne'}
+              </span>
+            )}
+          </div>
+          {activeAlerts.length > 0 ? (
+            <div className="space-y-3">
+              {activeAlerts.slice(0, 3).map((a, i) => (
+                <div key={i} className={`flex items-start gap-3 rounded-2xl border p-4 ${a.severity === 'critical' ? 'border-danger/30 bg-danger/10' : 'border-warning/30 bg-warning/10'}`}>
+                  <AlertTriangle size={18} className={a.severity === 'critical' ? 'text-danger' : 'text-warning'} />
+                  <div>
+                    <p className="font-bold text-white">{a.title}</p>
+                    {a.message && <p className="mt-1 text-sm text-white/50">{a.message}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : lastScan ? (
+            <div className="rounded-2xl border border-success/25 bg-success/10 p-4">
+              <p className="flex items-center gap-2 font-bold text-success"><CheckCircle2 size={18} /> Aucune alerte critique active</p>
+              <p className="mt-2 text-sm leading-6 text-white/50">Continuez à suivre vos scores après chaque correction ou mise à jour du site.</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-white/15 bg-slate-950/45 p-6 text-center">
+              <p className="font-bold text-white">Aucun site analysé</p>
+              <p className="mt-2 text-sm text-white/45">Lancez votre premier scan pour afficher vos alertes ici.</p>
+            </div>
+          )}
+          {uptime && (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <p className="text-xs text-white/40">Uptime 30j</p>
+                <p className="mt-1 text-xl font-black text-white">{uptime.uptime_ratio != null ? `${uptime.uptime_ratio.toFixed(1)}%` : '—'}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <p className="text-xs text-white/40">Temps réponse</p>
+                <p className="mt-1 text-xl font-black text-white">{uptime.response_time != null ? `${uptime.response_time}ms` : '—'}</p>
               </div>
             </div>
-          ))}
-        </motion.div>
-      )}
-      {activeAlerts.length === 0 && lastScan && (
-        <div className="flex items-center gap-3 p-4 bg-success/10 border border-success/30 rounded-2xl">
-          <CheckCircle2 size={20} className="text-success" />
-          <p className="text-success font-medium text-sm">✅ Aucune alerte active — Votre site est sain</p>
+          )}
         </div>
-      )}
+      </motion.section>
 
-      {/* Graphique évolution */}
       {historyData.length > 1 && (
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-card-bg border border-border-color rounded-2xl p-5">
-          <h3 className="text-white font-bold mb-4 flex items-center gap-2"><TrendingUp size={16} className="text-primary" /> Évolution des scores (6 derniers scans)</h3>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="rounded-[30px] border border-white/10 bg-white/[0.045] p-6">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-white"><TrendingUp size={18} className="text-primary" /> Progression de votre site</h3>
           <ScoreEvolutionChart history={historyData} onPointClick={d => { if (d?.id) navigate(`/rapport/${d.id}`); }} />
         </motion.div>
       )}
 
-      {/* Actions rapides */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {lastScan && isPaid(lastScan.id) && (
           <button onClick={() => generatePDF(lastScan)} className="flex items-center gap-3 p-4 bg-card-bg border border-border-color rounded-2xl hover:border-primary/50 transition text-left">
@@ -703,7 +750,7 @@ const NAV_ITEMS = [
 ];
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
-export default function Dashboard({ user }) {
+export default function Dashboard({ user, authLoading = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { scans, deleteScan, isPaid, markAsPaid } = useScans();
@@ -712,8 +759,13 @@ export default function Dashboard({ user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uptime, setUptime] = useState(null);
   const [showWelcomePopup, setShowWelcomePopup] = useState(() => shouldShowDashboardWelcome(location.state));
+  const accessState = getDashboardAccessState(user, 'client', { loading: authLoading });
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'auto' }); }, []);
+
+  useEffect(() => {
+    if (accessState.status === 'redirect') navigate(accessState.redirectTo, { replace: true });
+  }, [accessState.redirectTo, accessState.status, navigate]);
 
   useEffect(() => {
     if (!shouldShowDashboardWelcome(location.state)) return;
@@ -752,7 +804,18 @@ export default function Dashboard({ user }) {
 
   const PAGE_TITLES = { overview: 'Vue d\'ensemble', reports: 'Rapports', security: 'Sécurité', performance: 'Performance', history: 'Historique', subscription: 'Mon Abonnement', settings: 'Paramètres' };
 
-  if (!user) {
+  if (accessState.status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-dark-navy px-4">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white/60 text-sm">Chargement sécurisé de votre espace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (accessState.status === 'unauthenticated') {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 pt-20">
         <div className="text-center">
@@ -764,10 +827,21 @@ export default function Dashboard({ user }) {
     );
   }
 
+  if (accessState.status === 'redirect') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-dark-navy px-4">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white/60 text-sm">Redirection vers votre espace dédié...</p>
+        </div>
+      </div>
+    );
+  }
+
   const lastScan = scans[0];
 
   return (
-    <div className="flex min-h-screen bg-dark-navy">
+    <div className="flex min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(21,102,240,0.16),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.14),transparent_30%),#07111F]">
       {/* Welcome popup */}
       <AnimatePresence>
         {showWelcomePopup && (
@@ -793,12 +867,15 @@ export default function Dashboard({ user }) {
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-full w-64 bg-[#0A0F1E] border-r border-border-color flex flex-col z-40 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+      <aside className={`fixed top-0 left-0 h-full w-64 bg-[#08111F]/96 border-r border-primary/20 flex flex-col z-40 transition-transform duration-300 shadow-[18px_0_80px_rgba(2,6,23,0.28)] ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         {/* Logo */}
-        <div className="p-5 border-b border-border-color">
+        <div className="p-5 border-b border-primary/20">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center font-bold text-white text-sm">W</div>
-            <span className="text-white font-bold">Webi<span className="text-primary">safe</span></span>
+            <div className="w-9 h-9 bg-gradient-to-br from-primary to-emerald-400 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-[0_0_28px_rgba(21,102,240,0.35)]">W</div>
+            <div>
+              <span className="block text-white font-bold leading-tight">Webi<span className="text-primary">safe</span></span>
+              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300/80">Client space</span>
+            </div>
           </div>
         </div>
 
@@ -806,7 +883,7 @@ export default function Dashboard({ user }) {
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {NAV_ITEMS.map(item => (
             <button key={item.id} onClick={() => { setActivePage(item.id); setSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition ${activePage === item.id ? 'bg-primary/20 text-primary font-semibold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition ${activePage === item.id ? 'bg-primary/18 text-blue-100 font-semibold ring-1 ring-primary/20' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
               {item.icon} {item.label}
             </button>
           ))}
@@ -818,7 +895,7 @@ export default function Dashboard({ user }) {
         </nav>
 
         {/* User */}
-        <div className="p-4 border-t border-border-color">
+        <div className="p-4 border-t border-primary/20">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0">
               <User size={16} className="text-primary" />
@@ -837,11 +914,12 @@ export default function Dashboard({ user }) {
       {/* Main content */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-[#0A0F1E]/90 backdrop-blur-xl border-b border-border-color px-4 lg:px-8 h-14 flex items-center gap-4">
+        <header className="sticky top-0 z-30 bg-[#07111F]/82 backdrop-blur-xl border-b border-primary/15 px-4 lg:px-8 h-16 flex items-center gap-4">
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-white/60 hover:text-white">
             <Menu size={20} />
           </button>
           <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300/70">Espace client personnel</p>
             <p className="text-white font-semibold text-sm">{PAGE_TITLES[activePage]}</p>
           </div>
           {lastScan && uptime && (

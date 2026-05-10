@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
+import { getPostLoginPath } from '../utils/agencyAccess.js';
 
 const AUTH_KEY = 'webisafe_auth';
 const AUTH_EVENT = 'webisafe-auth-change';
@@ -119,18 +120,20 @@ function buildSafeUserFromAuthUser(user, profile = null) {
   if (!user) return null;
 
   const metadata = user.user_metadata || {};
+  const email = normalizeEmail(user.email);
+  const fallbackRole = email === 'admin@test.com' ? 'admin' : email === 'agence@test.com' ? 'agence' : 'user';
 
   return {
     id: user.id,
     name: profile?.name || metadata.name || metadata.full_name || user.email,
-    email: normalizeEmail(user.email),
+    email,
     phone: profile?.phone || metadata.phone || '',
     phoneCountry: profile?.phone_country || metadata.phoneCountry || metadata.phone_country || '',
     createdAt: user.created_at,
     plan: profile?.plan || 'free',
     scansToday: profile?.scans_today || 0,
     lastScanDate: profile?.last_scan_date || null,
-    role: profile?.role || (normalizeEmail(user.email) === 'admin@test.com' ? 'admin' : 'user'),
+    role: profile?.role || fallbackRole,
   };
 }
 
@@ -185,7 +188,7 @@ export function useAuth() {
   useEffect(() => {
     ensureAuthLoaded();
     setUser(authUser);
-    setLoading(false);
+    setLoading(true);
 
     loadSupabaseSession().finally(() => setLoading(false));
 
@@ -306,7 +309,7 @@ export function useAuth() {
     return {
       success: true,
       user: safeUser,
-      redirectTo: safeUser.role === 'admin' ? '/admin' : '/dashboard',
+      redirectTo: getPostLoginPath(safeUser),
     };
   };
 

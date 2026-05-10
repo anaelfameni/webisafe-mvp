@@ -4,6 +4,7 @@ import { CheckCircle2, Copy, Loader2, ShieldCheck, Smartphone } from 'lucide-rea
 import ToastMessage from '../components/ToastMessage';
 import { useScans } from '../hooks/useScans';
 import { fetchLatestPaymentRequest, reportPayment, unlockScanAsAdmin } from '../utils/paymentApi';
+import { canUseAgencyBypass } from '../utils/agencyAccess';
 import { isValidEmail, normalizeURL } from '../utils/validators';
 import { WAVE_PAYMENT_AMOUNT, WAVE_PAYMENT_TOTAL, WAVE_PHONE_DISPLAY, formatFcfa, generateWavePaymentCode, getWaveBusinessLink } from '../utils/wavePayment';
 
@@ -233,6 +234,31 @@ export default function Payment({ user }) {
             >
               <ShieldCheck size={16} />
               Voir l'audit premium (Admin)
+            </button>
+          </div>
+        )}
+
+        {canUseAgencyBypass(user, scanId) && (
+          <div className="mb-6 rounded-2xl border-2 border-cyan-500/40 bg-cyan-500/10 p-5 text-center">
+            <p className="text-xs uppercase tracking-widest text-cyan-300 font-bold mb-2">⚙️ Mode Agence</p>
+            <p className="text-sm text-white/70 mb-4">Accédez directement à l'audit premium sans paiement.</p>
+            <button
+              onClick={() => {
+                markAsPaid(scanId);
+                const agencyScan = {
+                  ...(scan || {}),
+                  id: scanId,
+                  url: scan?.url || urlToAudit,
+                  paid: true,
+                  user_email: scan?.user_email || scan?.email || user?.email || null,
+                };
+                saveScan(agencyScan);
+                navigate(`/rapport/${encodeURIComponent(scanId)}`, { state: { agencyBypass: true, agencyScan } });
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 px-6 py-3 text-sm font-bold text-white transition"
+            >
+              <ShieldCheck size={16} />
+              Voir l'audit premium (Agence)
             </button>
           </div>
         )}

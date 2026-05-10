@@ -10,6 +10,7 @@ const Analyse = lazy(() => import('./pages/Analyse'));
 const Rapport = lazy(() => import('./pages/Rapport'));
 const Payment = lazy(() => import('./pages/Payment'));
 const Admin = lazy(() => import('./pages/Admin'));
+const Agence = lazy(() => import('./pages/AgenceDashboard'));
 const Tarifs = lazy(() => import('./pages/Tarifs'));
 const Statistiques = lazy(() => import('./pages/Statistiques'));
 const Contact = lazy(() => import('./pages/Contact'));
@@ -36,10 +37,10 @@ function PageLoader() {
   );
 }
 
-function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, handleAuth }) {
+function AppShell({ user, authLoading, logout, showAuth, setShowAuth, authMode, setAuthMode, handleAuth }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const isFullscreenRoute = location.pathname === '/admin' || location.pathname === '/dashboard';
+  const isFullscreenRoute = location.pathname === '/admin' || location.pathname === '/dashboard' || location.pathname === '/agence';
 
   const handleAuthAndRedirect = async (mode, data) => {
     const result = await handleAuth(mode, data);
@@ -109,12 +110,13 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
             />
             <Route path="/analyse" element={<Analyse />} />
             <Route path="/payment" element={<Payment user={user} />} />
-            <Route path="/admin" element={<Admin user={user} />} />
+            <Route path="/admin" element={<Admin user={user} authLoading={authLoading} />} />
+            <Route path="/agence" element={<Agence user={user} authLoading={authLoading} />} />
             <Route path="/rapport/:id" element={<Rapport />} />
             <Route path="/tarifs" element={<Tarifs />} />
             <Route path="/statistiques" element={<Statistiques />} />
             <Route path="/contact" element={<Contact />} />
-            <Route path="/dashboard" element={<Dashboard user={user} />} />
+            <Route path="/dashboard" element={<Dashboard user={user} authLoading={authLoading} />} />
             <Route path="/partenaire" element={<Partenaire user={user} />} />
             <Route path="/partenaire/confirmation" element={<PartenaireConfirmation user={user} />} />
             <Route path="/affiliate/dashboard" element={<AffiliateDashboard />} />
@@ -161,7 +163,7 @@ function AppShell({ user, logout, showAuth, setShowAuth, authMode, setAuthMode, 
 }
 
 function App() {
-  const { user, login, signup, logout } = useAuth();
+  const { user, loading, login, signup, logout } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('login');
 
@@ -184,6 +186,7 @@ function App() {
     <Router>
       <AppShell
         user={user}
+        authLoading={loading}
         logout={handleLogout}
         showAuth={showAuth}
         setShowAuth={setShowAuth}

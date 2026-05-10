@@ -1,4 +1,7 @@
 import { createHash, randomUUID } from 'crypto';
+import * as cheerio from 'cheerio';
+import { analyzeCspQuality, analyzeSri, buildComplianceBadges, detectCms, detectJsLibraries } from '../../lib/audit/securitySignals.js';
+import { checkDnssec, checkHttpMethods, scanWordPressSecurity } from './securityProbes.js';
 
 const VT_BASE = 'https://www.virustotal.com/api/v3/urls';
 const OBSERVATORY_BASE = 'https://http-observatory.security.mozilla.org/api/v1';
@@ -298,6 +301,21 @@ export async function scanSensitiveFiles(url) {
   };
 }
 
+async function fetchSecurityHtml(url) {
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5_000),
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
+    });
+    if (!response.ok) return { html: '', headers: null, finalUrl: url };
+    return { html: await response.text(), headers: response.headers, finalUrl: response.url || url };
+  } catch {
+    return { html: '', headers: null, finalUrl: url };
+  }
+}
+
 // ── 5) SSL Labs ───────────────────────────────────────────────────────────────
 export async function fetchSSLGrade(domain) {
   try {
@@ -434,6 +452,25 @@ export async function scanSecurity(url, vtApiKey) {
 
   const finalScore = Math.max(0, baseScore - (sensitiveData.score_penalty ?? 0));
 
+  const securityHtml = await fetchSecurityHtml(headersData.finalUrl ?? url);
+  const $security = cheerio.load(securityHtml.html || '');
+  const cspQuality = analyzeCspQuality(securityHtml.headers?.get?.('content-security-policy') || '');
+  const cmsDetection = detectCms($security, securityHtml.html || '', { headers: securityHtml.headers });
+  const jsLibraries = detectJsLibraries($security, securityHtml.html || '');
+  const sri = analyzeSri($security, securityHtml.finalUrl || headersData.finalUrl || url);
+  const [httpMethods, dnssec, wordpressSecurity] = await Promise.all([
+    checkHttpMethods(headersData.finalUrl ?? url),
+    checkDnssec(domain),
+    scanWordPressSecurity(securityHtml.finalUrl || headersData.finalUrl || url, securityHtml.html || '', cmsDetection),
+  ]);
+  const complianceBadges = buildComplianceBadges({
+    https: isHttps,
+    csp_quality: cspQuality,
+    dnssec,
+    sri,
+    malware_detected: malwareDetected,
+  });
+
   return {
     score: finalScore,
     malware_detected: malwareDetected,
@@ -447,6 +484,14 @@ export async function scanSecurity(url, vtApiKey) {
     security_grade: headersData.grade,
     ssl_details: sslData,
     sensitive_files: sensitiveData,
+    csp_quality: cspQuality,
+    http_methods: httpMethods,
+    dnssec,
+    cms_detection: cmsDetection,
+    wordpress_security: wordpressSecurity,
+    js_libraries: jsLibraries,
+    sri,
+    compliance_badges: complianceBadges,
     headers_missing_count: headersData.headers_manquants?.length ?? 0,
     failles_owasp_count: sensitiveData.exposed_files?.length ?? 0,
     partial: observatoryScore === null && headersData.header_score === null,

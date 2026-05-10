@@ -6,6 +6,19 @@ import { createClient } from '@supabase/supabase-js';
 import { runAdvancedSecurityChecks } from '../scanners/security-checks.js';
 import { runExtendedSecurityChecks } from '../scanners/extended-security-checks.js';
 import { setCorsHeaders, checkRateLimit } from '../api_shared/_utils.js';
+import { analyzeSeoSignals, buildSeoBusinessRecommendations } from '../lib/audit/seoSignals.js';
+import {
+    analyzeCspQuality,
+    analyzeSri,
+    buildComplianceBadges,
+    detectCms,
+    detectJsLibraries,
+} from '../lib/audit/securitySignals.js';
+import {
+    checkDnssec,
+    checkHttpMethods,
+    scanWordPressSecurity,
+} from '../server/scanners/securityProbes.js';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -579,6 +592,85 @@ async function saveScanAnalytics(domain, countryCode, scores, cms, hosting, sslV
     } catch (e) { console.warn('[ANALYTICS] insert error:', e.message); }
 }
 
+// ── Helpers scan enrichis (SEO probes + HTML sécurité) ────────────────────────
+async function fetchProbeText(url, timeoutMs = 3_500) {
+    try {
+        const response = await fetch(url, {
+            signal: AbortSignal.timeout(timeoutMs),
+            redirect: 'follow',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)',
+                'Accept': 'text/plain,text/html,application/xml;q=0.9,*/*;q=0.8',
+            },
+        });
+        const text = await response.text().catch(() => '');
+        return { ok: response.ok, status: response.status, text, url };
+    } catch (error) {
+        return { ok: false, status: 0, text: '', url, error: error?.name || 'FETCH_ERROR' };
+    }
+}
+
+async function probeSeoResources(pageUrl) {
+    let origin;
+    try { origin = new URL(pageUrl).origin; } catch {
+        return {
+            robots: { status: 'error', url: null, blocking: null },
+            sitemap: { status: 'error', url: null, discovered_from: null },
+            favicon: { status: 'error', url: null },
+        };
+    }
+
+    const robotsResponse = await fetchProbeText(`${origin}/robots.txt`);
+    const robotsText = robotsResponse.text || '';
+    const sitemapMatch = robotsText.match(/^\s*Sitemap:\s*(\S+)/im);
+    const sitemapCandidates = [sitemapMatch?.[1], `${origin}/sitemap.xml`].filter(Boolean);
+    let sitemap = { status: 'warning', url: null, discovered_from: null };
+
+    for (const candidate of sitemapCandidates) {
+        const sitemapResponse = await fetchProbeText(candidate);
+        if (sitemapResponse.ok && /<urlset|<sitemapindex/i.test(sitemapResponse.text)) {
+            sitemap = {
+                status: 'pass',
+                url: candidate,
+                discovered_from: candidate === sitemapMatch?.[1] ? 'robots' : 'common_path',
+            };
+            break;
+        }
+    }
+
+    const faviconUrl = `${origin}/favicon.ico`;
+    const faviconResponse = await fetchProbeText(faviconUrl);
+
+    return {
+        robots: {
+            status: robotsResponse.ok ? 'pass' : 'warning',
+            url: robotsResponse.ok ? `${origin}/robots.txt` : null,
+            blocking: /disallow:\s*\//i.test(robotsText) && !/allow:\s*\//i.test(robotsText),
+        },
+        sitemap,
+        favicon: {
+            status: faviconResponse.ok ? 'pass' : 'warning',
+            url: faviconResponse.ok ? faviconUrl : null,
+        },
+    };
+}
+
+async function fetchSecurityHtml(url) {
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5_000),
+            redirect: 'follow',
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
+        });
+        if (!response.ok) return { html: '', headers: null, finalUrl: url };
+        const html = await response.text().catch(() => '');
+        return { html, headers: response.headers, finalUrl: response.url || url };
+    } catch {
+        return { html: '', headers: null, finalUrl: url };
+    }
+}
+
 // ── Sécurité ──────────────────────────────────────────────────────────────────
 const SECURITY_HEADERS = {
     'strict-transport-security': { points: 20, label: 'HSTS' },
@@ -692,6 +784,49 @@ async function scanSecurity(url, vtApiKey) {
     // Faille critique réelle : malware avéré → score sévère
     if (malwareDetected === true) cappedScore = Math.min(cappedScore, 25);
 
+    // ── Signaux avancés (CSP, HTTP methods, DNSSEC, CMS, WordPress, JS, SRI, compliance) ──
+    let cspQuality = null;
+    let httpMethods = null;
+    let dnssec = null;
+    let cmsDetection = null;
+    let wordpressSecurity = null;
+    let jsLibraries = null;
+    let sriSignals = null;
+    let complianceBadges = [];
+
+    try {
+        const securityHtml = await fetchSecurityHtml(finalUrl || url);
+        const $security = cheerio.load(securityHtml.html || '');
+        const cspHeader = securityHtml.headers?.get?.('content-security-policy') || '';
+        cspQuality = analyzeCspQuality(cspHeader);
+        cmsDetection = detectCms($security, securityHtml.html || '', { headers: securityHtml.headers });
+        jsLibraries = detectJsLibraries($security, securityHtml.html || '');
+        sriSignals = analyzeSri($security, securityHtml.finalUrl || finalUrl || url);
+
+        let domain = '';
+        try { domain = new URL(finalUrl || url).hostname; } catch { /* ignore */ }
+
+        const [methodsRes, dnssecRes, wpRes] = await Promise.allSettled([
+            checkHttpMethods(finalUrl || url),
+            domain ? checkDnssec(domain) : Promise.resolve(null),
+            scanWordPressSecurity(securityHtml.finalUrl || finalUrl || url, securityHtml.html || '', cmsDetection),
+        ]);
+
+        httpMethods = methodsRes.status === 'fulfilled' ? methodsRes.value : null;
+        dnssec = dnssecRes.status === 'fulfilled' ? dnssecRes.value : null;
+        wordpressSecurity = wpRes.status === 'fulfilled' ? wpRes.value : null;
+
+        complianceBadges = buildComplianceBadges({
+            https: isHttps,
+            csp_quality: cspQuality,
+            dnssec,
+            sri: sriSignals,
+            malware_detected: malwareDetected,
+        });
+    } catch (err) {
+        console.warn('[SEC] Signaux avancés échec:', err.message);
+    }
+
     return {
         score: cappedScore,
         raw_score: rawScore,
@@ -707,6 +842,14 @@ async function scanSecurity(url, vtApiKey) {
         headers_missing_count: headersMissing.length,
         failles_owasp_count: 0,
         sensitive_files: null,
+        csp_quality: cspQuality,
+        http_methods: httpMethods,
+        dnssec,
+        cms_detection: cmsDetection,
+        wordpress_security: wordpressSecurity,
+        js_libraries: jsLibraries,
+        sri: sriSignals,
+        compliance_badges: complianceBadges,
         partial: false,
     };
 }
@@ -828,6 +971,26 @@ async function scanSEO(url) {
     }
     console.log(`[SEO] raw=${rawScore} failed=[${failedChecks.join(',')}] capped=${cappedScore}`);
 
+    // ── Signaux SEO enrichis + Visibilité IA + recommandations business ─────
+    let seoProbes = null;
+    let seoSignals = null;
+    let businessRecommendations = [];
+    try {
+        seoProbes = await probeSeoResources(url);
+    } catch (err) {
+        console.warn('[SEO] probeSeoResources échec:', err.message);
+    }
+    try {
+        seoSignals = analyzeSeoSignals($, url, seoProbes || {});
+        businessRecommendations = buildSeoBusinessRecommendations(seoSignals);
+    } catch (err) {
+        console.warn('[SEO] analyzeSeoSignals échec:', err.message);
+    }
+
+    const technicalChecks = seoSignals?.technical_checks ?? null;
+    const aiVisibility = seoSignals?.ai_visibility ?? null;
+    const effectiveHasSitemap = hasSitemap || technicalChecks?.sitemap_xml?.status === 'pass';
+
     return {
         score: cappedScore,
         raw_score: rawScore,
@@ -836,13 +999,23 @@ async function scanSEO(url) {
         has_description: description.length > 0,
         description_length: description.length,
         h1_count: h1Count,
+        h2_count: technicalChecks?.headings_structure?.h2_count ?? null,
+        h3_count: technicalChecks?.headings_structure?.h3_count ?? null,
+        images_without_alt: technicalChecks?.images_alt?.missing_count ?? null,
+        has_lang: technicalChecks?.lang_attribute?.status === 'pass',
+        has_structured_data: technicalChecks?.structured_data?.status === 'pass',
+        has_twitter_cards: technicalChecks?.twitter_cards?.status === 'pass',
+        has_favicon: technicalChecks?.favicon?.status === 'pass',
         h1_detected_in_static_html: h1Count > 0,
         spa_detected: isSPA,
         has_viewport: hasViewport,
         has_open_graph: hasOpenGraph,
         has_canonical: hasCanonical,
-        has_sitemap: hasSitemap,
+        has_sitemap: effectiveHasSitemap,
         is_indexable: isIndexable,
+        technical_checks: technicalChecks,
+        ai_visibility: aiVisibility,
+        business_recommendations: businessRecommendations,
         failed_checks: failedChecks,
         partial: false,
         html_snippet: html.slice(0, 5000),

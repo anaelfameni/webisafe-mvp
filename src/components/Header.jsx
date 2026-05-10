@@ -108,11 +108,15 @@ export default function Header({ user: currentUser, onLogout, onAuthClick }) {
             {user ? (
               <>
                 <button
-                  onClick={() => navigate(user?.role === 'admin' ? '/admin' : '/dashboard')}
+                  onClick={() => navigate(
+                    user?.role === 'admin' ? '/admin' :
+                    user?.role === 'agence' ? '/agence' : '/dashboard'
+                  )}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-card-bg border border-border-color hover:border-primary/50 text-xs text-text-primary font-medium transition-all"
                 >
                   <LayoutDashboard size={14} className="text-primary" />
-                  {user?.role === 'admin' ? 'Panel Admin' : 'Tableau de bord'}
+                  {user?.role === 'admin' ? 'Panel Admin' :
+                   user?.role === 'agence' ? 'Console Agence' : 'Tableau de bord'}
                 </button>
                 <button
                   onClick={handleLogout}
@@ -192,11 +196,15 @@ export default function Header({ user: currentUser, onLogout, onAuthClick }) {
                     </div>
                   </div>
                   <button
-                    onClick={() => { navigate(user?.role === 'admin' ? '/admin' : '/dashboard'); setMobileMenuOpen(false); }}
+                    onClick={() => { navigate(
+                      user?.role === 'admin' ? '/admin' :
+                      user?.role === 'agence' ? '/agence' : '/dashboard'
+                    ); setMobileMenuOpen(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 border border-primary/20 text-primary text-sm font-semibold hover:bg-primary/20 transition-all"
                   >
                     <LayoutDashboard size={16} />
-                    {user?.role === 'admin' ? 'Panel Admin' : 'Tableau de bord'}
+                    {user?.role === 'admin' ? 'Panel Admin' :
+                     user?.role === 'agence' ? 'Console Agence' : 'Tableau de bord'}
                   </button>
                   <button
                     onClick={async () => { await handleLogout(); setMobileMenuOpen(false); }}
