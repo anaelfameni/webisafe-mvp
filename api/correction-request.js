@@ -14,6 +14,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'POST') {
+    // H.10 — Rate limit endpoint public : 5 demandes/min/IP
+    const rateLimit = checkRateLimit(req, 5, 60000);
+    if (!rateLimit.allowed) {
+      return json(res, 429, { error: `Trop de tentatives, réessayez dans ${rateLimit.retryAfter}s` });
+    }
+
     let body;
     try { body = await readJsonBody(req); } catch { return json(res, 400, { error: 'Corps invalide' }); }
 

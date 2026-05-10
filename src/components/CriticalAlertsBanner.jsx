@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, AlertOctagon, AlertTriangle, Globe } from 'lucide-react';
 
 const SEVERITY_STYLE = {
   critical: 'bg-red-500/15 border-red-500/40 text-red-300',
@@ -8,10 +8,11 @@ const SEVERITY_STYLE = {
   warning: 'bg-yellow-500/15 border-yellow-500/40 text-yellow-200',
 };
 
+// E.15 — Emojis de sévérité remplacés par Lucide icons
 const SEVERITY_ICON = {
-  critical: '🚨',
-  high: '⚠️',
-  warning: '🌍',
+  critical: AlertOctagon,
+  high: AlertTriangle,
+  warning: Globe,
 };
 
 const SEVERITY_LABEL = {
@@ -34,7 +35,7 @@ export default function CriticalAlertsBanner({ alerts }) {
         {alerts.map((alert, i) => {
           if (dismissed.includes(i)) return null;
           const style = SEVERITY_STYLE[alert.severity] ?? SEVERITY_STYLE.warning;
-          const icon = SEVERITY_ICON[alert.severity] ?? '⚠️';
+          const Icon = SEVERITY_ICON[alert.severity] ?? AlertTriangle;
           const label = SEVERITY_LABEL[alert.severity] ?? 'Avertissement';
 
           return (
@@ -47,9 +48,7 @@ export default function CriticalAlertsBanner({ alerts }) {
               role="alert"
               aria-live="polite"
             >
-              <span className="text-xl flex-shrink-0" aria-hidden="true">
-                {icon}
-              </span>
+              <Icon className="flex-shrink-0" size={20} aria-hidden="true" />
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm">
                   <span className="sr-only">{label} : </span>

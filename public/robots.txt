@@ -1,6 +1,33 @@
+# Webisafe - robots.txt
+# https://www.robotstxt.org/
+
 User-agent: *
 Allow: /
-Disallow: /api/
-Disallow: /dashboard/
 
+# Espaces privés
+Disallow: /api/
+Disallow: /admin
+Disallow: /agence
+Disallow: /dashboard
+Disallow: /payment
+Disallow: /reset-password
+Disallow: /partenaire-confirmation
+Disallow: /affilie
+Disallow: /rapport/
+
+# Pages internes de scan (résultats personnels)
+Disallow: /analyse?
+
+# Crawl-delay pour les bots agressifs
+User-agent: SemrushBot
+Crawl-delay: 10
+
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: MJ12bot
+Disallow: /
+
+# Sitemap
 Sitemap: https://webisafe.vercel.app/sitemap.xml
+

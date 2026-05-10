@@ -1,0 +1,16 @@
+Contact: mailto:webisafe@gmail.com
+Expires: 2027-05-10T00:00:00.000Z
+Preferred-Languages: fr, en
+Canonical: https://webisafe.vercel.app/.well-known/security.txt
+Policy: https://webisafe.vercel.app/confidentialite
+
+# Vous avez identifié une vulnérabilité de sécurité sur Webisafe ?
+# Merci de nous contacter à webisafe@gmail.com avec :
+#  - Description du problème
+#  - Étapes de reproduction
+#  - Impact estimé
+#
+# Nous nous engageons à répondre sous 72h ouvrées.
+# Politique de divulgation responsable : merci de ne pas exploiter
+# la vulnérabilité au-delà de ce qui est strictement nécessaire à la
+# preuve de concept, et de ne pas divulguer publiquement avant correction.

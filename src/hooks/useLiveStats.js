@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react'
 
+// G.3 — Seuil minimum de scans pour afficher le compteur
+// Sous ce seuil, on affiche "En phase de lancement" plutôt qu'un nombre faible
+// qui décrédibilise (ex: "12 sites analysés").
+const MIN_SCANS_FOR_PUBLIC_DISPLAY = 100;
+
 function readLocalScanEvents() {
   try {
     const scans = JSON.parse(localStorage.getItem('webisafe_scans') || '[]')
@@ -25,6 +30,7 @@ export function useLiveStats() {
   const [totalScans, setTotalScans]   = useState(null)
   const [activity, setActivity]       = useState([])
   const [loading, setLoading]         = useState(true)
+  const [isLowVolume, setIsLowVolume] = useState(false)
 
   useEffect(() => {
     // 1. Chargement initial
@@ -45,11 +51,14 @@ export function useLiveStats() {
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
           .slice(0, 10)
 
-        setTotalScans(Math.max(payload?.stats?.total_scans || 0, localActivity.length))
+        const total = Math.max(payload?.stats?.total_scans || 0, localActivity.length)
+        setTotalScans(total)
+        setIsLowVolume(total < MIN_SCANS_FOR_PUBLIC_DISPLAY)
         setActivity(mergedActivity)
       } catch {
         const localActivity = readLocalScanEvents()
         setTotalScans(localActivity.length)
+        setIsLowVolume(localActivity.length < MIN_SCANS_FOR_PUBLIC_DISPLAY)
         setActivity(localActivity)
       } finally {
         setLoading(false)
@@ -67,5 +76,5 @@ export function useLiveStats() {
     }
   }, [])
 
-  return { totalScans, activity, loading }
+  return { totalScans, activity, loading, isLowVolume }
 }

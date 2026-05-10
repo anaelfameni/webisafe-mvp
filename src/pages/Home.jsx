@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useLiveStats } from '../hooks/useLiveStats';
-import { Zap, Shield, Search, Smartphone, ArrowRight, TrendingDown, Eye, Activity, Globe, Radio, Clock } from 'lucide-react';
+import { Zap, Shield, Search, Smartphone, ArrowRight, TrendingDown, Eye, Activity, Globe, Radio, Clock, Snail, ShieldAlert, CheckCircle, FileText, MapPin, Image as ImageIcon, Circle, AlertCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { SUPPORT_PHONE } from '../config/brand';
 import toast from 'react-hot-toast';
 import URLInput from '../components/URLInput';
@@ -80,24 +80,32 @@ export default function Home() {
     navigate(buildFreeScanUrl({ url: normalized, email }));
   };
 
+  // E.2 — Emojis remplacés par Lucide icons
+  // F.6 — Stats sourcées : Google "The Need for Mobile Speed" 2017 (53%) + Kaspersky 2024 (PME africaines)
   const problemCards = [
     {
-      icon: '🐌',
-      title: 'Site Lent',
-      description: 'Un délai de 1 seconde = 7% de conversions perdues. Votre site fait-il fuir vos clients ?',
+      Icon: Snail,
+      iconClass: 'text-warning',
+      title: 'Site lent',
+      description: 'Selon Google, 53 % des visiteurs mobiles abandonnent un site qui met plus de 3 secondes à charger.',
       statLabel: 'Baisse de trafic',
+      source: 'Source : Google « The Need for Mobile Speed »',
     },
     {
-      icon: '🔒',
-      title: 'Faille Sécurité',
-      description: '73% des sites africains ont une vulnérabilité critique non détectée.',
+      Icon: ShieldAlert,
+      iconClass: 'text-danger',
+      title: 'Faille de sécurité',
+      description: 'En 2024, l’ANSSI Côte d’Ivoire a recensé 27 millions de cybermenaces (1 % du PIB numérique).',
       statLabel: 'Risques de perte de données',
+      source: 'Source : ANSSI Côte d’Ivoire 2024 — rapport annuel',
     },
     {
-      icon: '📉',
-      title: 'SEO Invisible',
-      description: 'Si Google ne vous trouve pas, vos clients non plus. Votre site est-il indexé correctement ?',
-      statLabel: 'Perte de clients',
+      Icon: TrendingDown,
+      iconClass: 'text-rose-400',
+      title: 'SEO invisible',
+      description: 'Si Google ne vous trouve pas, vos clients non plus. Plus de 75 % des utilisateurs ne dépassent pas la première page de résultats.',
+      statLabel: 'Perte de clients potentiels',
+      source: 'Source : Forrester Research — étude SEO 2023',
     },
   ];
 
@@ -108,7 +116,7 @@ export default function Home() {
     { icon: <Smartphone size={24} />, title: 'UX Mobile', description: 'Votre site fonctionne-t-il sur téléphone ? 78% de vos visiteurs sont sur mobile.', color: 'text-primary' },
   ];
 
-  const { totalScans, activity, loading: liveLoading } = useLiveStats();
+  const { totalScans, activity, loading: liveLoading, isLowVolume } = useLiveStats();
 
   const faqItems = [
     {
@@ -193,16 +201,27 @@ export default function Home() {
             transition={{ delay: 0.5, duration: 1.2, ease: 'easeOut' }}
             className="flex flex-wrap items-center justify-center gap-3 mb-10"
           >
+            {/* F.6 — Stats sourcées (sources affichées au survol via title) */}
             {[
-              '60% des sites africains +4s de chargement',
-              '73% des sites africains ont une faille securite critique',
-              '53% des visiteurs quittent un site lent',
+              {
+                label: '53 % de visiteurs mobiles partent au-delà de 3 s',
+                source: 'Google — The Need for Mobile Speed (2017, mise à jour 2024)',
+              },
+              {
+                label: '27 M cybermenaces recensées en CI en 2024',
+                source: 'ANSSI Côte d’Ivoire — rapport annuel 2024',
+              },
+              {
+                label: '92 M cybermenaces en Afrique de l’Ouest en 2025',
+                source: 'Kaspersky — rapport cybermenaces 2025',
+              },
             ].map((stat, index) => (
               <span
                 key={index}
-                className="text-xs px-3 py-1.5 bg-danger/10 text-danger/80 rounded-full border border-danger/20"
+                title={stat.source}
+                className="text-xs px-3 py-1.5 bg-danger/10 text-danger/80 rounded-full border border-danger/20 cursor-help"
               >
-                {stat}
+                {stat.label}
               </span>
             ))}
           </motion.div>
@@ -231,24 +250,32 @@ export default function Home() {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {problemCards.map((card, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.2, duration: 1.2, ease: 'easeOut' }}
-                className="bg-card-bg border border-border-color rounded-2xl p-6 card-hover"
-              >
-                <span className="text-4xl mb-4 block">{card.icon}</span>
-                <h3 className="text-xl font-bold text-white mb-2">{card.title}</h3>
-                <p className="text-text-secondary text-sm mb-4 leading-relaxed">{card.description}</p>
-                <div className="flex items-center gap-2 text-danger">
-                  <TrendingDown size={16} />
-                  <span className="text-sm font-medium">{card.statLabel}</span>
-                </div>
-              </motion.div>
-            ))}
+            {problemCards.map((card, index) => {
+              const IconComponent = card.Icon;
+              return (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.2, duration: 1.2, ease: 'easeOut' }}
+                  className="bg-card-bg border border-border-color rounded-2xl p-6 card-hover"
+                >
+                  <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/5 mb-4 ${card.iconClass}`}>
+                    <IconComponent size={24} />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">{card.title}</h3>
+                  <p className="text-text-secondary text-sm mb-3 leading-relaxed">{card.description}</p>
+                  {card.source && (
+                    <p className="text-text-secondary/50 text-[10px] italic mb-3">{card.source}</p>
+                  )}
+                  <div className="flex items-center gap-2 text-danger">
+                    <TrendingDown size={16} />
+                    <span className="text-sm font-medium">{card.statLabel}</span>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -299,7 +326,8 @@ export default function Home() {
           >
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-border-color">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center font-bold text-white text-sm">W</div>
+                {/* C.2 — Logo SVG dans l'aperçu rapport */}
+                <img src="/logo.svg" alt="Webisafe" className="w-8 h-8" loading="lazy" />
                 <div>
                   <p className="text-white font-semibold text-sm">Rapport Webisafe</p>
                   <p className="text-text-secondary text-xs">exemple-site.ci · 19 avril 2025</p>
@@ -318,54 +346,72 @@ export default function Home() {
               </div>
 
               <div className="lg:col-span-4 grid grid-cols-2 gap-4">
+                {/* E.3 — Emojis catégories remplacés par Lucide icons */}
                 {[
-                  { name: '⚡ Performance', score: 68, color: 'bg-warning' },
-                  { name: '🔒 Sécurité', score: 45, color: 'bg-danger' },
-                  { name: '🔍 SEO', score: 82, color: 'bg-success' },
-                  { name: '📱 UX Mobile', score: 71, color: 'bg-primary' },
-                ].map((cat, index) => (
-                  <div key={index}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-text-secondary text-sm">{cat.name}</span>
-                      <span className="text-white font-semibold text-sm">{cat.score}/100</span>
+                  { Icon: Zap, name: 'Performance', score: 68, color: 'bg-warning', iconClass: 'text-warning' },
+                  { Icon: Shield, name: 'Sécurité', score: 45, color: 'bg-danger', iconClass: 'text-danger' },
+                  { Icon: Search, name: 'SEO', score: 82, color: 'bg-success', iconClass: 'text-success' },
+                  { Icon: Smartphone, name: 'UX Mobile', score: 71, color: 'bg-primary', iconClass: 'text-primary' },
+                ].map((cat, index) => {
+                  const CatIcon = cat.Icon;
+                  return (
+                    <div key={index}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="flex items-center gap-1.5 text-text-secondary text-sm">
+                          <CatIcon size={14} className={cat.iconClass} />
+                          {cat.name}
+                        </span>
+                        <span className="text-white font-semibold text-sm">{cat.score}/100</span>
+                      </div>
+                      <div className="h-2 bg-dark-navy rounded-full overflow-hidden">
+                        <div className={`h-full ${cat.color} rounded-full`} style={{ width: `${cat.score}%` }} />
+                      </div>
                     </div>
-                    <div className="h-2 bg-dark-navy rounded-full overflow-hidden">
-                      <div className={`h-full ${cat.color} rounded-full`} style={{ width: `${cat.score}%` }} />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
             <div className="space-y-3">
               <p className="text-white font-semibold text-sm mb-3">Remarques prioritaires :</p>
+              {/* E.3 — Emojis 🟢🟠🔴 remplacés par <Circle> coloré */}
               {[
-                { priority: '🟢', title: 'Texte ok sur mobile' },
-                { priority: '🟢', title: 'Images compressées' },
-                { priority: '🟠', title: 'Meta description absente' },
-                { priority: '🔴', title: 'Headers de sécurité manquants' },
-                { priority: '🔴', title: 'Sitemap.xml non trouvé' },
-              ].map((rec, index) => (
-                <div key={index} className="flex items-center gap-3 p-3 bg-dark-navy rounded-lg">
-                  <span>{rec.priority}</span>
-                  <span className="text-text-primary text-sm">{rec.title}</span>
-                </div>
-              ))}
+                { severity: 'ok', title: 'Texte ok sur mobile' },
+                { severity: 'ok', title: 'Images compressées' },
+                { severity: 'warn', title: 'Meta description absente' },
+                { severity: 'critical', title: 'Headers de sécurité manquants' },
+                { severity: 'critical', title: 'Sitemap.xml non trouvé' },
+              ].map((rec, index) => {
+                const dotColor =
+                  rec.severity === 'ok' ? 'text-success'
+                  : rec.severity === 'warn' ? 'text-warning'
+                  : 'text-danger';
+                return (
+                  <div key={index} className="flex items-center gap-3 p-3 bg-dark-navy rounded-lg">
+                    <Circle size={10} className={`${dotColor} fill-current flex-shrink-0`} />
+                    <span className="text-text-primary text-sm">{rec.title}</span>
+                  </div>
+                );
+              })}
 
               <div className="mt-5 pt-4 border-t border-border-color">
                 <p className="text-white font-semibold text-sm mb-3">Plan de correction :</p>
+                {/* E.3 — Emojis ✅🖼️📝🛡️📍 remplacés par Lucide icons */}
                 {[
-                  { icon: '✅', fix: 'Responsive validé — texte lisible sans zoom' },
-                  { icon: '🖼️', fix: 'Convertir images en WebP/AVIF, lazy-load' },
-                  { icon: '📝', fix: 'Ajouter <meta name="description"> par page' },
-                  { icon: '🛡️', fix: 'Activer HSTS + CSP + X-Frame-Options' },
-                  { icon: '📍', fix: 'Générer sitemap.xml + robots.txt' },
-                ].map((item, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/10 rounded-lg">
-                    <span className="text-sm">{item.icon}</span>
-                    <span className="text-text-primary text-sm">{item.fix}</span>
-                  </div>
-                ))}
+                  { Icon: CheckCircle, iconClass: 'text-success', fix: 'Responsive validé — texte lisible sans zoom' },
+                  { Icon: ImageIcon, iconClass: 'text-primary', fix: 'Convertir images en WebP/AVIF, lazy-load' },
+                  { Icon: FileText, iconClass: 'text-primary', fix: 'Ajouter <meta name="description"> par page' },
+                  { Icon: ShieldCheck, iconClass: 'text-primary', fix: 'Activer HSTS + CSP + X-Frame-Options' },
+                  { Icon: MapPin, iconClass: 'text-primary', fix: 'Générer sitemap.xml + robots.txt' },
+                ].map((item, index) => {
+                  const ItemIcon = item.Icon;
+                  return (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/10 rounded-lg">
+                      <ItemIcon size={16} className={`${item.iconClass} flex-shrink-0`} />
+                      <span className="text-text-primary text-sm">{item.fix}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </motion.div>
@@ -386,9 +432,14 @@ export default function Home() {
               <Radio size={14} className="text-rose-400" />
               <span className="text-rose-400 text-xs font-semibold uppercase tracking-wider">Live</span>
             </div>
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-3">Transparence totale</h2>
+            {/* G.3 — Disclaimer phase de lancement quand peu de scans */}
+            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-3">
+              {isLowVolume ? 'Webisafe en phase de lancement' : 'Transparence totale'}
+            </h2>
             <p className="text-text-secondary max-w-xl mx-auto text-sm">
-              Aucun chiffre inventé. Chaque entrée dans ce feed correspond à une vraie analyse effectuée par un utilisateur réel. Ce que vous voyez, c'est Webisafe au travail.
+              {isLowVolume
+                ? 'Notre plateforme vient de démarrer. Chaque audit visible ci-dessous est réel. Aucun chiffre n’est gonflé : nous préférons être transparents sur notre croissance.'
+                : 'Aucun chiffre inventé. Chaque entrée dans ce feed correspond à une vraie analyse effectuée par un utilisateur réel. Ce que vous voyez, c’est Webisafe au travail.'}
             </p>
           </motion.div>
 
@@ -520,8 +571,9 @@ export default function Home() {
             </div>
           </motion.div>
 
+          {/* F.7 — Mention infrastructure technique remplacée par message orienté utilisateur */}
           <p className="text-text-secondary/30 text-[11px] text-center mt-4">
-            Données synchronisées en temps réel depuis Supabase · Mises à jour instantanées
+            Mises à jour automatiques toutes les 30 secondes · Données chiffrées en transit (TLS)
           </p>
         </div>
       </section>

@@ -106,7 +106,7 @@ function PageOverview({ user, scans, isPaid, validatedPremiumMap, navigate, upti
           <span className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-[shimmer_3s_infinite]" />
           <CheckCircle2 size={28} className="text-success flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-white font-bold text-base">🎉 Votre rapport premium est prêt !</p>
+            <p className="text-white font-bold text-base">Votre rapport premium est prêt</p>
             <p className="text-white/60 text-sm mt-0.5">
               L'audit complet de <strong>{extractDomain(mostRecentValidated.url)}</strong> a été validé et est maintenant accessible.
             </p>
@@ -308,7 +308,13 @@ function PageReports({ scans, isPaid, validatedPremiumMap, navigate }) {
           </div>
           {(lastScan.critical_alerts ?? []).slice(0, 3).map((a, i) => (
             <div key={i} className="flex items-center gap-2 text-xs text-white/60 mb-1">
-              <span>{a.severity === 'critical' ? '🔴' : '🟠'}</span> {a.title}
+              <span
+                className={`inline-block h-1.5 w-1.5 rounded-full flex-shrink-0 ${
+                  a.severity === 'critical' ? 'bg-danger' : 'bg-warning'
+                }`}
+                aria-hidden="true"
+              />
+              {a.title}
             </div>
           ))}
         </motion.div>
@@ -387,7 +393,7 @@ function PageSecurity({ scans }) {
         <div>
           <p className="text-white/50 text-xs mb-1">Score Sécurité</p>
           <p className="text-4xl font-bold text-white">{secScore ?? '—'}<span className="text-white/30 text-xl">/100</span></p>
-          <p className="text-white/50 text-sm mt-1">{secScore >= 80 ? '✅ Bonne protection' : secScore >= 55 ? '⚠️ Protection partielle' : '🔴 Site vulnérable'}</p>
+          <p className="text-white/50 text-sm mt-1">{secScore >= 80 ? 'Bonne protection' : secScore >= 55 ? 'Protection partielle' : 'Site vulnérable'}</p>
         </div>
       </motion.div>
 
@@ -398,7 +404,12 @@ function PageSecurity({ scans }) {
             {checks.filter(c => c.group === group).map((c, i) => (
               <div key={i} className="flex items-center justify-between py-2 border-b border-border-color/50 last:border-0">
                 <div className="flex items-center gap-2">
-                  <span>{c.ok === true ? '✅' : c.ok === false ? '❌' : '⚠️'}</span>
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full flex-shrink-0 ${
+                      c.ok === true ? 'bg-success' : c.ok === false ? 'bg-danger' : 'bg-warning'
+                    }`}
+                    aria-hidden="true"
+                  />
                   <span className="text-white/80 text-sm">{c.label}</span>
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${c.ok === true ? 'bg-success/10 text-success' : c.ok === false ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'}`}>
@@ -459,7 +470,7 @@ function PagePerformance({ scans }) {
             <p className="text-white/50 text-xs mb-1">Poids de la page</p>
             <p className="text-xl font-bold text-white">{perf.poids_page_mb} MB</p>
             <p className={`text-xs mt-1 ${perf.poids_page_mb > 3 ? 'text-danger' : perf.poids_page_mb > 2 ? 'text-warning' : 'text-success'}`}>
-              {perf.poids_page_mb > 3 ? '🔴 Trop lourd' : perf.poids_page_mb > 2 ? '🟡 À optimiser' : '✅ Acceptable'}
+              {perf.poids_page_mb > 3 ? 'Trop lourd' : perf.poids_page_mb > 2 ? 'À optimiser' : 'Acceptable'}
             </p>
           </div>
         )}
@@ -468,7 +479,7 @@ function PagePerformance({ scans }) {
             <p className="text-white/50 text-xs mb-1">Requêtes HTTP</p>
             <p className="text-xl font-bold text-white">{perf.nb_requetes}</p>
             <p className={`text-xs mt-1 ${perf.nb_requetes > 100 ? 'text-danger' : perf.nb_requetes > 60 ? 'text-warning' : 'text-success'}`}>
-              {perf.nb_requetes > 100 ? '🔴 Trop de requêtes' : '✅ Acceptable'}
+              {perf.nb_requetes > 100 ? 'Trop de requêtes' : 'Acceptable'}
             </p>
           </div>
         )}

@@ -18,7 +18,10 @@ export default function ScoreHistoryChart({ userId, url }) {
 
     return (
         <div className="bg-card-bg border border-border-color rounded-2xl p-5">
-            <h3 className="text-white font-semibold mb-4">📈 Évolution du score</h3>
+            <h3 className="inline-flex items-center gap-2 text-white font-semibold mb-4">
+                <TrendingUp size={16} className="text-primary" aria-hidden="true" />
+                Évolution du score
+            </h3>
             <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />

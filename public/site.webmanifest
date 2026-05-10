@@ -1,16 +1,19 @@
 {
-  "name": "Webisafe — Audit Web",
+  "name": "Webisafe — Audit web pour PME africaines",
   "short_name": "Webisafe",
-  "description": "Audit gratuit de vitesse, SEO, sécurité et UX mobile pour les PME africaines.",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#060e1a",
+  "description": "Analysez gratuitement la sécurité, la performance, le SEO et l'expérience mobile de votre site web en 60 secondes.",
+  "icons": [
+    { "src": "/favicon-16x16.png", "sizes": "16x16", "type": "image/png" },
+    { "src": "/favicon-32x32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
   "theme_color": "#060e1a",
-  "orientation": "portrait",
+  "background_color": "#060e1a",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "start_url": "/",
   "scope": "/",
   "lang": "fr",
-  "icons": [
-    { "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png" }
-  ]
+  "categories": ["business", "productivity", "utilities", "security"]
 }

@@ -1,6 +1,6 @@
 import { generatePdf } from '../lib/generatePdf.js';
 import { buildPdfFilename } from '../lib/pdfModel.js';
-import { json, readJsonBody, setCorsHeaders } from '../api_shared/_utils.js';
+import { json, readJsonBody, setCorsHeaders, checkRateLimit } from '../api_shared/_utils.js';
 
 export const config = { maxDuration: 60 };
 
@@ -8,6 +8,12 @@ export default async function handler(req, res) {
   setCorsHeaders(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
+
+  // H.10 — Rate limit endpoint coûteux (Puppeteer) : 10 PDF/min/IP
+  const rateLimit = checkRateLimit(req, 10, 60000);
+  if (!rateLimit.allowed) {
+    return json(res, 429, { error: `Trop de g\u00e9n\u00e9rations PDF, r\u00e9essayez dans ${rateLimit.retryAfter}s` });
+  }
 
   try {
     const scanData = req.body && typeof req.body === 'object' ? req.body : await readJsonBody(req);

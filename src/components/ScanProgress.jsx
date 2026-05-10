@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle, Loader2, Circle, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Loader2, Circle, ArrowLeft, Lightbulb, ShieldAlert, Smartphone, Search, Zap, Globe, TrendingUp, AlertTriangle } from 'lucide-react';
 
 const SCAN_STEPS = [
   'Connexion au site...',
@@ -12,15 +12,16 @@ const SCAN_STEPS = [
   'Génération des recommandations',
 ];
 
+// E.4 — Emojis remplacés par Lucide icons + sources ajoutées
 const FACTS = [
-  '💡 53% des visiteurs quittent un site qui met plus de 3 secondes à charger',
-  '🔒 73% des sites web en Afrique ont au moins une faille de sécurité critique',
-  '📱 Plus de 80% du trafic web en Afrique vient du mobile',
-  '🔍 75% des utilisateurs ne vont jamais au-delà de la première page Google',
-  '⚡ Amazon perd 1% de revenus pour chaque 100ms de délai supplémentaire',
-  '🌍 Le temps de chargement moyen en Afrique est de 8.7 secondes',
-  '💰 Un site rapide peut augmenter vos conversions de 7%',
-  '🛡️ 43% des cyberattaques ciblent les petites entreprises',
+  { Icon: Lightbulb, text: '53 % des visiteurs mobiles quittent un site qui met plus de 3 secondes à charger.', source: 'Google — The Need for Mobile Speed' },
+  { Icon: ShieldAlert, text: 'En 2024, l’ANSSI a recensé 27 millions de cybermenaces en Côte d’Ivoire.', source: 'ANSSI Côte d’Ivoire 2024' },
+  { Icon: Smartphone, text: 'Plus de 80 % du trafic web en Afrique vient du mobile.', source: 'Statista — Africa Mobile Internet Usage' },
+  { Icon: Search, text: '75 % des utilisateurs ne dépassent pas la première page de Google.', source: 'Forrester — SEO Behavior Study' },
+  { Icon: Zap, text: 'Amazon perd 1 % de revenus pour chaque 100 ms de délai supplémentaire.', source: 'Amazon — Internal performance study' },
+  { Icon: Globe, text: 'Le temps de chargement moyen en Afrique est de 8,7 secondes.', source: 'HTTP Archive — Web Almanac' },
+  { Icon: TrendingUp, text: 'Un site rapide peut augmenter vos conversions de 7 %.', source: 'Akamai — Online Retail Performance' },
+  { Icon: AlertTriangle, text: '43 % des cyberattaques ciblent les petites entreprises.', source: 'Verizon Data Breach Report' },
 ];
 
 export default function ScanProgress({ currentStep, url }) {
@@ -44,11 +45,9 @@ export default function ScanProgress({ currentStep, url }) {
       >
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-blue-400 to-success shimmer" />
 
-        {/* Logo */}
+        {/* Logo — C.2 logo SVG */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center font-bold text-white text-xl">
-            W
-          </div>
+          <img src="/logo.svg" alt="Webisafe" className="w-10 h-10" loading="eager" />
           <span className="text-2xl font-bold text-white">
             Webi<span className="text-primary">safe</span>
           </span>
@@ -111,18 +110,23 @@ export default function ScanProgress({ currentStep, url }) {
           ))}
         </div>
 
-        {/* Educational Facts */}
-        <div className="h-16 flex items-center justify-center border-t border-border-color pt-4">
+        {/* Educational Facts — E.4 sans emojis */}
+        <div className="min-h-20 flex items-center justify-center border-t border-border-color pt-4">
           <motion.div
             key={factIndex}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="text-center"
+            className="flex items-start gap-3 max-w-md text-left"
           >
-            <p className="text-text-secondary text-sm italic">
-              {FACTS[factIndex]}
-            </p>
+            {(() => {
+              const FactIcon = FACTS[factIndex].Icon;
+              return <FactIcon size={18} className="text-primary flex-shrink-0 mt-0.5" />;
+            })()}
+            <div>
+              <p className="text-text-secondary text-sm">{FACTS[factIndex].text}</p>
+              <p className="text-text-secondary/40 text-[10px] mt-1 italic">{FACTS[factIndex].source}</p>
+            </div>
           </motion.div>
         </div>
       </motion.div>

@@ -120,9 +120,6 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
 
     setLoading(true);
 
-    // Petit délai UX (optionnel)
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
     let result;
     try {
       result = await onAuth(mode, {

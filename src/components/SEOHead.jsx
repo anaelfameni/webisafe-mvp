@@ -4,12 +4,13 @@
  */
 
 import React from 'react';
+import { BRAND_URL, SUPPORT_EMAIL, SUPPORT_PHONE } from '../config/brand';
 
 const defaultMeta = {
-  title: 'Webisafe - Audit de sites web pour les PME africaines',
-  description: 'Analysez gratuitement votre site web : performance, sécurité, SEO et UX. Rapport détaillé avec recommandations actionnables pour améliorer votre présence en ligne.',
-  url: 'https://webisafe.vercel.app',
-  image: 'https://webisafe.vercel.app/og-image.png',
+  title: 'Webisafe — Audit de sites web gratuit pour PME africaines',
+  description: 'Analysez gratuitement votre site web : performance, sécurité, SEO et UX. Rapport détaillé avec recommandations actionnables en 60 secondes.',
+  url: BRAND_URL,
+  image: `${BRAND_URL}/og-image.png`,
   type: 'website',
 };
 
@@ -99,32 +100,39 @@ export const organizationJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: 'Webisafe',
-  url: 'https://webisafe.vercel.app',
-  logo: 'https://webisafe.vercel.app/logo.png',
-  description: 'Audit de sites web pour les PME africaines',
+  url: BRAND_URL,
+  logo: `${BRAND_URL}/logo.svg`,
+  description: 'Plateforme d\'audit automatisé de sites web pour PME africaines : sécurité, performance, SEO et UX mobile.',
+  foundingLocation: {
+    '@type': 'Place',
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Abidjan',
+      addressCountry: 'CI',
+    },
+  },
   contactPoint: {
     '@type': 'ContactPoint',
-    telephone: '+225-01-70-90-77-80',
+    telephone: SUPPORT_PHONE.replace(/\s/g, ''),
     contactType: 'customer service',
-    email: 'webisafe@gmail.com',
-    areaServed: ['CI', 'SN', 'ML', 'BF', 'GN', 'TG', 'BJ', 'NE', 'CM', 'GH', 'NG'],
+    email: SUPPORT_EMAIL,
+    areaServed: ['CI', 'SN', 'ML', 'BF', 'GN', 'TG', 'BJ', 'NE', 'CM'],
     availableLanguage: ['French'],
   },
-  sameAs: [
-    'https://twitter.com/webisafe_ci',
-    'https://linkedin.com/company/webisafe',
-  ],
+  sameAs: [],
 };
 
 export const websiteJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'Webisafe',
-  url: 'https://webisafe.vercel.app',
-  description: 'Audit de sites web pour les PME africaines',
+  url: BRAND_URL,
+  description: 'Audit de sites web pour PME africaines',
+  inLanguage: 'fr',
+  publisher: { '@type': 'Organization', name: 'Webisafe' },
   potentialAction: {
     '@type': 'SearchAction',
-    target: 'https://webisafe.vercel.app/analyse?url={search_term_string}',
+    target: `${BRAND_URL}/analyse?url={search_term_string}`,
     'query-input': 'required name=search_term_string',
   },
 };
@@ -135,17 +143,24 @@ export const softwareApplicationJsonLd = {
   name: 'Webisafe',
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
-  offers: {
-    '@type': 'Offer',
-    price: '35000',
-    priceCurrency: 'XOF',
-    availability: 'https://schema.org/InStock',
-  },
-  aggregateRating: {
-    '@type': 'AggregateRating',
-    ratingValue: '4.8',
-    reviewCount: '150',
-  },
+  url: BRAND_URL,
+  description: 'Plateforme d\'audit automatisé de sites web pour PME africaines.',
+  offers: [
+    { '@type': 'Offer', name: 'Audit gratuit', price: '0', priceCurrency: 'XOF' },
+    { '@type': 'Offer', name: 'Rapport Premium', price: '35000', priceCurrency: 'XOF' },
+    {
+      '@type': 'Offer',
+      name: 'Webisafe Protect',
+      price: '15000',
+      priceCurrency: 'XOF',
+      priceSpecification: {
+        '@type': 'UnitPriceSpecification',
+        price: '15000',
+        priceCurrency: 'XOF',
+        billingDuration: 'P1M',
+      },
+    },
+  ],
 };
 
 export const breadcrumbJsonLd = (items) => ({
@@ -166,7 +181,7 @@ export const articleJsonLd = ({
   image,
   datePublished,
   dateModified,
-  author = { name: 'Webisafe Team' },
+  author = { name: 'Webisafe' },
 }) => ({
   '@context': 'https://schema.org',
   '@type': 'Article',
@@ -185,7 +200,67 @@ export const articleJsonLd = ({
     name: 'Webisafe',
     logo: {
       '@type': 'ImageObject',
-      url: 'https://webisafe.vercel.app/logo.png',
+      url: `${BRAND_URL}/logo.svg`,
     },
   },
 });
+
+// FAQ JSON-LD pour la home
+export const faqJsonLd = (questions) => ({
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: questions.map((q) => ({
+    '@type': 'Question',
+    name: q.question,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: q.answer,
+    },
+  })),
+});
+
+// Pages metadata pre-defined for use in <SEOHead>
+export const pageMeta = {
+  home: {
+    title: 'Webisafe — Audit web gratuit pour PME africaines | Résultats en 60s',
+    description: 'Analysez gratuitement votre site : sécurité, performance, SEO, mobile. Rapport actionnable en 60 secondes pour PME africaines.',
+    url: BRAND_URL,
+  },
+  protect: {
+    title: 'Webisafe Protect — Surveillance web 24/7 pour 15 000 FCFA/mois',
+    description: 'Surveillance uptime, scans hebdomadaires, alertes critiques en temps réel. Protection complète de votre site web pour seulement 15 000 FCFA/mois.',
+    url: `${BRAND_URL}/protect`,
+  },
+  tarifs: {
+    title: 'Tarifs Webisafe — Audit web pour PME africaines',
+    description: 'Audit gratuit, rapport Premium 35 000 FCFA, abonnement Protect 15 000 FCFA/mois. Pas d\'abonnement caché, paiement Wave Money.',
+    url: `${BRAND_URL}/tarifs`,
+  },
+  apropos: {
+    title: 'À propos de Webisafe — Audit web pour l\'Afrique',
+    description: 'Webisafe est une plateforme ivoirienne d\'audit automatisé de sites web. Découvrez notre mission, méthodologie et équipe.',
+    url: `${BRAND_URL}/apropos`,
+  },
+  contact: {
+    title: 'Contact Webisafe — Support audit web Afrique',
+    description: 'Contactez l\'équipe Webisafe : support, partenariats, marque blanche. Réponse sous 24h.',
+    url: `${BRAND_URL}/contact`,
+  },
+  cgu: {
+    title: 'CGU — Conditions générales d\'utilisation Webisafe',
+    description: 'Conditions générales d\'utilisation de la plateforme Webisafe : objet, tarification, droit de rétractation, garantie SLA, médiation.',
+    url: `${BRAND_URL}/cgu`,
+    noindex: false,
+  },
+  confidentialite: {
+    title: 'Politique de confidentialité — Webisafe',
+    description: 'Comment Webisafe collecte, utilise et protège vos données personnelles. Sous-traitants, transferts, droits, cookies.',
+    url: `${BRAND_URL}/confidentialite`,
+    noindex: false,
+  },
+  partenaire: {
+    title: 'Programme partenaire Webisafe — Gagnez 30% de commissions',
+    description: 'Devenez partenaire Webisafe : 30% de commissions sur chaque audit vendu, 20% sur chaque abonnement Protect. Inscription gratuite.',
+    url: `${BRAND_URL}/partenaire`,
+  },
+};

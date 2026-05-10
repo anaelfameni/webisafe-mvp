@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 
 export default function AgenceWaitlistForm() {
   const [email, setEmail] = useState('');
@@ -24,8 +25,8 @@ export default function AgenceWaitlistForm() {
   if (status === 'success') {
     return (
       <div className="p-4 bg-success/10 border border-success/20 rounded-xl text-center">
-        <p className="text-success text-sm font-medium">
-          ✅ Vous êtes sur la liste !
+        <p className="inline-flex items-center justify-center gap-2 text-success text-sm font-medium">
+          <CheckCircle2 size={16} aria-hidden="true" /> Vous êtes sur la liste
         </p>
         <p className="text-text-secondary/60 text-xs mt-1">
           Nous vous contacterons en priorité au lancement.

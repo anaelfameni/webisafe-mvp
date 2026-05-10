@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Check } from 'lucide-react';
+import { X, Mail, Check, Lock } from 'lucide-react';
 
 export default function WaveCheckoutModal({
   isOpen,
@@ -149,7 +149,9 @@ export default function WaveCheckoutModal({
 
               {/* Sécurité */}
               <div className="mt-4 text-center">
-                <p className="text-white/35 text-xs">🔒 Paiement sécurisé via Wave</p>
+                <p className="inline-flex items-center justify-center gap-1.5 text-white/35 text-xs">
+                  <Lock size={11} aria-hidden="true" /> Paiement Wave Money — chiffrement TLS 1.2+
+                </p>
               </div>
 
               {/* Badge Wave */}

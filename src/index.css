@@ -210,22 +210,4 @@ input:focus, textarea:focus, select:focus {
   }
 }
 
-/* Marquee ticker */
-@keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.animate-marquee {
-  animation: marquee 30s linear infinite;
-}
-
-@media (max-width: 768px) {
-  .animate-marquee {
-    animation: marquee 10s linear infinite;
-  }
-}
-
-.animate-marquee:hover {
-  animation-play-state: paused;
-}
+/* D.2 — Marquee animations supprimées le 10/05/2026 (cf. audit qualité). */

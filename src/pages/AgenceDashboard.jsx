@@ -286,8 +286,8 @@ export default function AgenceDashboard({ user, authLoading = false }) {
               </div>
             ))}
           </div>
-          <div className="mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
-            <p className="flex items-center gap-2 font-black text-emerald-300"><ShieldCheck size={16} /> Webisafe Verified actif</p>
+          <div className="mt-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4">
+            <p className="flex items-center gap-2 font-black text-cyan-200"><ShieldCheck size={16} /> Plan agence — marque blanche activée</p>
             <p className="mt-2 text-sm leading-6 text-white/52">Positionnez vos rapports comme des livrables premium prêts à présenter au client.</p>
           </div>
         </div>
@@ -545,8 +545,8 @@ export default function AgenceDashboard({ user, authLoading = false }) {
                 <p className="truncate text-xs text-white/40">{user.email}</p>
               </div>
             </div>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
-              <ShieldCheck size={12} /> Verified actif
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-bold text-cyan-200">
+              <ShieldCheck size={12} /> Plan agence
             </div>
           </div>
         </div>

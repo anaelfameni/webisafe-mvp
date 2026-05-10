@@ -27,7 +27,7 @@ export default function Header({ user: currentUser, onLogout, onAuthClick }) {
     { label: 'Fonctionnalités', path: '/#features' },
     { label: 'Protect', path: '/protect' },
     { label: 'Tarifs', path: '/tarifs' },
-    { label: 'Affiliation', path: '/partenaire' },
+    { label: 'Partenaires', path: '/partenaire' },
     { label: 'Contact', path: '/contact' },
   ];
 
@@ -78,10 +78,17 @@ export default function Header({ user: currentUser, onLogout, onAuthClick }) {
                 }
               }}
               className="flex items-center gap-2 group"
+              aria-label="Webisafe — Retour à l'accueil"
             >
-              <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center font-bold text-white text-lg group-hover:scale-110 transition-transform">
-                W
-              </div>
+              <img
+                src="/logo.svg"
+                alt="Webisafe"
+                width={36}
+                height={36}
+                className="h-9 w-9 group-hover:scale-105 transition-transform"
+                loading="eager"
+                fetchpriority="high"
+              />
               <span className="text-xl font-bold text-white">
                 Webi<span className="text-primary">safe</span>
               </span>

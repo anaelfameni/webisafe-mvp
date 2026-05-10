@@ -252,7 +252,7 @@ export default function Protect() {
             </div>
             <div className="h-12 w-px bg-white/10" />
             <div className="text-left">
-              <p className="text-white/60 text-sm">Paiement sécurisé Wave Business</p>
+              <p className="text-white/60 text-sm">Paiement Wave Money — chiffrement TLS 1.2+</p>
               <p className="text-white/40 text-xs">Sans engagement · Résiliable à tout moment</p>
             </div>
           </div>
@@ -389,31 +389,46 @@ export default function Protect() {
         <h2 className="text-center text-lg font-bold text-white mb-6">Exemples d'alertes Protect</h2>
         <div className="bg-[#0C1627] border border-white/10 rounded-2xl p-5 space-y-4">
           {[
-            { time: 'Alerte type', event: 'Site down détecté', detail: 'Alerte envoyée en 4 min', color: '🔴' },
-            { time: 'Alerte type', event: 'SSL expire dans 14 jours', detail: 'Rappel envoyé', color: '🟡' },
-            { time: 'Alerte type', event: 'Scan mensuel complété', detail: 'Score 84/100', color: '🟢' },
-          ].map((item, i) => (
-            <div key={i} className="flex items-start gap-3 text-sm">
-              <span className="text-xs mt-0.5">{item.color}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-white/60 text-xs">{item.time} — {item.event}</p>
-                <p className="text-white/80 text-sm font-medium">{item.detail}</p>
+            { time: 'Alerte type', event: 'Site down détecté', detail: 'Alerte envoyée en 4 min', tone: 'danger' },
+            { time: 'Alerte type', event: 'SSL expire dans 14 jours', detail: 'Rappel envoyé', tone: 'warning' },
+            { time: 'Alerte type', event: 'Scan mensuel complété', detail: 'Score 84/100', tone: 'success' },
+          ].map((item, i) => {
+            const dotClass = item.tone === 'danger' ? 'bg-danger' : item.tone === 'warning' ? 'bg-warning' : 'bg-success';
+            return (
+              <div key={i} className="flex items-start gap-3 text-sm">
+                <span className={`inline-block h-2 w-2 rounded-full mt-1.5 ${dotClass}`} aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-white/60 text-xs">{item.time} — {item.event}</p>
+                  <p className="text-white/80 text-sm font-medium">{item.detail}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {/* ── Témoignages clients ── */}
+      {/* ── F.1 — Bloc remplacé : phase de lancement bêta + offre early adopter ── */}
       <div className="max-w-2xl mx-auto mb-20">
-        <h2 className="text-center text-lg font-bold text-white mb-6">Ce que disent nos abonnés</h2>
-        <div className="bg-[#0C1627] border border-white/10 rounded-2xl p-6 text-center">
-          <p className="text-white/50 text-sm">
-            Les premiers témoignages arrivent bientôt. Soyez parmi les premiers à partager votre expérience Protect.
-          </p>
-          <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-block mt-4 text-primary text-sm font-semibold hover:underline">
-            Contactez-nous pour témoigner
-          </a>
+        <h2 className="text-center text-lg font-bold text-white mb-6">Phase de lancement bêta</h2>
+        <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/15 via-[#0C1627] to-[#0C1627] p-6">
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
+              Early adopter
+            </span>
+            <h3 className="mt-3 text-xl font-bold text-white">Soyez parmi les 10 premiers abonnés Protect</h3>
+            <p className="mt-2 text-sm text-white/60 leading-relaxed">
+              Webisafe Protect entre en phase bêta. Les 10 premières entreprises qui s’inscrivent
+              bénéficient de <strong className="text-white">–50 % de réduction la première année</strong>{' '}
+              et d’un accès direct à l’équipe Webisafe pour façonner la roadmap.
+            </p>
+            <a
+              href={`mailto:${SUPPORT_EMAIL}?subject=Inscription%20Protect%20bêta`}
+              className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-full bg-primary hover:bg-primary-hover text-white text-sm font-semibold transition"
+            >
+              Réserver ma place dans la bêta
+            </a>
+          </div>
         </div>
       </div>
 
@@ -495,7 +510,7 @@ export default function Protect() {
                   <p className="text-white/40 text-xs mt-1">Protect Basic · 1 mois</p>
                 </div>
 
-                {/* ── Bouton Wave Business ── */}
+                {/* ── Bouton de paiement Wave ── */}
                 <div className="mb-5">
                   <a
                     href={getWaveBusinessLink('protect')}

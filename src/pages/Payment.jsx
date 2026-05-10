@@ -208,7 +208,7 @@ export default function Payment({ user }) {
         {/* Bouton bypass ADMIN uniquement */}
         {user?.role === 'admin' && scanId && (
           <div className="mb-6 rounded-2xl border-2 border-orange-500/40 bg-orange-500/10 p-5 text-center">
-            <p className="text-xs uppercase tracking-widest text-orange-400 font-bold mb-2">⚙️ Mode Admin</p>
+            <p className="inline-flex items-center gap-1.5 text-xs uppercase tracking-widest text-orange-400 font-bold mb-2"><ShieldCheck size={12} /> Mode Admin</p>
             <p className="text-sm text-white/70 mb-4">Accédez directement à l'audit premium sans paiement.</p>
             <button
               onClick={async () => {
@@ -240,7 +240,7 @@ export default function Payment({ user }) {
 
         {canUseAgencyBypass(user, scanId) && (
           <div className="mb-6 rounded-2xl border-2 border-cyan-500/40 bg-cyan-500/10 p-5 text-center">
-            <p className="text-xs uppercase tracking-widest text-cyan-300 font-bold mb-2">⚙️ Mode Agence</p>
+            <p className="inline-flex items-center gap-1.5 text-xs uppercase tracking-widest text-cyan-300 font-bold mb-2"><ShieldCheck size={12} /> Mode Agence</p>
             <p className="text-sm text-white/70 mb-4">Accédez directement à l'audit premium sans paiement.</p>
             <button
               onClick={() => {

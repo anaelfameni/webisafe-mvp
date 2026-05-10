@@ -19,6 +19,12 @@ import {
   RefreshCw,
   Loader2,
   Wrench,
+  Lightbulb,
+  AlertOctagon,
+  AlertTriangle,
+  Lock,
+  XCircle,
+  CheckCircle2,
 } from 'lucide-react';
 
 import CriticalAlertsBanner from '../components/CriticalAlertsBanner';
@@ -29,6 +35,8 @@ import ScanInsightCards from '../components/ScanInsightCards';
 
 import { useAuth } from '../hooks/useAuth';
 import { useScans } from '../hooks/useScans';
+import { isAgencyUser } from '../utils/agencyAccess';
+import { logError } from '../utils/logger';
 
 import { generatePDF } from '../utils/generatePDF';
 import { getScoreBadge } from '../utils/calculateScore';
@@ -55,8 +63,11 @@ function MetricRow({ label, value, status, hint }) {
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-text-primary text-sm font-medium text-right">{value ?? 'N/A'}</span>
         {status && (
-          <span role="status" aria-label={statusLabel}>
-            <span aria-hidden="true">{status === 'pass' ? '✅' : status === 'warn' ? '⚠️' : status === 'unknown' ? '—' : '❌'}</span>
+          <span role="status" aria-label={statusLabel} className="inline-flex items-center">
+            {status === 'pass' && <CheckCircle2 size={14} className="text-emerald-400" aria-hidden="true" />}
+            {status === 'warn' && <AlertTriangle size={14} className="text-yellow-300" aria-hidden="true" />}
+            {status === 'unknown' && <span className="text-white/50" aria-hidden="true">—</span>}
+            {status === 'fail' && <XCircle size={14} className="text-red-400" aria-hidden="true" />}
           </span>
         )}
       </div>
@@ -366,8 +377,11 @@ export default function Rapport() {
   const location = useLocation();
   const { getScan, saveScan } = useScans();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || location.state?.adminBypass === true;
-  const isAgencyBypass = location.state?.agencyBypass === true;
+  // H.2/H.3 — La détermination admin/agence repose uniquement sur le rôle
+  // serveur (Supabase) restitué par useAuth. location.state est un signal UI
+  // côté navigateur, jamais une source de vérité d'autorisation.
+  const isAdmin = user?.role === 'admin';
+  const isAgencyBypass = isAgencyUser(user);
 
   const [scan, setScan] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -476,7 +490,7 @@ export default function Rapport() {
         saveScan(freshScan);
       }
     } catch (e) {
-      console.error('Rescan error:', e);
+      logError('rescan', e, { scanId: id });
     } finally {
       setIsRescanning(false);
     }
@@ -575,7 +589,7 @@ export default function Rapport() {
     try {
       await generatePDF(pdfScan);
     } catch (error) {
-      console.error('Erreur PDF:', error);
+      logError('pdf-download', error, { scanId: id });
       alert(error?.message || 'Impossible de générer le PDF pour le moment.');
     } finally {
       setDownloadingPdf(false);
@@ -759,15 +773,16 @@ export default function Rapport() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
             {[
-              { name: 'Performance', score: norm?.scores?.performance, icon: '⚡' },
-              { name: 'Sécurité', score: norm?.scores?.security, icon: '🔒' },
-              { name: 'SEO', score: norm?.scores?.seo, icon: '🔍' },
-              { name: 'UX Mobile', score: norm?.scores?.ux, icon: '📱' },
+              { name: 'Performance', score: norm?.scores?.performance, Icon: Zap },
+              { name: 'Sécurité', score: norm?.scores?.security, Icon: Shield },
+              { name: 'SEO', score: norm?.scores?.seo, Icon: Search },
+              { name: 'UX Mobile', score: norm?.scores?.ux, Icon: Smartphone },
             ].map((cat) => {
               const badge = getScoreBadge(cat.score ?? 0);
+              const Icon = cat.Icon;
               return (
                 <div key={cat.name} className="bg-dark-navy rounded-xl p-4 text-center">
-                  <span className="text-2xl" aria-hidden="true" title={cat.name}>{cat.icon}</span>
+                  <Icon size={24} className="text-primary mx-auto" aria-hidden="true" />
                   <p className="text-white font-bold text-xl mt-2">
                     {cat.score ?? 'N/A'}
                     {cat.score != null && <span className="text-white text-sm">/100</span>}
@@ -848,7 +863,7 @@ export default function Rapport() {
         {/* ── PERFORMANCE ────────────────────────────────────────────────── */}
         <section id="performance" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span aria-hidden="true">⚡</span> Performance</h2>
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Zap size={18} aria-hidden="true" /> Performance</h2>
 
             {perfM?.partial && (
               <div className="mb-4 rounded-xl border border-yellow-500/25 bg-yellow-500/10 p-4 text-yellow-200 text-xs">
@@ -898,7 +913,7 @@ export default function Rapport() {
         {/* ── SECURITY ───────────────────────────────────────────────────── */}
         <section id="security" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span aria-hidden="true">🔒</span> Sécurité</h2>
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Shield size={18} aria-hidden="true" /> Sécurité</h2>
 
             <MetricRow label="Score Sécurité" value={`${norm?.scores?.security ?? 'N/A'}/100`} />
             <MetricRow
@@ -913,7 +928,7 @@ export default function Rapport() {
             <MetricRow
               label="Malware (VirusTotal)"
               value={
-                secM?.malware_detected === true ? '<span aria-hidden="true">🚨</span> Détecté'
+                secM?.malware_detected === true ? (<span className="inline-flex items-center gap-1"><AlertOctagon size={14} className="text-red-400" aria-hidden="true" /> Détecté</span>)
                   : secM?.malware_detected === false ? 'Aucun'
                     : 'Non vérifié'
               }
@@ -997,7 +1012,7 @@ export default function Rapport() {
             {/* Fichiers sensibles */}
             {norm?.sensitiveFiles?.critical && (
               <div className="mt-6 rounded-2xl border border-red-500/25 bg-red-500/10 p-5">
-                <p className="text-red-200 font-semibold text-sm"><span aria-hidden="true">🚨</span> Fichiers sensibles exposés</p>
+                <p className="inline-flex items-center gap-2 text-red-200 font-semibold text-sm"><AlertOctagon size={16} aria-hidden="true" /> Fichiers sensibles exposés</p>
                 {norm.sensitiveFiles.alert_message && (
                   <p className="text-red-200/80 text-xs mt-1">{norm.sensitiveFiles.alert_message}</p>
                 )}
@@ -1050,7 +1065,7 @@ export default function Rapport() {
         {/* ── EXTENDED SECURITY ──────────────────────────────────────────── */}
         <section id="extended_security" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">🛡️ Sécurité Avancée</h2>
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><ShieldCheck size={18} aria-hidden="true" /> Sécurité Avancée</h2>
             <MetricRow
               label="Score Sécurité Avancée"
               value={norm?.extendedSecurityScore != null ? `${norm.extendedSecurityScore}/100` : 'N/A'}
@@ -1199,7 +1214,7 @@ export default function Rapport() {
                           <SeverityPill severity={check.criticality} />
                         </div>
                         {check.recommendation && check.status !== 'pass' && (
-                          <p className="text-primary/90 text-xs mt-2">💡 {check.recommendation}</p>
+                          <p className="inline-flex items-start gap-1.5 text-primary/90 text-xs mt-2"><Lightbulb size={12} className="mt-0.5 flex-shrink-0" aria-hidden="true" /> {check.recommendation}</p>
                         )}
                         {check.difficulty && check.difficulty !== '—' && check.status !== 'pass' && (
                           <p className="text-white/40 text-xs mt-1">Difficulté : {check.difficulty} · Estimation : {check.time_estimate}</p>
@@ -1215,7 +1230,7 @@ export default function Rapport() {
         {/* ── SEO ────────────────────────────────────────────────────────── */}
         <section id="seo" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">🔍 SEO</h2>
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Search size={18} aria-hidden="true" /> SEO</h2>
 
             <MetricRow label="Score SEO" value={`${norm?.scores?.seo ?? 'N/A'}/100`} />
             <MetricRow
@@ -1301,7 +1316,7 @@ export default function Rapport() {
                       <p className="text-white/40 text-[11px] mt-1">Signal : {check.evidence}</p>
                       <p className="text-white/50 text-[11px] mt-1">{check.business_impact}</p>
                       {check.status !== 'pass' && (
-                        <p className="text-primary/90 text-[11px] mt-2">💡 {check.recommendation}</p>
+                        <p className="inline-flex items-start gap-1.5 text-primary/90 text-[11px] mt-2"><Lightbulb size={11} className="mt-0.5 flex-shrink-0" aria-hidden="true" /> {check.recommendation}</p>
                       )}
                     </div>
                   ))}
@@ -1335,7 +1350,7 @@ export default function Rapport() {
         {/* ── UX ─────────────────────────────────────────────────────────── */}
         <section id="ux" className="mb-8">
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">📱 UX Mobile</h2>
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Smartphone size={18} aria-hidden="true" /> UX Mobile</h2>
 
             <MetricRow label="Score UX" value={`${norm?.scores?.ux ?? 'N/A'}/100`} />
             <MetricRow

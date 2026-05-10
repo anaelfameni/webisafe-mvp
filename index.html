@@ -11,7 +11,11 @@
 
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-  <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
 
   <!-- SEO Core -->
@@ -71,7 +75,23 @@
           "@type": "Organization",
           "name": "Webisafe",
           "url": "https://webisafe.vercel.app/",
-          "logo": "https://webisafe.vercel.app/favicon-512.png",
+          "logo": "https://webisafe.vercel.app/logo.svg",
+          "description": "Plateforme d'audit automatisé de sites web pour PME africaines : sécurité, performance, SEO et UX mobile.",
+          "foundingLocation": {
+            "@type": "Place",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Abidjan",
+              "addressCountry": "CI"
+            }
+          },
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer service",
+            "email": "webisafe@gmail.com",
+            "availableLanguage": ["French"],
+            "areaServed": ["CI", "SN", "ML", "BF", "GN", "TG", "BJ", "NE", "CM"]
+          },
           "sameAs": []
         },
         {
@@ -89,16 +109,32 @@
           "operatingSystem": "Web",
           "url": "https://webisafe.vercel.app/",
           "description": "Webisafe analyse la vitesse, le SEO, la sécurité et l'expérience mobile des sites web des PME africaines.",
-          "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "XOF"
-          },
-          "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": "4.8",
-            "ratingCount": "120"
-          }
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Audit gratuit",
+              "price": "0",
+              "priceCurrency": "XOF"
+            },
+            {
+              "@type": "Offer",
+              "name": "Rapport Premium",
+              "price": "35000",
+              "priceCurrency": "XOF"
+            },
+            {
+              "@type": "Offer",
+              "name": "Webisafe Protect",
+              "price": "15000",
+              "priceCurrency": "XOF",
+              "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "price": "15000",
+                "priceCurrency": "XOF",
+                "billingDuration": "P1M"
+              }
+            }
+          ]
         }
       ]
     }

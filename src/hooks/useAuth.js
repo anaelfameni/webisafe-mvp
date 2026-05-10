@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 import { getPostLoginPath } from '../utils/agencyAccess.js';
+import { logError } from '../utils/logger.js';
 
 const AUTH_KEY = 'webisafe_auth';
 const AUTH_EVENT = 'webisafe-auth-change';
-const SHOULD_PERSIST_AUTH = !import.meta.env.DEV;
+// H.7 — La persistance de l'auth doit être identique en dev et en prod
+// pour éviter les comportements divergents (bugs cachés).
+const SHOULD_PERSIST_AUTH = true;
 
 let authUser = null;
 let authLoaded = false;
@@ -151,7 +154,7 @@ async function getProfile(sessionToken = null) {
     const data = await response.json();
     return data.profile || null;
   } catch (error) {
-    console.error('[auth] profile fetch error:', error);
+    logError('auth.profile_fetch', error);
     return null;
   }
 }
@@ -160,7 +163,7 @@ async function syncPublicUser(user, values = {}) {
   try {
     await getProfile();
   } catch (error) {
-    console.error('[auth] public user sync error:', error);
+    logError('auth.public_user_sync', error);
   }
 }
 
@@ -168,7 +171,7 @@ async function loadSupabaseSession() {
   const { data, error } = await supabase.auth.getSession();
 
   if (logoutInProgress || error || !data?.session?.user) {
-    if (error) console.error('[auth] session error:', error);
+    if (error) logError('auth.session', error);
     setGlobalUser(null);
     return null;
   }

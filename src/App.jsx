@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import Home from './pages/Home';
+import RouteSEO from './components/RouteSEO';
 import { useAuth } from './hooks/useAuth';
 
 const Analyse = lazy(() => import('./pages/Analyse'));
@@ -12,7 +13,6 @@ const Payment = lazy(() => import('./pages/Payment'));
 const Admin = lazy(() => import('./pages/Admin'));
 const Agence = lazy(() => import('./pages/AgenceDashboard'));
 const Tarifs = lazy(() => import('./pages/Tarifs'));
-const Statistiques = lazy(() => import('./pages/Statistiques'));
 const Contact = lazy(() => import('./pages/Contact'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Partenaire = lazy(() => import('./pages/Partenaire'));
@@ -22,9 +22,10 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const CGU = lazy(() => import('./pages/CGU'));
 const Confidentialite = lazy(() => import('./pages/Confidentialite'));
 const APropos = lazy(() => import('./pages/APropos'));
-const NotFound = lazy(() => import('./pages/NotFound'));
 const Protect = lazy(() => import('./pages/Protect'));
 const Corrections = lazy(() => import('./pages/Corrections'));
+// H.4 — NotFound minimaliste remplacé par la page Error complète
+const NotFoundPage = lazy(() => import('./pages/Error').then((mod) => ({ default: mod.NotFoundPage })));
 
 function PageLoader() {
   return (
@@ -93,6 +94,8 @@ function AppShell({ user, authLoading, logout, showAuth, setShowAuth, authMode, 
         />
       )}
 
+      <RouteSEO />
+
       <main>
         <Suspense fallback={<PageLoader />}>
           <Routes>
@@ -114,7 +117,6 @@ function AppShell({ user, authLoading, logout, showAuth, setShowAuth, authMode, 
             <Route path="/agence" element={<Agence user={user} authLoading={authLoading} />} />
             <Route path="/rapport/:id" element={<Rapport />} />
             <Route path="/tarifs" element={<Tarifs />} />
-            <Route path="/statistiques" element={<Statistiques />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/dashboard" element={<Dashboard user={user} authLoading={authLoading} />} />
             <Route path="/partenaire" element={<Partenaire user={user} />} />
@@ -126,28 +128,13 @@ function AppShell({ user, authLoading, logout, showAuth, setShowAuth, authMode, 
             <Route path="/a-propos" element={<APropos />} />
             <Route path="/protect" element={<Protect />} />
             <Route path="/corrections" element={<Corrections />} />
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </main>
 
       {!isFullscreenRoute && (
-        <div className={location.pathname === '/' ? 'mb-12' : ''}>
-          <Footer />
-        </div>
-      )}
-
-      {!isFullscreenRoute && location.pathname === '/' && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-primary/10 backdrop-blur-md border-t border-primary/20 py-2.5 overflow-hidden">
-          <div className="flex whitespace-nowrap animate-marquee">
-            {[...Array(6)].map((_, i) => (
-              <span key={i} className="mx-8 text-xs sm:text-sm font-medium text-primary/90 uppercase tracking-widest flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                Premier écosystème complet d'audit, correction et surveillance web conçu pour l'Afrique · Diagnostic gratuit en 60 secondes
-              </span>
-            ))}
-          </div>
-        </div>
+        <Footer />
       )}
 
       {!isFullscreenRoute && (

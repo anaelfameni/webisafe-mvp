@@ -19,31 +19,31 @@ const FAULT_TIME_MAP = {
 };
 
 const FAULT_DIFFICULTY_MAP = {
-  ssl_expired: '⭐ Facile — Faisable sans développeur',
-  ssl_misconfigured: '⭐⭐ Intermédiaire — Accès hébergeur requis',
-  hsts_missing: '⭐⭐⭐ Technique — Modification fichier serveur',
-  csp_missing: '⭐⭐⭐ Technique — Connaissance HTTP requise',
-  xframe_missing: '⭐⭐ Intermédiaire — Accès hébergeur requis',
-  xcontent_missing: '⭐⭐ Intermédiaire — Accès hébergeur requis',
-  mixed_content: '⭐⭐ Intermédiaire — Inspection du code requise',
-  images_unoptimized: '⭐ Facile — Faisable sans développeur',
-  cache_missing: '⭐⭐ Intermédiaire — Plugin ou config serveur',
-  gzip_disabled: '⭐⭐ Intermédiaire — Accès hébergeur requis',
-  js_render_blocking: '⭐⭐⭐ Technique — Connaissance JavaScript',
-  css_render_blocking: '⭐⭐⭐ Technique — Connaissance CSS',
-  meta_title_missing: '⭐ Facile — Faisable sans développeur',
-  meta_description_missing: '⭐ Facile — Faisable sans développeur',
-  h1_missing: '⭐ Facile — Faisable sans développeur',
-  alt_missing: '⭐ Facile — Faisable sans développeur',
-  sitemap_missing: '⭐ Facile — Plugin WordPress ou outil en ligne',
-  robots_missing: '⭐⭐ Intermédiaire — Accès FTP requis',
-  xss_vulnerability: '⭐⭐⭐⭐ Expert — Développeur senior requis',
-  sql_injection: '⭐⭐⭐⭐ Expert — Développeur senior requis',
-  wordpress_outdated: '⭐ Facile — Faisable sans développeur',
-  plugin_outdated: '⭐ Facile — Faisable sans développeur',
-  no_https_redirect: '⭐⭐ Intermédiaire — Accès hébergeur requis',
-  mobile_not_responsive: '⭐⭐⭐⭐ Expert — Développeur requis',
-  default: '⭐⭐ Intermédiaire',
+  ssl_expired: 'Facile — Faisable sans développeur',
+  ssl_misconfigured: 'Intermédiaire — Accès hébergeur requis',
+  hsts_missing: 'Technique — Modification fichier serveur',
+  csp_missing: 'Technique — Connaissance HTTP requise',
+  xframe_missing: 'Intermédiaire — Accès hébergeur requis',
+  xcontent_missing: 'Intermédiaire — Accès hébergeur requis',
+  mixed_content: 'Intermédiaire — Inspection du code requise',
+  images_unoptimized: 'Facile — Faisable sans développeur',
+  cache_missing: 'Intermédiaire — Plugin ou config serveur',
+  gzip_disabled: 'Intermédiaire — Accès hébergeur requis',
+  js_render_blocking: 'Technique — Connaissance JavaScript',
+  css_render_blocking: 'Technique — Connaissance CSS',
+  meta_title_missing: 'Facile — Faisable sans développeur',
+  meta_description_missing: 'Facile — Faisable sans développeur',
+  h1_missing: 'Facile — Faisable sans développeur',
+  alt_missing: 'Facile — Faisable sans développeur',
+  sitemap_missing: 'Facile — Plugin WordPress ou outil en ligne',
+  robots_missing: 'Intermédiaire — Accès FTP requis',
+  xss_vulnerability: 'Expert — Développeur senior requis',
+  sql_injection: 'Expert — Développeur senior requis',
+  wordpress_outdated: 'Facile — Faisable sans développeur',
+  plugin_outdated: 'Facile — Faisable sans développeur',
+  no_https_redirect: 'Intermédiaire — Accès hébergeur requis',
+  mobile_not_responsive: 'Expert — Développeur requis',
+  default: 'Intermédiaire',
 };
 
 function getTemps(rec) {
@@ -114,21 +114,27 @@ function isSecuriteCategory(categorie) {
 }
 
 function getPrioriteLabel(priorite, categorie) {
-  if (isSecuriteCategory(categorie)) return '🔴 Priorité urgente';
+  if (isSecuriteCategory(categorie)) return { text: 'Priorité urgente', tone: 'critical' };
   const p = Number(priorite);
-  if (p === 1) return '🔴 Priorité urgente';
-  if (p === 2) return '🟠 Priorité haute';
-  if (p <= 4) return '🟡 Priorité moyenne';
-  return '🟢 Amélioration';
+  if (p === 1) return { text: 'Priorité urgente', tone: 'critical' };
+  if (p === 2) return { text: 'Priorité haute', tone: 'warning' };
+  if (p <= 4) return { text: 'Priorité moyenne', tone: 'medium' };
+  return { text: 'Amélioration', tone: 'low' };
 }
 
-// Compat ancien format
+function priorityToneClasses(tone) {
+  if (tone === 'critical') return 'bg-danger/10 text-danger border-danger/20';
+  if (tone === 'warning') return 'bg-warning/10 text-warning border-warning/20';
+  if (tone === 'medium') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+  return 'bg-success/10 text-success border-success/20';
+}
+
 function getPriorityConfig(priority, categorie) {
   const isUrgent = isSecuriteCategory(categorie) || priority === 'CRITIQUE';
   const configs = {
-    CRITIQUE: { borderColor: 'border-danger/30', badgeBg: 'bg-danger/10', badgeText: 'text-danger', dot: 'bg-danger', label: '🔴 URGENT' },
-    IMPORTANT: { borderColor: 'border-warning/30', badgeBg: 'bg-warning/10', badgeText: 'text-warning', dot: 'bg-warning', label: isUrgent ? '🔴 URGENT' : '🟠 IMPORTANT' },
-    AMELIORATION: { borderColor: 'border-success/30', badgeBg: 'bg-success/10', badgeText: 'text-success', dot: 'bg-success', label: '🟢 AMÉLIORATION' },
+    CRITIQUE: { borderColor: 'border-danger/30', badgeBg: 'bg-danger/10', badgeText: 'text-danger', dot: 'bg-danger', label: 'URGENT' },
+    IMPORTANT: { borderColor: 'border-warning/30', badgeBg: 'bg-warning/10', badgeText: 'text-warning', dot: 'bg-warning', label: isUrgent ? 'URGENT' : 'IMPORTANT' },
+    AMELIORATION: { borderColor: 'border-success/30', badgeBg: 'bg-success/10', badgeText: 'text-success', dot: 'bg-success', label: 'AMÉLIORATION' },
   };
   if (isUrgent && priority !== 'CRITIQUE' && priority !== 'AMELIORATION') {
     return { ...configs.CRITIQUE };
@@ -165,7 +171,9 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
             <span className={`text-xs font-semibold px-3 py-1 rounded-full ${style.badgeBg} ${style.badgeText}`}>
               {recommendation.categorie}
             </span>
-            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-red-600/10 text-red-300">🔴 Urgent</span>
+            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-red-600/10 text-red-300 border border-red-500/20">
+              <AlertTriangle size={12} /> Urgent
+            </span>
           </div>
           <h4 className="text-white font-semibold text-sm mb-2">Problème critique détecté</h4>
           <p className="text-text-secondary text-sm mb-3 leading-relaxed">
@@ -200,10 +208,12 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
             <span className={`text-xs font-semibold px-3 py-1 rounded-full ${style.badgeBg} ${style.badgeText}`}>
               {recommendation.categorie}
             </span>
-            <span className="text-white/50 text-xs">{prioriteLabel}</span>
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${priorityToneClasses(prioriteLabel.tone)}`}>
+              {prioriteLabel.text}
+            </span>
           </div>
-          <span className="text-xs font-medium text-cyan-400/80 bg-cyan-400/8 border border-cyan-400/15 px-2 py-1 rounded-lg flex-shrink-0 whitespace-nowrap">
-            ⏱️ {tempsDisplay}
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-cyan-400/80 bg-cyan-400/8 border border-cyan-400/15 px-2 py-1 rounded-lg flex-shrink-0 whitespace-nowrap">
+            <Clock size={11} /> {tempsDisplay}
           </span>
         </div>
 
@@ -229,9 +239,10 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
         )}
 
         {/* Difficulté */}
-        <div className="flex items-center gap-1.5 pt-2 border-t border-white/5">
-          <span className="text-white/30 text-xs">🔧</span>
-          <span className={`text-xs font-medium ${difficulteColor}`}>{difficulteDisplay}</span>
+        <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+          <Wrench size={12} className="text-white/30" />
+          <DifficultyBadge label={difficulteDisplay} />
+          <span className="text-white/40 text-xs ml-1">— {difficulteDisplay.replace(/^[^—]+—\s*/, '')}</span>
         </div>
       </motion.div>
     );
@@ -263,8 +274,8 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
         <span className={`text-xs font-semibold px-3 py-1 rounded-full ${config.badgeBg} ${config.badgeText}`}>
           {config.label}
         </span>
-        <span className="text-xs font-medium text-cyan-400/80 bg-cyan-400/8 border border-cyan-400/15 px-2 py-1 rounded-lg whitespace-nowrap">
-          ⏱️ {tempsOld}
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-cyan-400/80 bg-cyan-400/8 border border-cyan-400/15 px-2 py-1 rounded-lg whitespace-nowrap">
+          <Clock size={11} /> {tempsOld}
         </span>
       </div>
 
@@ -278,8 +289,9 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
 
       {recommendation.impactBusiness && (
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-3">
-          <p className="text-primary text-sm font-medium">
-            💡 {recommendation.impactBusiness}
+          <p className="inline-flex items-start gap-1.5 text-primary text-sm font-medium">
+            <Sparkles size={14} className="mt-0.5 flex-shrink-0" />
+            <span>{recommendation.impactBusiness}</span>
           </p>
         </div>
       )}
@@ -291,9 +303,9 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
         </div>
       )}
 
-      <div className="flex items-center gap-1.5 pt-2 border-t border-white/5">
-        <span className="text-white/30 text-xs">🔧</span>
-        <span className={`text-xs font-medium ${difficulteOldColor}`}>{difficulteOld}</span>
+      <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+        <Wrench size={12} className="text-white/30" />
+        <DifficultyBadge label={difficulteOld} />
       </div>
     </motion.div>
   );

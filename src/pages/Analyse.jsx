@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ArrowLeft, Lock, MapPin, Wrench, X } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Lock, MapPin, Wrench, X, Zap, Shield, Search, Smartphone } from 'lucide-react';
 
 import LargeSiteDisclaimer from '../components/LargeSiteDisclaimer';
 
@@ -667,7 +667,7 @@ export default function Analyse() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
           <ScoreCard
             title="Performance"
-            icon="⚡"
+            icon={<Zap size={22} className="text-yellow-300" aria-hidden="true" />}
             iconLabel="Performance"
             score={performanceScore}
             metrics={getPerformanceMetrics(displayData)}
@@ -676,7 +676,7 @@ export default function Analyse() {
           />
           <ScoreCard
             title="Sécurité"
-            icon="🔒"
+            icon={<Shield size={22} className="text-emerald-300" aria-hidden="true" />}
             iconLabel="Sécurité"
             score={securityScore}
             metrics={getSecurityMetrics(displayData)}
@@ -685,7 +685,7 @@ export default function Analyse() {
           />
           <ScoreCard
             title="SEO"
-            icon="🔍"
+            icon={<Search size={22} className="text-sky-300" aria-hidden="true" />}
             iconLabel="SEO"
             score={seoScore}
             metrics={getSeoMetrics(displayData)}
@@ -694,7 +694,7 @@ export default function Analyse() {
           />
           <ScoreCard
             title="UX Mobile"
-            icon="📱"
+            icon={<Smartphone size={22} className="text-pink-300" aria-hidden="true" />}
             iconLabel="Mobile"
             score={uxScore}
             metrics={getUxMetrics(displayData)}
@@ -822,7 +822,7 @@ export default function Analyse() {
                         />
                       </div>
                       <div className="absolute inset-0 bg-gradient-to-t from-dark-navy/80 via-dark-navy/40 to-transparent flex flex-col items-center justify-center gap-3">
-                        <p className="text-white font-bold text-sm"><span aria-hidden="true">🔒</span> Recommandation la plus critique</p>
+                        <p className="inline-flex items-center gap-2 text-white font-bold text-sm"><Lock size={14} aria-hidden="true" /> Recommandation la plus critique</p>
                         <button
                           onClick={() => setShowFreemiumGate(true)}
                           className="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-[0_0_24px_rgba(21,102,240,0.5)] transition-all text-sm"

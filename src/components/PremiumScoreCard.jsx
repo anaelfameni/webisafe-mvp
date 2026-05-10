@@ -25,7 +25,7 @@ export default function PremiumScoreCard({ score, domain, ctaButton, onClose, co
             <div className="flex flex-col gap-2.5 w-full md:w-1/2 z-10">
               {isNull ? (
                 <div className="flex items-center gap-3 px-4 py-6 rounded-xl border bg-yellow-500/5 border-yellow-500/20">
-                  <span className="text-xl">⚠️</span>
+                  <AlertTriangle size={20} className="text-yellow-300 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-bold text-yellow-200">Score global partiel</p>
                     <p className="text-xs text-white/60 mt-1">

@@ -63,11 +63,7 @@ export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewD
               ) : (
                 <span className="text-text-primary">{metric.value}</span>
               )}
-              {metric.status && (
-                <span>
-                  {metric.status === 'pass' ? '✅' : metric.status === 'warn' ? '⚠️' : metric.status === 'unknown' ? '—' : '❌'}
-                </span>
-              )}
+              {metric.status && <StatusIcon status={metric.status} />}
             </div>
           </div>
         ))}
