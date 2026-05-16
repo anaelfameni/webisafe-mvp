@@ -1,4 +1,4 @@
-import { checkRateLimit, getSupabaseAdminClient, readJsonBody, setCorsHeaders } from './_utils.js';
+import { checkRateLimit, getSupabaseAdminClient, readJsonBody, setCorsHeaders } from '../api_shared/_utils.js';
 
 function normalizeRefCode(value) {
   const refCode = String(value || '').trim().toUpperCase();
