@@ -54,6 +54,7 @@ export default async function handler(req, res) {
     id: body?.id ? String(body.id).trim() : null,
     payment_code: String(body?.payment_code || '').trim(),
     scan_id: String(body?.scan_id || '').trim(),
+    user_id: body?.user_id ? String(body.user_id).trim() : null,
     user_email: String(body?.user_email || '').trim().toLowerCase(),
     url_to_audit: String(body?.url_to_audit || '').trim(),
     wave_phone: String(body?.wave_phone || '').trim(),
@@ -90,6 +91,8 @@ export default async function handler(req, res) {
         : WAVE_PAYMENT_AMOUNT,
     status: payload.status,
   };
+  // user_id seulement si fourni (sinon laisser la DB gerer le default/null)
+  if (payload.user_id) upsertPayload.user_id = payload.user_id;
 
   let request;
   let dbError;
@@ -115,7 +118,12 @@ export default async function handler(req, res) {
 
   if (dbError) {
     console.error('[report-payment] DB error:', dbError);
-    return json(res, 500, { success: false, error: 'Erreur enregistrement paiement' });
+    const detail = [dbError.message, dbError.details, dbError.hint].filter(Boolean).join(' - ');
+    return json(res, 500, {
+      success: false,
+      error: `Erreur enregistrement paiement: ${detail || dbError.code || 'inconnu'}`,
+      debug: { code: dbError.code, message: dbError.message, details: dbError.details, hint: dbError.hint },
+    });
   }
 
   const appUrl = resolveAppUrl();

@@ -162,6 +162,7 @@ export default function Payment({ user }) {
         id: currentRequest.id,
         payment_code: currentRequest.payment_code,
         scan_id: scanId,
+        user_id: user?.id || null,
         user_email: email,
         url_to_audit: urlToAudit,
         amount: finalAmount,
