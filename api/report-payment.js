@@ -11,8 +11,10 @@ import {
   buildPaymentReceivedEmail,
   formatPaymentTimestamp,
   resolveAppUrl,
-} from '../src/utils/paymentEmails.js';
-import { WAVE_PAYMENT_AMOUNT } from '../src/utils/wavePayment.js';
+} from '../api_shared/_paymentEmails.js';
+
+// Inline (anciennement importe de /src/utils/wavePayment.js qui cassait le build Vercel)
+const WAVE_PAYMENT_AMOUNT = 35000;
 
 // Endpoint de signalement de paiement Wave.
 // - Persiste la demande en base (payment_requests) avec statut "waiting_validation".
@@ -87,7 +89,6 @@ export default async function handler(req, res) {
         ? payload.amount
         : WAVE_PAYMENT_AMOUNT,
     status: payload.status,
-    updated_at: new Date().toISOString(),
   };
 
   let request;

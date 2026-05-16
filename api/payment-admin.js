@@ -20,7 +20,7 @@ import {
   buildPaymentConfirmedEmail,
   buildPaymentRejectedEmail,
   resolveAppUrl,
-} from '../src/utils/paymentEmails.js';
+} from '../api_shared/_paymentEmails.js';
 
 export default async function handler(req, res) {
   setCorsHeaders(req, res);
