@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useLiveStats } from '../hooks/useLiveStats';
 import { Zap, Shield, Search, Smartphone, ArrowRight, TrendingDown, Eye, Activity, Globe, Radio, Clock, Snail, ShieldAlert, CheckCircle, FileText, MapPin, Image as ImageIcon, Circle, AlertCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { SUPPORT_PHONE } from '../config/brand';
+import { SUPPORT_PHONE, SCAN_DURATION_AVG_LABEL, SCAN_DURATION_RANGE_LABEL } from '../config/brand';
 import toast from 'react-hot-toast';
 import URLInput from '../components/URLInput';
 import PricingSection from '../components/PricingSection';
@@ -16,7 +16,12 @@ function timeAgo(dateStr) {
   const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
   if (diff < 60) return `il y a ${diff}s`;
   if (diff < 3600) return `il y a ${Math.floor(diff / 60)}min`;
-  return `il y a ${Math.floor(diff / 3600)}h`;
+  if (diff < 86400) return `il y a ${Math.floor(diff / 3600)}h`;
+  const days = Math.floor(diff / 86400);
+  if (days < 30) return `il y a ${days}j`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `il y a ${months} mois`;
+  return `il y a ${Math.floor(months / 12)} an${Math.floor(months / 12) > 1 ? 's' : ''}`;
 }
 
 function getScoreColor(score) {
@@ -127,7 +132,7 @@ export default function Home() {
     {
       question: "Combien de temps dure l'analyse ?",
       answer:
-        "L'analyse complète prend entre 30 et 90 secondes selon la taille de votre site et la vitesse de votre serveur. Vous recevez les résultats directement sur la page, en temps réel.",
+        `L'analyse complète prend ${SCAN_DURATION_RANGE_LABEL} selon la taille de votre site et la vitesse de votre serveur. Vous recevez les résultats directement sur la page, en temps réel.`,
     },
     {
       question: 'Mes données sont-elles sécurisées ?',
@@ -137,7 +142,7 @@ export default function Home() {
     {
       question: 'Le rapport est-il en français ?',
       answer:
-        "Oui, 100% en français. Toutes les recommandations sont rédigées dans un langage simple et actionnable, sans jargon technique. Chaque problème est expliqué avec son impact business et une solution pas à pas.",
+        "Oui, 100% en français. Chaque problème est expliqué avec son impact business et une solution pas à pas, dans un langage simple et actionnable.",
     },
     {
       question: 'Quels paiements acceptez-vous ?',
@@ -166,14 +171,15 @@ export default function Home() {
             transition={{ duration: 1.2, ease: 'easeOut' }}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full mb-6"
           >
-            <span className="text-sm">🩺</span>
+            {/* E.1 — Emoji médecin remplacé par icône Lucide neutre */}
+            <Activity size={14} className="text-primary" aria-hidden="true" />
             <span className="text-primary text-sm font-medium">
-              Le médecin de votre site web. Diagnostic gratuit. Traitement sur devis.
+              Audit complet en {SCAN_DURATION_AVG_LABEL} — Sécurité, performance et SEO
             </span>
           </motion.div>
 
           <h1 className="sr-only">
-            Auditez la sécurité de votre site web en 30 secondes — Webisafe
+            Auditez la sécurité de votre site web en {SCAN_DURATION_AVG_LABEL} — Webisafe
           </h1>
 
           <motion.h1
@@ -602,7 +608,7 @@ export default function Home() {
         >
           <h2 className="text-2xl lg:text-3xl font-bold text-white mb-4">Votre site a peut-être une faille critique en ce moment</h2>
           <p className="text-text-secondary mb-6">
-            Découvrez-le en 60 secondes gratuitement. Aucune inscription requise.
+            Découvrez-le en {SCAN_DURATION_AVG_LABEL} gratuitement. Aucune inscription requise.
           </p>
           <button
             onClick={() => document.getElementById('hero')?.scrollIntoView({ behavior: 'smooth' })}

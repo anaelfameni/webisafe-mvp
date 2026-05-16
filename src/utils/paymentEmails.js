@@ -124,9 +124,67 @@ export function buildPaymentConfirmedEmail({
     to: user_email,
     subject: '✅ Votre rapport Webisafe est prêt !',
     html: createEmailShell({
-      title: '🎉 Votre rapport est disponible !',
+      title: 'Votre rapport est disponible',
       body,
       footer: 'Email automatique Webisafe — Merci de votre confiance.',
+      appUrl,
+    }),
+  };
+}
+
+// I.5 — Email automatique au client à la réception de sa demande de paiement.
+// Différent de buildPaymentConfirmedEmail (envoyé après validation admin).
+export function buildPaymentReceivedEmail({
+  appUrl,
+  payment_code,
+  user_email,
+  url_to_audit,
+  timestamp,
+}) {
+  const paymentCode = escapeHtml(payment_code || '');
+  const auditUrl = escapeHtml(url_to_audit || '');
+
+  const body = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+      <div style="width:42px;height:42px;border-radius:12px;background:#1566F0;color:#ffffff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900">W</div>
+      <div style="font-size:24px;font-weight:800;color:#ffffff">Webisafe</div>
+    </div>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.8;color:#dbe7ff">Bonjour,</p>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.8;color:#cbd5e1">
+      Nous avons bien reçu votre demande de paiement pour l'audit premium de
+      <strong style="color:#ffffff">${auditUrl}</strong>.
+    </p>
+    <div style="margin:0 0 22px;padding:22px;border-radius:20px;background:rgba(15,23,42,0.72);border:1px solid rgba(96,165,250,0.22)">
+      <div style="font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#7fb0ff;margin-bottom:8px">Votre code de paiement</div>
+      <div style="font-size:28px;font-weight:900;letter-spacing:0.04em;color:#1566F0">${paymentCode}</div>
+      <div style="font-size:12px;margin-top:8px;color:#94a3b8">Conservez ce code, il sert de référence en cas de question.</div>
+    </div>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.8;color:#cbd5e1">
+      Notre équipe vérifie votre paiement Wave manuellement. Vous recevrez un second
+      email dès que votre rapport complet est disponible.
+    </p>
+    <div style="margin:0 0 24px;padding:18px 20px;border-radius:18px;background:rgba(34,197,94,0.10);border:1px solid rgba(34,197,94,0.28);color:#bbf7d0;font-size:14px;line-height:1.7">
+      Délai habituel : sous 2h ouvrées (Lun-Ven 8h–18h GMT). Hors créneau, traité dès l'ouverture.
+    </div>
+    <p style="margin:0 0 12px;font-size:15px;line-height:1.8;color:#cbd5e1">
+      Une question ? Répondez à cet email ou contactez-nous :
+    </p>
+    <div style="padding:16px 18px;border-radius:16px;background:rgba(15,23,42,0.72);border:1px solid rgba(96,165,250,0.16);color:#e5eefc;font-size:14px;line-height:1.9">
+      <div>WhatsApp : +225 05 95 33 56 62</div>
+      <div>Email : webisafe@gmail.com</div>
+    </div>
+    <p style="margin:24px 0 0;font-size:13px;color:#94a3b8">
+      Demande reçue le ${escapeHtml(timestamp || '')}.
+    </p>
+  `;
+
+  return {
+    to: user_email,
+    subject: `Votre demande de paiement Webisafe — code ${String(payment_code || '').replace(/[\r\n]+/g, ' ')}`,
+    html: createEmailShell({
+      title: 'Demande de paiement reçue',
+      body,
+      footer: 'Email automatique Webisafe — Vous pouvez répondre directement à ce message.',
       appUrl,
     }),
   };

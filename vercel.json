@@ -111,7 +111,6 @@
     { "source": "/.htpasswd", "destination": "/404" },
     { "source": "/wp-admin", "destination": "/404" },
     { "source": "/wp-login.php", "destination": "/404" },
-    { "source": "/admin", "destination": "/404" },
     { "source": "/administrator", "destination": "/404" },
     { "source": "/phpmyadmin", "destination": "/404" },
     { "source": "/pma", "destination": "/404" },

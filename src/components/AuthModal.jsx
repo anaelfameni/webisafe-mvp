@@ -139,7 +139,7 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
       setLoading(false);
       resetForm();
 
-      // ✅ Fix : on ferme la modal par défaut après succès
+      // Fix : on ferme la modal par défaut après succès
       // Le parent peut empêcher la fermeture en renvoyant { close: false }
       if (result.close !== false) {
         onClose();

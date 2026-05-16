@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Activity,
   BarChart3,
@@ -461,7 +461,7 @@ export default function AgenceDashboard({ user, authLoading = false }) {
       <div className="rounded-[28px] border border-primary/25 bg-slate-950/70 p-6">
         <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
           <div className="flex items-center gap-3">
-            {settings.logo_url ? <img src={settings.logo_url} alt={settings.agency_name} className="h-10 w-10 rounded-2xl object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary font-black text-white">W</div>}
+            {settings.logo_url ? <img src={settings.logo_url} alt={settings.agency_name} loading="lazy" decoding="async" className="h-10 w-10 rounded-2xl object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary font-black text-white">W</div>}
             <div>
               <p className="font-black text-white">Audit offert par {settings.agency_name}</p>
               <p className="text-xs text-white/45">{settings.widget_enabled ? 'Widget actif' : 'Widget inactif'} · {settings.email_capture_enabled ? 'Capture email active' : 'Capture email inactive'}</p>
@@ -497,9 +497,18 @@ export default function AgenceDashboard({ user, authLoading = false }) {
         <ToggleRow label="Widget embarquable" description="Active le widget d’audit dans l’espace agence." checked={settings.widget_enabled} onChange={(value) => updateSetting('widget_enabled', value)} />
         <ToggleRow label="Capture email prospect" description="Prépare la capture email dans le tunnel widget." checked={settings.email_capture_enabled} onChange={(value) => updateSetting('email_capture_enabled', value)} />
       </div>
-      <button disabled={saving} className="mt-6 rounded-full bg-primary px-6 py-3 text-sm font-black text-white transition hover:bg-primary-hover disabled:opacity-60">
-        {saving ? 'Enregistrement...' : 'Enregistrer les paramètres'}
-      </button>
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <button disabled={saving} className="rounded-full bg-primary px-6 py-3 text-sm font-black text-white transition hover:bg-primary-hover disabled:opacity-60">
+          {saving ? 'Enregistrement...' : 'Enregistrer les paramètres'}
+        </button>
+        {/* T.2 — Lien vers la page branding persistante avec preview live */}
+        <Link
+          to="/agence/branding"
+          className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-5 py-3 text-sm font-bold text-emerald-200 transition hover:bg-emerald-400/20"
+        >
+          <Palette size={14} /> Branding avancé + preview live
+        </Link>
+      </div>
     </form>
   );
 

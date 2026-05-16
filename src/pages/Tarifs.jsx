@@ -15,14 +15,24 @@ export default function Tarifs() {
         'Pour le moment, le paiement se fait en une seule fois pour le rapport unique (35 000 FCFA). Pour le White Label Lite, le paiement est mensuel.',
     },
     {
-      question: "Que se passe-t-il apres le paiement ?",
+      question: "Que se passe-t-il après le paiement ?",
       answer:
-        "Une fois votre paiement Wave signale, notre equipe le verifie rapidement. Vous recevez ensuite un email de confirmation et votre rapport complet devient accessible.",
+        "Une fois votre paiement Wave signalé, notre équipe le vérifie rapidement. Vous recevez ensuite un email de confirmation et votre rapport complet devient accessible.",
     },
     {
       question: 'Puis-je obtenir un remboursement ?',
       answer:
-        "Aucun remboursement n'est possible apres la generation du rapport. Nous vous recommandons d'utiliser l'audit gratuit pour valider la pertinence de l'outil avant d'acheter.",
+        "Garantie satisfait ou remboursé 7 jours. Si le rapport ne répond pas à vos attentes après lecture complète, contactez le support sous 7 jours pour un remboursement intégral. Au-delà, aucun remboursement n'est possible. Nous vous recommandons aussi de lancer l'audit gratuit avant pour valider la pertinence de l'outil.",
+    },
+    {
+      question: "Existe-t-il des engagements de durée pour Protect ?",
+      answer:
+        "Non. Le tarif mensuel est sans engagement. Les formules trimestrielle (-10 %), semestrielle (-15 %) et annuelle (-20 %) offrent une remise immédiate en échange d'un paiement anticipé. La résiliation est possible à tout moment, le solde non consommé est remboursé au prorata sur demande.",
+    },
+    {
+      question: "Puis-je combiner Audit Premium et pack Correction ?",
+      answer:
+        "Oui. Le pack Audit + Correction Standard combine les deux services avec 15 % de remise (102 000 FCFA au lieu de 120 000 FCFA). Idéal pour passer du diagnostic à la correction sans perdre de temps.",
     },
   ];
 
@@ -67,7 +77,7 @@ export default function Tarifs() {
           className="max-w-2xl mx-auto text-center bg-gradient-to-b from-primary/10 to-transparent border border-primary/20 rounded-2xl p-8 lg:p-12"
         >
           <h2 className="text-2xl lg:text-3xl font-bold text-white mb-4">
-            Pret a ameliorer votre site ?
+            Prêt à améliorer votre site ?
           </h2>
           <p className="text-text-secondary mb-6">
             Lancez votre premier audit gratuit en 60 secondes. Aucune inscription requise.
@@ -80,7 +90,7 @@ export default function Tarifs() {
             <ArrowRight size={18} />
           </button>
           <p className="text-text-secondary/60 text-xs mt-3">
-            Commencez par un audit gratuit - aucune carte bancaire requise
+            Commencez par un audit gratuit — aucune carte bancaire requise
           </p>
         </motion.div>
       </section>

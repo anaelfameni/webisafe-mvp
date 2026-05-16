@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Activity, Bell, TrendingUp, CheckCircle2, Copy, Loader2, ArrowRight,
-  Eye, BarChart3, BadgeCheck, ChevronDown, ChevronUp, Zap, Clock, ShieldCheck, Smartphone
+  Eye, BarChart3, BadgeCheck, ChevronDown, ChevronUp, Zap, Clock, ShieldCheck, Smartphone,
+  Moon, Lock, TrendingDown
 } from 'lucide-react';
 import { SUPPORT_EMAIL } from '../config/brand';
 import { useAuth } from '../hooks/useAuth';
@@ -188,7 +189,7 @@ export default function Protect() {
           <div className="w-20 h-20 bg-success/15 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="text-success" size={40} />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-3">Demande envoyée ✓</h1>
+          <h1 className="text-2xl font-bold text-white mb-3">Demande envoyée</h1>
           <p className="text-white/60 text-sm mb-6 leading-relaxed">
             Votre demande est reçue. Vous recevrez un email de confirmation sous <strong className="text-white">2h ouvrées</strong>.<br />
             Pour toute question : <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">{SUPPORT_EMAIL}</a>
@@ -257,17 +258,16 @@ export default function Protect() {
             </div>
           </div>
 
-          {/* Ancrage comparatif */}
+          {/* M.5 — Argument honnête, sans comparaison fictive avec un dev */}
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
             className="mt-5 text-center text-white/40 text-sm max-w-lg mx-auto leading-relaxed"
           >
-            Un développeur à temps partiel pour surveiller votre site :{' '}
-            <span className="text-white/60 font-medium">150 000 FCFA/mois</span>.{' '}
-            Il dort la nuit.{' '}
-            <span className="text-primary font-semibold">Protect ne dort jamais.</span>
+            Surveiller manuellement un site demande du temps, des outils et une vigilance constante.{' '}
+            <span className="text-primary font-semibold">Protect concentre tout cela</span>{' '}
+            en un seul abonnement, activé en moins de 3 minutes.
           </motion.p>
         </motion.div>
       </div>
@@ -279,23 +279,24 @@ export default function Protect() {
           <p className="text-white/50 text-sm max-w-xl mx-auto">Voici 3 situations que nos abonnés ne vivent plus depuis Protect.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-5">
+          {/* E.3/E.15 — Emojis remplacés par icônes Lucide */}
           {[
             {
-              emoji: '🌙',
+              Icon: Moon,
               before: 'Votre site tombe à 3h du matin',
               after: 'Vous recevez une alerte en moins de 5 minutes, avant le premier client du matin.',
               tag: 'Uptime',
               color: 'blue',
             },
             {
-              emoji: '🔐',
+              Icon: Lock,
               before: 'Votre SSL expire demain',
               after: 'Vous avez reçu des rappels à J-14, J-7 et J-1. Chrome n\'affiche pas "Non sécurisé" sur votre site.',
               tag: 'SSL',
               color: 'green',
             },
             {
-              emoji: '📉',
+              Icon: TrendingDown,
               before: 'Votre score SEO baisse de 20 points',
               after: 'L\'alerte automatique vous permet d\'agir avant que Google pénalise votre référencement.',
               tag: 'Score',
@@ -303,10 +304,13 @@ export default function Protect() {
             },
           ].map((s, i) => {
             const c = COLORS[s.color];
+            const ScenarioIcon = s.Icon;
             return (
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
                 className={`bg-[#0C1627] border ${c.border} rounded-2xl p-5 flex flex-col gap-4`}>
-                <div className={`w-11 h-11 ${c.bg} rounded-xl flex items-center justify-center text-2xl`}>{s.emoji}</div>
+                <div className={`w-11 h-11 ${c.bg} rounded-xl flex items-center justify-center`}>
+                  <ScenarioIcon size={22} className={c.text} aria-hidden="true" />
+                </div>
                 <div>
                   <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">Sans Protect</p>
                   <p className="text-white/70 text-sm font-medium">{s.before}</p>
@@ -382,6 +386,11 @@ export default function Protect() {
           </motion.div>
         </div>
         <p className="text-white/25 text-[11px] text-center mt-3">Surveillance active dès validation de votre abonnement</p>
+        <p className="text-center mt-3">
+          <Link to="/protect/status" className="text-primary hover:underline text-xs font-semibold">
+            Voir l’état des services en temps réel →
+          </Link>
+        </p>
       </div>
 
       {/* ── Exemples d'alertes que vous recevrez ── */}

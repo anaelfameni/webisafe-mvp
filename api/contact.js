@@ -1,0 +1,138 @@
+import { createClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
+import { setCorsHeaders, checkRateLimit, escapeHtml } from '../api_shared/_utils.js';
+
+// F.4 — Endpoint contact réactivé pour permettre l'envoi du formulaire.
+// H.10 — Rate limit 5 messages / minute par IP.
+
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const ADMIN_EMAIL = process.env.CONTACT_ADMIN_EMAIL || 'webisafe@gmail.com';
+const FROM_EMAIL = process.env.CONTACT_FROM_EMAIL || 'Webisafe <onboarding@resend.dev>';
+
+export default async function handler(req, res) {
+  setCorsHeaders(req, res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Méthode non autorisée' });
+  }
+
+  const rateLimit = checkRateLimit(req, 5, 60000);
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ error: `Trop de messages. Réessayez dans ${rateLimit.retryAfter}s.` });
+  }
+
+  const { name, email, subject, message } = req.body || {};
+
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: 'Champs obligatoires manquants' });
+  }
+
+  const trimmedName = String(name).trim();
+  const trimmedEmail = String(email).trim().toLowerCase();
+  const trimmedSubject = String(subject || '').trim();
+  const trimmedMessage = String(message).trim();
+
+  if (trimmedName.length < 2 || trimmedName.length > 100) {
+    return res.status(400).json({ error: 'Le nom doit faire entre 2 et 100 caractères.' });
+  }
+  if (trimmedMessage.length < 10 || trimmedMessage.length > 5000) {
+    return res.status(400).json({ error: 'Le message doit faire entre 10 et 5000 caractères.' });
+  }
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!EMAIL_RE.test(trimmedEmail)) {
+    return res.status(400).json({ error: 'Adresse email invalide.' });
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    console.error('[contact] Supabase non configuré', {
+      hasUrl: !!SUPABASE_URL,
+      hasKey: !!SUPABASE_SERVICE_KEY,
+    });
+    return res.status(500).json({
+      error: 'Configuration serveur manquante (Supabase). Contactez l\'administrateur.',
+    });
+  }
+  if (!RESEND_API_KEY) {
+    console.error('[contact] RESEND_API_KEY manquante');
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+
+  try {
+    const { error: dbError } = await supabase
+      .from('contact_messages')
+      .insert({ name: trimmedName, email: trimmedEmail, subject: trimmedSubject || null, message: trimmedMessage });
+
+    if (dbError) {
+      console.error('[contact] Supabase insert error:', dbError);
+      return res.status(500).json({
+        error: `Erreur DB: ${dbError.message || 'inconnue'}`,
+        hint: dbError.hint || null,
+      });
+    }
+  } catch (err) {
+    console.error('[contact] Supabase exception:', err);
+    return res.status(500).json({ error: 'Erreur de sauvegarde en base.' });
+  }
+
+  const emailErrors = [];
+
+  if (resend) {
+    try {
+      const { error } = await resend.emails.send({
+        from: FROM_EMAIL,
+        to: ADMIN_EMAIL,
+        reply_to: trimmedEmail,
+        subject: `Nouveau message de ${trimmedName.replace(/[\r\n]+/g, ' ')} — ${(trimmedSubject || 'sans objet').replace(/[\r\n]+/g, ' ')}`,
+        html: `
+          <h2>Nouveau message via Webisafe</h2>
+          <p><strong>Nom :</strong> ${escapeHtml(trimmedName)}</p>
+          <p><strong>Email :</strong> <a href="mailto:${escapeHtml(trimmedEmail)}">${escapeHtml(trimmedEmail)}</a></p>
+          <p><strong>Sujet :</strong> ${escapeHtml(trimmedSubject || '—')}</p>
+          <hr/>
+          <p>${escapeHtml(trimmedMessage).replace(/\n/g, '<br/>')}</p>
+        `,
+      });
+      if (error) {
+        console.error('[contact] Resend admin error:', error);
+        emailErrors.push(`admin: ${error.message || error.name}`);
+      }
+    } catch (err) {
+      console.error('[contact] Resend admin exception:', err);
+      emailErrors.push(`admin: ${err.message}`);
+    }
+
+    try {
+      const { error } = await resend.emails.send({
+        from: FROM_EMAIL,
+        to: trimmedEmail,
+        subject: 'Votre message a bien été reçu',
+        html: `
+          <h2>Bonjour ${escapeHtml(trimmedName)},</h2>
+          <p>Nous avons bien reçu votre message et vous répondrons dans les 24h.</p>
+          <p style="color:#888">— L'équipe Webisafe</p>
+        `,
+      });
+      if (error) {
+        console.error('[contact] Resend confirm error:', error);
+        emailErrors.push(`confirm: ${error.message || error.name}`);
+      }
+    } catch (err) {
+      console.error('[contact] Resend confirm exception:', err);
+      emailErrors.push(`confirm: ${err.message}`);
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    saved: true,
+    emailsSent: resend && emailErrors.length === 0,
+    emailErrors: emailErrors.length ? emailErrors : undefined,
+  });
+}

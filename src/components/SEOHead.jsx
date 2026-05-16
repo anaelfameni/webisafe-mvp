@@ -263,4 +263,34 @@ export const pageMeta = {
     description: 'Devenez partenaire Webisafe : 30% de commissions sur chaque audit vendu, 20% sur chaque abonnement Protect. Inscription gratuite.',
     url: `${BRAND_URL}/partenaire`,
   },
+  // M.4 / N.1 — SEO pour les ressources et les articles vérifiés
+  ressources: {
+    title: 'Ressources Webisafe — Articles vérifiés sur la performance web en Afrique',
+    description: "Articles concrets sur la performance, la sécurité et le SEO des sites web en Afrique de l'Ouest. Sources publiques (Google, OWASP, ANSSI, Schema.org).",
+    url: `${BRAND_URL}/ressources`,
+  },
+  // T.1 — Page publique White Label
+  whiteLabel: {
+    title: 'Webisafe White Label — Revendez l\'audit web sous votre marque',
+    description: 'Offre White Label pour agences digitales : PDF rebrandé, sous-domaine dédié, console multi-clients et facturation agence. Devis sur mesure.',
+    url: `${BRAND_URL}/white-label`,
+  },
+  // S.3 — Page publique de statut Protect
+  protectStatus: {
+    title: 'Statut plateforme — Webisafe',
+    description: 'État en temps réel des services Webisafe : application, API de scan, génération PDF et monitoring Protect.',
+    url: `${BRAND_URL}/protect/status`,
+    noindex: false,
+  },
 };
+
+// N.1 — Helper pour construire les meta d'un article individuel
+export function getArticleMeta(article) {
+  if (!article) return null;
+  return {
+    title: `${article.title} — Webisafe Ressources`,
+    description: article.excerpt,
+    url: `${BRAND_URL}/ressources/${article.slug}`,
+    type: 'article',
+  };
+}

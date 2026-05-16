@@ -1,9 +1,34 @@
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, ArrowRight, MessageCircle, Shield, Lock } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Check, ArrowRight, MessageCircle, Shield, Lock, Wrench, Briefcase } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+
+// L.2 / L.3 — Périodes de facturation Protect avec remises clairement affichées
+const PROTECT_BASE_MONTHLY = 15000; // FCFA
+const PROTECT_BILLING_OPTIONS = [
+  { id: 'monthly', label: 'Mensuel', months: 1, discount: 0 },
+  { id: 'quarterly', label: 'Trimestriel', months: 3, discount: 0.10 },
+  { id: 'biannual', label: 'Semestriel', months: 6, discount: 0.15 },
+  { id: 'annual', label: 'Annuel', months: 12, discount: 0.20 },
+];
+
+function formatFcfa(value) {
+  return value.toLocaleString('fr-FR');
+}
+
+function getProtectPlanForBilling(billingId) {
+  const option = PROTECT_BILLING_OPTIONS.find((opt) => opt.id === billingId) || PROTECT_BILLING_OPTIONS[0];
+  const monthly = Math.round(PROTECT_BASE_MONTHLY * (1 - option.discount));
+  const total = monthly * option.months;
+  const totalRegular = PROTECT_BASE_MONTHLY * option.months;
+  const savings = totalRegular - total;
+  return { option, monthly, total, totalRegular, savings };
+}
 
 export default function PricingSection({ onScan, hideHeader = false }) {
   const navigate = useNavigate();
+  const [protectBilling, setProtectBilling] = useState('monthly');
+  const protectPricing = useMemo(() => getProtectPlanForBilling(protectBilling), [protectBilling]);
 
   const plans = [
     {
@@ -16,10 +41,10 @@ export default function PricingSection({ onScan, hideHeader = false }) {
       description: "Obtenez un premier diagnostic fiable avant d'aller plus loin.",
       features: [
         'Score global /100',
-        'Resume des blocages prioritaires detectes',
-        'Lecture simple des impacts sur trafic, conversions et credibilite',
-        'Premieres explications sur les problemes visibles',
-        'Orientation claire sur les urgences a traiter',
+        'Résumé des blocages prioritaires détectés',
+        'Lecture simple des impacts sur trafic, conversions et crédibilité',
+        'Premières explications sur les problèmes visibles',
+        'Orientation claire sur les urgences à traiter',
         'Limite : 1 scan / jour',
       ],
       cta: 'Scanner Gratuitement',
@@ -34,14 +59,14 @@ export default function PricingSection({ onScan, hideHeader = false }) {
       price: '35 000',
       oldPrice: '40 000',
       currency: 'FCFA',
-      period: 'paiement unique',
+      period: 'paiement unique · sans abonnement',
       description: 'Rapport professionnel complet pour comprendre et corriger ce qui freine votre site.',
       features: [
         'Rapport PDF professionnel',
-        '25+ metriques analysees',
-        'Explications detaillees des failles et impacts business',
-        "Plan d'action priorise en 3 etapes",
-        '1 rescan gratuit apres 30 jours',
+        '25+ métriques analysées',
+        'Explications détaillées des failles et impacts business',
+        "Plan d'action priorisé en 3 étapes",
+        '1 rescan gratuit après 30 jours',
         'Support email 48h',
       ],
       cta: 'Obtenir Mon Rapport',
@@ -60,9 +85,13 @@ export default function PricingSection({ onScan, hideHeader = false }) {
       name: 'Webisafe Protect',
       badge: 'Surveillance Continue',
       badgeColor: 'bg-primary/15 text-primary',
-      price: '15 000',
+      price: formatFcfa(protectPricing.monthly),
+      oldPrice: protectPricing.option.discount > 0 ? formatFcfa(PROTECT_BASE_MONTHLY) : null,
       currency: 'FCFA',
       period: '/mois',
+      periodNote: protectPricing.option.months > 1
+        ? `Facturé ${formatFcfa(protectPricing.total)} FCFA tous les ${protectPricing.option.months} mois · économie ${formatFcfa(protectPricing.savings)} FCFA`
+        : 'Facturation mensuelle · sans engagement',
       description: 'Votre site surveillé 24h/24, alertes automatiques et rapport mensuel sans rien faire.',
       bonus: 'Offre mai 2026 : audit initial offert (35 000 FCFA)',
       setup: 'Dès juin 2026 : audit initial 35 000 FCFA requis',
@@ -79,7 +108,32 @@ export default function PricingSection({ onScan, hideHeader = false }) {
       ctaStyle: 'bg-primary text-white hover:bg-primary-hover',
       ctaIcon: <Shield size={16} />,
       popular: false,
-      onClick: () => navigate('/protect'),
+      isProtect: true,
+      onClick: () => navigate('/protect', { state: { billing: protectBilling } }),
+    },
+    {
+      // L.4 — Plan combiné Audit + Correction Standard (15 % de remise)
+      name: 'Audit + Correction',
+      badge: 'Économisez 15 %',
+      badgeColor: 'bg-success/15 text-success',
+      price: '102 000',
+      oldPrice: '120 000',
+      currency: 'FCFA',
+      period: 'paiement unique · pack tout-en-un',
+      description: 'Diagnostic complet + correction par notre équipe. La solution la plus rapide pour passer du rapport aux résultats.',
+      features: [
+        'Audit Premium inclus (35 000 FCFA)',
+        'Pack Correction Standard inclus (85 000 FCFA)',
+        'Sécurité, performance, SEO et UX corrigés',
+        'Rescan post-correction inclus (J+30)',
+        'Délai : 3 à 5 jours ouvrés',
+        'Garantie 30 jours après correction',
+      ],
+      cta: 'Demander le pack combo',
+      ctaStyle: 'bg-success text-white hover:bg-success/90',
+      ctaIcon: <Wrench size={16} />,
+      popular: false,
+      onClick: () => navigate('/corrections?pack=combo'),
     },
   ];
 
@@ -100,7 +154,8 @@ export default function PricingSection({ onScan, hideHeader = false }) {
         </motion.div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
+      {/* J.1 — Grille 3 plans : 1 col mobile, 2 cols tablette, 3 cols desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {plans.map((plan, index) => (
             <motion.div
               key={index}
@@ -121,6 +176,26 @@ export default function PricingSection({ onScan, hideHeader = false }) {
               <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
               <p className="text-text-secondary text-sm mb-4">{plan.description}</p>
 
+              {plan.isProtect && (
+                <div className="mb-4 flex flex-wrap gap-1.5 p-1 bg-white/5 rounded-full border border-white/10">
+                  {PROTECT_BILLING_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setProtectBilling(option.id)}
+                      className={`flex-1 min-w-[68px] px-2 py-1.5 rounded-full text-[10px] font-semibold transition-all ${
+                        protectBilling === option.id
+                          ? 'bg-primary text-white shadow-md shadow-primary/20'
+                          : 'text-text-secondary hover:text-white'
+                      }`}
+                    >
+                      {option.label}
+                      {option.discount > 0 && <span className="ml-1 text-[9px] opacity-80">-{Math.round(option.discount * 100)}%</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="mb-6">
                 {plan.oldPrice && <span className="text-text-secondary line-through text-sm mr-2">{plan.oldPrice} FCFA</span>}
                 <div className="flex items-baseline gap-2 flex-wrap">
@@ -128,6 +203,7 @@ export default function PricingSection({ onScan, hideHeader = false }) {
                   <span className="text-text-secondary text-sm whitespace-nowrap">{plan.currency}</span>
                   {plan.period && <span className="text-text-secondary text-sm whitespace-nowrap">{plan.period}</span>}
                 </div>
+                {plan.periodNote && <p className="text-text-secondary text-xs mt-1.5">{plan.periodNote}</p>}
                 {plan.bonus && <p className="text-success text-xs mt-1 font-semibold">{plan.bonus}</p>}
                 {plan.setup && <p className="text-text-secondary text-xs mt-2">{plan.setup}</p>}
               </div>
@@ -199,21 +275,17 @@ export default function PricingSection({ onScan, hideHeader = false }) {
               ))}
             </ul>
 
-            <button
-              onClick={() =>
-                window.open(
-                  "https://wa.me/2250595335662?text=Bonjour, je suis interesse par l'acces agence Webisafe.",
-                  '_blank'
-                )
-              }
+            {/* F.4 — CTA structuré vers la page /white-label (formulaire de devis), plus de bouton WhatsApp brut */}
+            <Link
+              to="/white-label"
               className="relative overflow-hidden w-full py-3 px-6 rounded-full font-semibold text-sm transition-all flex items-center justify-center gap-2 bg-success text-white hover:bg-success/90"
             >
               <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-[shimmer_2.7s_infinite]" />
               <span className="relative z-10 flex items-center gap-2">
-                <MessageCircle size={16} />
-                Demander un accès
+                <Briefcase size={16} />
+                Demander un devis
               </span>
-            </button>
+            </Link>
           </motion.div>
         </div>
 

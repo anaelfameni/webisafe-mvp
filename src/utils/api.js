@@ -5,6 +5,9 @@
  * + plafonnement des scores côté frontend (sécurité double)
  */
 
+// H.8 — Erreurs routées vers le logger centralisé (Sentry en prod).
+import { logError } from './logger';
+
 // ── Helpers ratings Core Web Vitals ──────────────────────────────────────────
 function getLcpRating(ms) {
   if (ms === null || ms === undefined) return 'unknown';
@@ -253,7 +256,6 @@ const FAULT_DIFFICULTY_MAP = {
   canonical_missing: 'Niv. 1 — Facile — Activable via plugin SEO',
   h1_multiple: 'Niv. 1 — Facile — Faisable sans développeur',
   default: 'Niv. 2 — Intermédiaire',
-  default: '⭐⭐ Intermédiaire',
 };
 
 function getFaultTime(faultType) {
@@ -515,7 +517,7 @@ function generateRecommendations(data) {
     impact: "Augmentation du CTR de 20 à 40%, meilleure visibilité dans les SERP",
     impactBusiness: "Vos concurrents avec des rich snippets reçoivent 2x plus de clics que des résultats classiques, même s'ils sont positionnés en dessous.",
     comment_implémenter: "Choisissez le type Schema adapté (LocalBusiness, Product, Article, FAQPage). Générez le JSON-LD sur schema.org/generator. Injectez-le dans le <head> de vos pages. Validez avec l'outil de test Google.",
-    difficulte: '⭐⭐ Intermédiaire — Connaissance JSON/HTML recommandée',
+    difficulte: 'Niv. 2 — Intermédiaire — Connaissance JSON/HTML recommandée',
     temps: '1 à 3 heures',
   });
 
@@ -1060,7 +1062,7 @@ export async function runFullAnalysis(url, onProgress, email) {
     };
   } catch (error) {
     clearInterval(progressInterval);
-    console.error('API Error:', error);
+    logError('api.runFullAnalysis', error);
     throw error;
   }
 }

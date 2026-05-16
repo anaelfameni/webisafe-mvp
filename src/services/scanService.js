@@ -1,3 +1,6 @@
+// H.8 — Erreurs routées vers le logger centralisé (Sentry en prod, console.error en dev).
+import { logError } from '../utils/logger';
+
 const API_URL = '/api';
 
 export async function performScan(url) {
@@ -14,9 +17,9 @@ export async function performScan(url) {
     }
 
     return await response.json();
-    
+
   } catch (error) {
-    console.error('Erreur scan:', error);
+    logError('scanService.performScan', error, { url });
     throw error;
   }
 }

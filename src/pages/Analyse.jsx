@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ArrowLeft, Lock, MapPin, Wrench, X, Zap, Shield, Search, Smartphone } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Lock, MapPin, Wrench, X, Zap, Shield, Search, Smartphone, AlertTriangle } from 'lucide-react';
 
 import LargeSiteDisclaimer from '../components/LargeSiteDisclaimer';
 
@@ -23,6 +23,7 @@ import { useAuth } from '../hooks/useAuth';
 import { normalizeURL, extractDomain } from '../utils/validators';
 import { sendNurtureEmail } from '../utils/emailApi';
 import { SUPPORT_PHONE } from '../config/brand';
+import { logError } from '../utils/logger';
 import { trackClarityEvent } from '../lib/clarity';
 
 // ── Badge latence / CDN ───────────────────────────────────────────────────────
@@ -354,18 +355,38 @@ export default function Analyse() {
   const conclusionRef = useRef(null);
   const freemiumTriggeredRef = useRef(false);
 
-  // Affiche FreemiumGate 15s après l'affichage des résultats
+  // I.1 — Affiche FreemiumGate après 35s OU dès que l'utilisateur atteint
+  // la conclusion (premier des deux). Le délai de 15s coupait la lecture trop tôt
+  // et nuisait à la perception de valeur du rapport.
   useEffect(() => {
     if (scanState !== 'results' || !scanData || isUnlocked || hasPaid) return;
 
-    const timer = setTimeout(() => {
+    const triggerGate = () => {
       if (!freemiumTriggeredRef.current) {
         freemiumTriggeredRef.current = true;
         setShowFreemiumGate(true);
       }
-    }, 15000);
+    };
 
-    return () => clearTimeout(timer);
+    const timer = setTimeout(triggerGate, 35000);
+
+    let observer = null;
+    if (conclusionRef.current && typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            triggerGate();
+          }
+        },
+        { threshold: 0.4 }
+      );
+      observer.observe(conclusionRef.current);
+    }
+
+    return () => {
+      clearTimeout(timer);
+      if (observer) observer.disconnect();
+    };
   }, [scanState, scanData, isUnlocked, hasPaid]);
 
   // Pré-remplit l'email avec celui du compte connecté si disponible
@@ -444,7 +465,7 @@ export default function Analyse() {
         // Silencieux — ne pas bloquer l'expérience utilisateur
       }
     } catch (error) {
-      console.error('Erreur scan:', error);
+      logError('analyse.scan', error, { url });
       const message = error?.message || "Erreur lors de l'analyse";
       setScanError({
         type: 'SCAN_ERROR',
@@ -631,7 +652,8 @@ export default function Analyse() {
           </h1>
           {scanConfidence !== 'high' && (
             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-yellow-500/10 border-yellow-500/30 text-yellow-200 text-xs font-medium">
-              <span aria-hidden="true">⚠️</span>
+              {/* E.14 — Emoji ⚠️ remplacé par icône Lucide AlertTriangle */}
+              <AlertTriangle size={14} aria-hidden="true" />
               {scanConfidence === 'low'
                 ? 'Scan limité — protection anti-bot détectée'
                 : 'Analyse partielle — certains résultats indisponibles'}
@@ -869,7 +891,9 @@ export default function Analyse() {
                       aria-label="Obtenir le rapport complet"
                     >
                       <span className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-[0_0_24px_rgba(21,102,240,0.5)] transition-all">
-                        <span aria-hidden="true">🔒</span> Obtenir le rapport complet
+                        {/* E.14 — Emoji 🔒 remplacé par icône Lucide Lock */}
+                        <Lock size={16} aria-hidden="true" />
+                        Obtenir le rapport complet
                         <ArrowRight size={16} />
                       </span>
                     </button>
@@ -923,6 +947,7 @@ export default function Analyse() {
         onUnlock={handleUnlock}
         onUpgrade={handleOpenAuth}
         scanData={displayData}
+        scannedUrl={url}
       />
 
       {/* 2. AuthModal — affiché uniquement si non connecté */}

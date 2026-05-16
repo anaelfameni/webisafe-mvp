@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MessageCircle, Mail, Send, CheckCircle, MapPin, Clock } from 'lucide-react';
-import { SUPPORT_EMAIL } from '../config/brand';
+import { SUPPORT_EMAIL, REPORT_FIX_PHONE_RAW } from '../config/brand';
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -85,7 +85,7 @@ export default function Contact() {
           >
             {/* WhatsApp */}
             <a
-              href="https://wa.me/22505953356620?text=Bonjour, j'ai une question concernant Webisafe."
+              href={`https://wa.me/${REPORT_FIX_PHONE_RAW}?text=${encodeURIComponent("Bonjour, j'ai une question concernant Webisafe.")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="block bg-success/10 border border-success/30 rounded-2xl p-6 hover:bg-success/20 transition-all group"
@@ -210,7 +210,7 @@ export default function Contact() {
                   </div>
 
                   {error && (
-                    <p style={{ color: 'red', fontSize: '14px' }}>{error}</p>
+                    <p className="text-danger text-sm">{error}</p>
                   )}
 
                   <button

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import LanguageSwitcher from './LanguageSwitcher';
 
 export default function Header({ user: currentUser, onLogout, onAuthClick }) {
   const { user: contextUser, profile, signOut } = useAuth();
@@ -24,7 +25,7 @@ export default function Header({ user: currentUser, onLogout, onAuthClick }) {
 
   const navItems = [
     { label: 'Accueil', path: '/' },
-    { label: 'Fonctionnalités', path: '/#features' },
+    { label: 'Fonctionnalités', path: '/fonctionnalites' },
     { label: 'Protect', path: '/protect' },
     { label: 'Tarifs', path: '/tarifs' },
     { label: 'Partenaires', path: '/partenaire' },
@@ -67,7 +68,12 @@ export default function Header({ user: currentUser, onLogout, onAuthClick }) {
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16 lg:h-20 relative">
+        {/* J.4 — Header se contracte au scroll (h-20 → h-14) */}
+        <div
+          className={`flex items-center relative transition-[height] duration-300 ${
+            isScrolled ? 'h-14 lg:h-16' : 'h-16 lg:h-20'
+          }`}
+        >
           {/* Logo */}
           <div className="flex-1 flex items-center justify-start">
             <Link
@@ -112,6 +118,7 @@ export default function Header({ user: currentUser, onLogout, onAuthClick }) {
 
           {/* Desktop Actions */}
           <div className="hidden lg:flex flex-1 items-center justify-end gap-3 ml-8">
+            <LanguageSwitcher />
             {user ? (
               <>
                 <button
@@ -190,6 +197,11 @@ export default function Header({ user: currentUser, onLogout, onAuthClick }) {
               </div>
 
               <div className="h-px bg-white/8 mb-4" />
+
+              <div className="px-4 mb-3 flex items-center justify-between">
+                <span className="text-white/40 text-xs uppercase tracking-wider">Langue</span>
+                <LanguageSwitcher compact />
+              </div>
 
               {user ? (
                 <div className="space-y-2">

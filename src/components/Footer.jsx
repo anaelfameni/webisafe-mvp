@@ -28,7 +28,9 @@ export default function Footer() {
             <ul className="space-y-2 text-sm">
               <li><Link to="/" className="text-white/50 hover:text-white transition-colors">Audit gratuit</Link></li>
               <li><Link to="/protect" className="text-white/50 hover:text-white transition-colors">Webisafe Protect</Link></li>
+              <li><Link to="/protect/status" className="text-white/50 hover:text-white transition-colors">Statut plateforme</Link></li>
               <li><Link to="/tarifs" className="text-white/50 hover:text-white transition-colors">Tarifs</Link></li>
+              <li><Link to="/white-label" className="text-white/50 hover:text-white transition-colors">White Label (agences)</Link></li>
               <li><Link to="/partenaire" className="text-white/50 hover:text-white transition-colors">Programme partenaire</Link></li>
             </ul>
           </div>
@@ -38,6 +40,7 @@ export default function Footer() {
             <h3 className="text-white font-semibold text-sm mb-3">Entreprise</h3>
             <ul className="space-y-2 text-sm">
               <li><Link to="/a-propos" className="text-white/50 hover:text-white transition-colors">À propos</Link></li>
+              <li><Link to="/ressources" className="text-white/50 hover:text-white transition-colors">Ressources & articles</Link></li>
               <li><Link to="/contact" className="text-white/50 hover:text-white transition-colors">Contact</Link></li>
               <li>
                 <a href={`mailto:${SUPPORT_EMAIL}`} className="text-white/50 hover:text-white transition-colors">
@@ -53,8 +56,9 @@ export default function Footer() {
             <ul className="space-y-2 text-sm">
               <li><Link to="/cgu" className="text-white/50 hover:text-white transition-colors">CGU</Link></li>
               <li><Link to="/confidentialite" className="text-white/50 hover:text-white transition-colors">Confidentialité</Link></li>
-              <li><a href="/.well-known/security.txt" className="text-white/50 hover:text-white transition-colors">Sécurité (security.txt)</a></li>
-              <li><a href="/sitemap.xml" className="text-white/50 hover:text-white transition-colors">Plan du site</a></li>
+              {/* Liens masqués à la demande client : security.txt et sitemap restent accessibles directement par URL. */}
+              {/* <li><a href="/.well-known/security.txt" className="text-white/50 hover:text-white transition-colors">Sécurité (security.txt)</a></li> */}
+              {/* <li><a href="/sitemap.xml" className="text-white/50 hover:text-white transition-colors">Plan du site</a></li> */}
             </ul>
           </div>
         </div>

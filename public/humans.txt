@@ -1,0 +1,33 @@
+/* TEAM */
+
+    Fondateur & Développeur : Anael FAMENI
+    Localisation : Abidjan, Côte d'Ivoire
+    Contact : webisafe@gmail.com
+    Site : https://webisafe.vercel.app
+
+/* THANKS */
+
+    À toutes les PME africaines qui testent Webisafe et nous remontent
+    leurs retours. Vous rendez ce produit meilleur chaque semaine.
+
+/* SITE */
+
+    Dernière mise à jour : 2026-05-10
+    Langues : Français
+    Couverture : Côte d'Ivoire, Afrique de l'Ouest, francophonie
+
+    Standards & technologies
+    ─────────────────────────
+    Frontend  : React 18, Vite, TailwindCSS, Lucide Icons, Framer Motion
+    Backend   : Supabase (PostgreSQL + Auth), Vercel Serverless Functions
+    Paiement  : Wave Mobile Money
+    Email     : Resend
+    Observabilité : Sentry, Microsoft Clarity, Google Analytics 4
+
+    Bonnes pratiques
+    ─────────────────
+    - HTTPS partout, HSTS, headers de sécurité (CSP, X-Frame-Options)
+    - Rate limiting sur tous les endpoints sensibles
+    - RGPD / Loi n° 2013-450 conformité
+    - Accessibilité (WCAG 2.1 AA visé)
+    - Sécurité responsable : voir /.well-known/security.txt

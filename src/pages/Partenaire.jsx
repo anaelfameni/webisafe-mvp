@@ -16,7 +16,7 @@ export default function Partenaire() {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, []);
 
-  const commissionPerSale = 17500;
+  const commissionPerSale = 15000;
   const calculateEarnings = (n) => (n * commissionPerSale).toLocaleString('fr-FR');
 
   const steps = [
@@ -36,7 +36,7 @@ export default function Partenaire() {
       icon: <Wallet size={22} />,
       step: '3',
       title: 'Tu gagnes',
-      desc: '17 500 FCFA virés sur Wave pour chaque vente confirmée. Sans limite.',
+      desc: '15 000 FCFA virés sur Wave pour chaque vente confirmée. Sans limite.',
     },
   ];
 
@@ -117,11 +117,11 @@ export default function Partenaire() {
           </span>
           <h1 className="text-5xl lg:text-6xl font-black text-white mb-5 leading-tight">
             Recommandez Webisafe.<br />
-            <span className="shiny-text">Gagnez jusqu'à 17 500 FCFA</span><br />
+            <span className="shiny-text">Gagnez jusqu'à 15 000 FCFA</span><br />
             <span className="text-white">par client.</span>
           </h1>
           <p className="text-white/50 text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-            Chaque Audit Premium vendu via votre lien = <strong className="text-white">50% de commission</strong> = <strong className="text-white">17 500 FCFA</strong> dans votre poche.
+            Chaque Audit Premium vendu via votre lien = <strong className="text-white">43% de commission</strong> = <strong className="text-white">15 000 FCFA</strong> dans votre poche.
             <br />Sans stock. Sans effort technique. Sans limite.
           </p>
           <button

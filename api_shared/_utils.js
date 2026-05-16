@@ -51,9 +51,15 @@ setInterval(() => {
   }
 }, 300000);
 
+export function getClientIp(req) {
+  return (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
+    .split(',')[0]
+    .trim();
+}
+
 export function checkRateLimit(req, maxRequests = 10, windowMs = RATE_LIMIT_WINDOW_MS) {
   const now = Date.now();
-  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+  const ip = getClientIp(req);
   const key = `${ip}:${req.url}`;
   const record = rateLimitMap.get(key) || { count: 0, resetAt: now + windowMs };
 
@@ -127,6 +133,39 @@ export async function requireAdmin(req, res) {
   }
 
   return user;
+}
+
+// U.2 — Audit log des actions admin (best-effort : ne bloque jamais la requête).
+export async function logAdminAction({
+  req,
+  actor,
+  action,
+  targetType = null,
+  targetId = null,
+  metadata = {},
+}) {
+  if (!actor || !action) return;
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return;
+
+  try {
+    await supabase.from('admin_audit_log').insert({
+      actor_id: actor.id,
+      actor_email: actor.email || null,
+      action,
+      target_type: targetType,
+      target_id: targetId ? String(targetId) : null,
+      metadata: metadata || {},
+      ip_address: getClientIp(req),
+      user_agent: req?.headers?.['user-agent']?.slice(0, 500) || null,
+    });
+  } catch (error) {
+    // On ne casse pas la requête métier si le log échoue (table absente, etc.).
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[audit-log] insert failed:', error?.message || error);
+    }
+  }
 }
 
 export async function requireAuthenticatedUser(req, res) {

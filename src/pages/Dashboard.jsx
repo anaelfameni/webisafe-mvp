@@ -366,128 +366,6 @@ function PageReports({ scans, isPaid, validatedPremiumMap, navigate }) {
   );
 }
 
-// ── Page: Sécurité ────────────────────────────────────────────────────────────
-function PageSecurity({ scans }) {
-  const lastScan = scans[0];
-  const sec = lastScan?.metrics?.security ?? lastScan?.security ?? {};
-  const secScore = lastScan?.scores?.security ?? null;
-  const checks = [
-    { label: 'HTTPS activé', ok: lastScan?.summary?.https_enabled, group: 'SSL & HTTPS' },
-    { label: 'Grade SSL', ok: ['A+', 'A', 'B'].includes(sec.ssl_grade), value: sec.ssl_grade, group: 'SSL & HTTPS' },
-    { label: 'Redirection HTTPS', ok: lastScan?.summary?.https_enabled, group: 'SSL & HTTPS' },
-    { label: 'Content-Security-Policy', ok: !(sec.headers_manquants ?? []).some(h => String(h?.header || h).toLowerCase().includes('content-security')), group: 'Headers HTTP' },
-    { label: 'X-Frame-Options', ok: !(sec.headers_manquants ?? []).some(h => String(h?.header || h).toLowerCase().includes('x-frame')), group: 'Headers HTTP' },
-    { label: 'X-Content-Type-Options', ok: !(sec.headers_manquants ?? []).some(h => String(h?.header || h).toLowerCase().includes('x-content')), group: 'Headers HTTP' },
-    { label: 'Strict-Transport-Security', ok: !(sec.headers_manquants ?? []).some(h => String(h?.header || h).toLowerCase().includes('strict-transport')), group: 'Headers HTTP' },
-    { label: 'Malware', ok: sec.malware_detected !== true, value: sec.malware_detected === true ? 'DÉTECTÉ' : 'Aucun', group: 'Vulnérabilités' },
-    { label: 'Fichiers sensibles exposés', ok: !sec.sensitive_files?.critical, group: 'Vulnérabilités' },
-  ];
-  const groups = [...new Set(checks.map(c => c.group))];
-
-  if (!lastScan) return <div className="text-white/40 text-sm p-8 text-center">Lancez un scan pour voir votre analyse sécurité.</div>;
-
-  return (
-    <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-6 bg-card-bg border border-border-color rounded-2xl p-6">
-        {secScore != null && <ScoreArc score={secScore} size={130} />}
-        <div>
-          <p className="text-white/50 text-xs mb-1">Score Sécurité</p>
-          <p className="text-4xl font-bold text-white">{secScore ?? '—'}<span className="text-white/30 text-xl">/100</span></p>
-          <p className="text-white/50 text-sm mt-1">{secScore >= 80 ? 'Bonne protection' : secScore >= 55 ? 'Protection partielle' : 'Site vulnérable'}</p>
-        </div>
-      </motion.div>
-
-      {groups.map(group => (
-        <motion.div key={group} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card-bg border border-border-color rounded-2xl p-5">
-          <h3 className="text-white font-bold text-sm mb-4">{group}</h3>
-          <div className="space-y-2">
-            {checks.filter(c => c.group === group).map((c, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-border-color/50 last:border-0">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-block h-1.5 w-1.5 rounded-full flex-shrink-0 ${
-                      c.ok === true ? 'bg-success' : c.ok === false ? 'bg-danger' : 'bg-warning'
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span className="text-white/80 text-sm">{c.label}</span>
-                </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${c.ok === true ? 'bg-success/10 text-success' : c.ok === false ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'}`}>
-                  {c.value ?? (c.ok === true ? 'OK' : c.ok === false ? 'Absent' : 'N/A')}
-                </span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      ))}
-    </div>
-  );
-}
-
-// ── Page: Performance ─────────────────────────────────────────────────────────
-function PagePerformance({ scans }) {
-  const lastScan = scans[0];
-  const perf = lastScan?.performance ?? {};
-  const vitals = perf.core_web_vitals ?? {};
-  const perfScore = lastScan?.scores?.performance ?? null;
-
-  if (!lastScan) return <div className="text-white/40 text-sm p-8 text-center">Lancez un scan pour voir votre analyse performance.</div>;
-
-  const cwv = [
-    { label: 'LCP', value: vitals.lcp?.value != null ? `${vitals.lcp.value}ms` : 'N/A', rating: vitals.lcp?.rating, desc: 'Largest Contentful Paint — temps d\'affichage du contenu principal. Objectif : < 2 500ms.' },
-    { label: 'CLS', value: vitals.cls?.value != null ? vitals.cls.value : 'N/A', rating: vitals.cls?.rating, desc: 'Cumulative Layout Shift — stabilité visuelle. Objectif : < 0.1.' },
-    { label: 'FCP', value: vitals.fcp?.value != null ? `${vitals.fcp.value}ms` : 'N/A', rating: vitals.fcp?.rating, desc: 'First Contentful Paint — premier affichage visible. Objectif : < 1 800ms.' },
-  ];
-  const ratingColor = r => r === 'good' ? '#22C55E' : r === 'needs_improvement' ? '#EAB308' : r === 'poor' ? '#EF4444' : '#94A3B8';
-  const ratingLabel = r => r === 'good' ? 'Bon' : r === 'needs_improvement' ? 'À améliorer' : r === 'poor' ? 'Critique' : 'Non mesuré';
-
-  return (
-    <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-6 bg-card-bg border border-border-color rounded-2xl p-6">
-        {perfScore != null && <ScoreArc score={perfScore} size={130} />}
-        <div>
-          <p className="text-white/50 text-xs mb-1">Score Performance</p>
-          <p className="text-4xl font-bold text-white">{perfScore ?? '—'}<span className="text-white/30 text-xl">/100</span></p>
-        </div>
-      </motion.div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {cwv.map(v => (
-          <motion.div key={v.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card-bg border border-border-color rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-white font-bold text-lg">{v.label}</span>
-              {v.rating && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${ratingColor(v.rating)}15`, color: ratingColor(v.rating) }}>{ratingLabel(v.rating)}</span>}
-            </div>
-            <p className="text-2xl font-bold text-white mb-2">{v.value}</p>
-            <p className="text-white/40 text-xs">{v.desc}</p>
-          </motion.div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        {perf.poids_page_mb != null && (
-          <div className="bg-card-bg border border-border-color rounded-xl p-4">
-            <p className="text-white/50 text-xs mb-1">Poids de la page</p>
-            <p className="text-xl font-bold text-white">{perf.poids_page_mb} MB</p>
-            <p className={`text-xs mt-1 ${perf.poids_page_mb > 3 ? 'text-danger' : perf.poids_page_mb > 2 ? 'text-warning' : 'text-success'}`}>
-              {perf.poids_page_mb > 3 ? 'Trop lourd' : perf.poids_page_mb > 2 ? 'À optimiser' : 'Acceptable'}
-            </p>
-          </div>
-        )}
-        {perf.nb_requetes != null && (
-          <div className="bg-card-bg border border-border-color rounded-xl p-4">
-            <p className="text-white/50 text-xs mb-1">Requêtes HTTP</p>
-            <p className="text-xl font-bold text-white">{perf.nb_requetes}</p>
-            <p className={`text-xs mt-1 ${perf.nb_requetes > 100 ? 'text-danger' : perf.nb_requetes > 60 ? 'text-warning' : 'text-success'}`}>
-              {perf.nb_requetes > 100 ? 'Trop de requêtes' : 'Acceptable'}
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ── Page: Historique ──────────────────────────────────────────────────────────
 function PageHistory({ scans, navigate }) {
   const historyData = scans.slice(0, 6).map(s => ({
@@ -753,8 +631,6 @@ function PageSettings({ user }) {
 const NAV_ITEMS = [
   { id: 'overview', label: 'Vue d\'ensemble', icon: <LayoutDashboard size={18} /> },
   { id: 'reports', label: 'Rapports', icon: <FileText size={18} /> },
-  { id: 'security', label: 'Sécurité', icon: <Shield size={18} /> },
-  { id: 'performance', label: 'Performance', icon: <Zap size={18} /> },
   { id: 'history', label: 'Historique', icon: <History size={18} /> },
   { id: 'subscription', label: 'Mon Abonnement', icon: <CreditCard size={18} /> },
   { id: 'settings', label: 'Paramètres', icon: <Settings size={18} /> },
@@ -813,7 +689,7 @@ export default function Dashboard({ user, authLoading = false }) {
       .catch(() => {});
   }, [user?.id]);
 
-  const PAGE_TITLES = { overview: 'Vue d\'ensemble', reports: 'Rapports', security: 'Sécurité', performance: 'Performance', history: 'Historique', subscription: 'Mon Abonnement', settings: 'Paramètres' };
+  const PAGE_TITLES = { overview: 'Vue d\'ensemble', reports: 'Rapports', history: 'Historique', subscription: 'Mon Abonnement', settings: 'Paramètres' };
 
   if (accessState.status === 'loading') {
     return (
@@ -899,7 +775,13 @@ export default function Dashboard({ user, authLoading = false }) {
             </button>
           ))}
           <hr className="border-border-color my-3" />
-          <button onClick={() => navigate('/protect')} className="relative overflow-hidden w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white bg-primary hover:bg-primary-hover transition font-semibold shadow-[0_0_18px_rgba(21,102,240,0.4)]">
+          <button
+            onClick={() => navigate('/contact')}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/5 transition"
+          >
+            <Bell size={18} /> Support &amp; contact
+          </button>
+          <button onClick={() => navigate('/protect')} className="relative overflow-hidden w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white bg-primary hover:bg-primary-hover transition font-semibold shadow-[0_0_18px_rgba(21,102,240,0.4)] mt-2">
             <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_2.5s_infinite]" />
             <ArrowUpCircle size={18} className="relative" /> <span className="relative">Activer Webisafe Protect</span>
           </button>
@@ -953,8 +835,6 @@ export default function Dashboard({ user, authLoading = false }) {
             <motion.div key={activePage} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               {activePage === 'overview' && <PageOverview user={user} scans={scans} isPaid={isPaid} validatedPremiumMap={validatedPremiumMap} navigate={navigate} uptime={uptime} />}
               {activePage === 'reports' && <PageReports scans={scans} isPaid={isPaid} validatedPremiumMap={validatedPremiumMap} navigate={navigate} />}
-              {activePage === 'security' && <PageSecurity scans={scans} />}
-              {activePage === 'performance' && <PagePerformance scans={scans} />}
               {activePage === 'history' && <PageHistory scans={scans} navigate={navigate} />}
               {activePage === 'subscription' && <PageSubscription user={user} navigate={navigate} />}
               {activePage === 'settings' && <PageSettings user={user} />}

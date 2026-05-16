@@ -33,6 +33,53 @@ body {
   background: #475569;
 }
 
+/* J.5 — Spacing global cohérent : utilitaire de section commune */
+.section-spacing {
+  padding-top: 5rem;
+  padding-bottom: 5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+@media (min-width: 1024px) {
+  .section-spacing {
+    padding-top: 6rem;
+    padding-bottom: 6rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+.section-spacing-tight {
+  padding-top: 3rem;
+  padding-bottom: 3rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+@media (min-width: 1024px) {
+  .section-spacing-tight {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+  }
+}
+
+/* J.2 — Boutons standardisés (primary / secondary / ghost) */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold text-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed;
+}
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-border-color hover:border-primary/50 text-text-primary hover:text-white bg-card-bg font-semibold text-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-text-secondary hover:text-white hover:bg-white/5 font-medium text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed;
+}
+
+/* J.3 — Cards standardisées (un seul style de fond) */
+.card-base {
+  @apply bg-card-bg border border-border-color rounded-2xl p-5 lg:p-6;
+}
+.card-elevated {
+  @apply bg-card-bg border border-border-color rounded-2xl p-5 lg:p-6 shadow-[0_8px_32px_rgba(15,23,42,0.45)];
+}
+
 /* Glassmorphism utility */
 .glass {
   background: rgba(30, 41, 59, 0.7);

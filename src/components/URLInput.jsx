@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
 import { isValidURL, isValidEmail, normalizeURL } from '../utils/validators';
+import { SCAN_DURATION_PROMISE } from '../config/brand';
 
 export default function URLInput({ onScan, loading, user }) {
   const [url, setUrl] = useState('');
@@ -119,8 +120,10 @@ export default function URLInput({ onScan, loading, user }) {
         </div>
       )}
       {isLoggedIn && (
-        <div className="mb-4 px-4 py-3 bg-success/10 border border-success/30 rounded-xl text-sm text-success">
-          ✓ Résultats envoyés à <strong>{user.email}</strong>
+        <div className="mb-4 px-4 py-3 bg-success/10 border border-success/30 rounded-xl text-sm text-success inline-flex items-center gap-2">
+          {/* E.14 — Emoji \u2713 remplacé par icône Lucide CheckCircle */}
+          <CheckCircle size={14} aria-hidden="true" />
+          <span>Résultats envoyés à <strong>{user.email}</strong></span>
         </div>
       )}
 
@@ -159,9 +162,9 @@ export default function URLInput({ onScan, loading, user }) {
         )}
       </motion.button>
 
-      {/* Trust badges */}
+      {/* Trust badges — I.6/I.7 : durée alignée sur la source unique brand.js */}
       <p className="text-success text-xs text-center mt-3 font-medium">
-        Gratuit · Sans inscription · Résultats en quelques minutes
+        Gratuit · Sans inscription · {SCAN_DURATION_PROMISE}
       </p>
     </motion.form>
   );

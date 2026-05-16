@@ -1,45 +1,65 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link, MousePointer, ShoppingCart, Percent, Wallet, ArrowLeft } from 'lucide-react';
+import { Link as LinkIcon, MousePointer, ShoppingCart, Percent, Wallet, ArrowLeft, BarChart3 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 
 export default function AffiliateDashboard() {
+  const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const refCode = new URLSearchParams(window.location.search).get('code');
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, []);
 
+  // V.1 — Auth Supabase obligatoire ; on récupère le token pour l'API.
   useEffect(() => {
-    if (!refCode) {
+    if (authLoading) return;
+    if (!user) {
       setLoading(false);
-      setError('Aucun code affilié fourni. Utilisez ?code=VOTRE_CODE dans l\'URL.');
+      setError('Connexion requise pour accéder à votre dashboard affiliation.');
       return;
     }
 
+    let cancelled = false;
     async function loadStats() {
       try {
-        const response = await fetch(`/api/affiliate-stats?code=${encodeURIComponent(refCode)}`);
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+        if (!accessToken) {
+          if (!cancelled) {
+            setError('Session expirée. Reconnectez-vous.');
+            setLoading(false);
+          }
+          return;
+        }
+
+        const response = await fetch('/api/affiliate-stats', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
         const payload = await response.json().catch(() => ({}));
 
+        if (cancelled) return;
+
         if (!response.ok) {
-          setError('Affilié introuvable ou problème de connexion.');
+          setError(payload?.error || 'Affilié introuvable ou problème de connexion.');
           setLoading(false);
           return;
         }
 
         setStats(payload.stats);
       } catch (err) {
-        setError('Erreur lors du chargement des statistiques.');
+        if (!cancelled) setError('Erreur lors du chargement des statistiques.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     loadStats();
-  }, [refCode]);
+    return () => { cancelled = true; };
+  }, [authLoading, user]);
 
   const statCards = [
     { icon: <MousePointer size={18} />, label: 'Clics', value: stats?.clicks ?? 0, color: 'text-primary' },
@@ -72,6 +92,9 @@ export default function AffiliateDashboard() {
     );
   }
 
+  const dailyClicks = stats?.dailyClicks ?? [];
+  const maxDailyClicks = dailyClicks.reduce((max, d) => Math.max(max, d.clicks), 0) || 1;
+
   return (
     <div className="min-h-screen pt-28 pb-20 px-4 bg-dark-navy">
       <div className="max-w-4xl mx-auto">
@@ -80,7 +103,7 @@ export default function AffiliateDashboard() {
           <p className="text-text-secondary text-sm mb-8">Bonjour {stats.name} — voici vos performances.</p>
 
           <div className="bg-card-bg border border-border-color rounded-2xl p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <Link size={18} className="text-primary flex-shrink-0" />
+            <LinkIcon size={18} className="text-primary flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-text-secondary text-xs mb-1">Votre lien à partager</p>
               <code className="text-white text-sm font-mono break-all">{stats.link}</code>
@@ -109,6 +132,28 @@ export default function AffiliateDashboard() {
                 <p className="text-text-secondary/60 text-xs">{card.label}</p>
               </motion.div>
             ))}
+          </div>
+
+          {/* V.3 — Activité 30 derniers jours */}
+          <div className="bg-card-bg border border-border-color rounded-2xl p-5 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 size={16} className="text-primary" />
+              <h2 className="text-white font-semibold text-sm">Activité sur 30 jours</h2>
+            </div>
+            {dailyClicks.length === 0 ? (
+              <p className="text-text-secondary/60 text-xs">Aucun clic enregistré sur les 30 derniers jours.</p>
+            ) : (
+              <div className="flex items-end gap-1 h-24" role="img" aria-label="Graphique des clics quotidiens sur 30 jours">
+                {dailyClicks.map((d) => (
+                  <div key={d.date} className="flex-1 flex flex-col justify-end" title={`${d.date} — ${d.clicks} clic${d.clicks > 1 ? 's' : ''}`}>
+                    <div
+                      className="w-full bg-primary/40 hover:bg-primary/70 transition-colors rounded-t"
+                      style={{ height: `${(d.clicks / maxDailyClicks) * 100}%`, minHeight: d.clicks > 0 ? '2px' : '0' }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

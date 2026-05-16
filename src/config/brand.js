@@ -2,7 +2,14 @@
 // Objectif : éviter les numéros/email hardcodés dispersés dans le code
 
 export const BRAND_NAME = 'Webisafe';
-export const BRAND_TAGLINE = 'Auditez la sécurité de votre site web en 30 secondes';
+export const BRAND_TAGLINE = 'Auditez la sécurité de votre site web en 60 secondes';
+
+// I.7 — Source unique de la durée de scan affichée à l'utilisateur.
+// Toute mention de durée doit utiliser ces constantes pour éviter les incohérences
+// entre Hero, FAQ, URLInput, emails, etc.
+export const SCAN_DURATION_AVG_LABEL = '60 secondes';
+export const SCAN_DURATION_RANGE_LABEL = '30 à 90 secondes';
+export const SCAN_DURATION_PROMISE = `Résultats en ${SCAN_DURATION_RANGE_LABEL}`;
 
 // URL canonique de la plateforme (sans slash final)
 // À mettre à jour dès l'achat du domaine pro (webisafe.com ou webisafe.ci)

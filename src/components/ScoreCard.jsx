@@ -1,6 +1,15 @@
 import { motion } from 'framer-motion';
 import { getScoreColor, getScoreBadge } from '../utils/calculateScore';
-import { ChevronRight, Lock } from 'lucide-react';
+import { ChevronRight, Lock, CheckCircle2, XCircle, AlertTriangle, HelpCircle } from 'lucide-react';
+
+// Mappe les statuts produits par Analyse.jsx (`pass` / `fail` / `warn` / `unknown`)
+// vers une icône lucide-react avec une couleur cohérente avec le design system.
+function StatusIcon({ status }) {
+  if (status === 'pass') return <CheckCircle2 size={14} className="text-success" aria-label="OK" />;
+  if (status === 'fail') return <XCircle size={14} className="text-danger" aria-label="Problème" />;
+  if (status === 'warn') return <AlertTriangle size={14} className="text-warning" aria-label="Attention" />;
+  return <HelpCircle size={14} className="text-white/30" aria-label="Indéterminé" />;
+}
 
 export default function ScoreCard({ title, icon, score, metrics, isPaid, onViewDetails, extra }) {
   const isNull = score === null;

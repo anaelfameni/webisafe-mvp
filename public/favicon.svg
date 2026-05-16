@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1566F0"/>
+      <stop offset="100%" stop-color="#0E4BC9"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="64" height="64" rx="12" ry="12" fill="url(#g)"/>
+  <!-- W agrandi : remplit ~85% du canvas (vs ~55% avant) pour rester lisible en favicon 16x16 -->
+  <g transform="translate(32 32) scale(1.32) translate(-32 -32)">
+    <path d="M14 18 L20.5 46 L26 28 L32 46 L37.5 28 L43.5 46 L50 18 L44.5 18 L40.5 38 L34.7 18 L29.3 18 L23.5 38 L19.5 18 Z" fill="#FFFFFF"/>
+  </g>
+</svg>

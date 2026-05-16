@@ -7,8 +7,18 @@
  */
 
 import { useLocation } from 'react-router-dom';
-import { SEOHead, pageMeta, organizationJsonLd, websiteJsonLd, softwareApplicationJsonLd } from './SEOHead';
+import {
+  SEOHead,
+  pageMeta,
+  organizationJsonLd,
+  websiteJsonLd,
+  softwareApplicationJsonLd,
+  articleJsonLd,
+  breadcrumbJsonLd,
+  getArticleMeta,
+} from './SEOHead';
 import { BRAND_URL } from '../config/brand';
+import { getArticleBySlug } from '../data/articles';
 
 // Mapping route → clé pageMeta
 function getMetaForPath(pathname) {
@@ -20,6 +30,67 @@ function getMetaForPath(pathname) {
   if (pathname === '/cgu') return pageMeta.cgu;
   if (pathname === '/confidentialite') return pageMeta.confidentialite;
   if (pathname === '/partenaire') return pageMeta.partenaire;
+
+  // T.1 / S.3 — Pages publiques agences & statut
+  if (pathname === '/white-label') {
+    return {
+      ...pageMeta.whiteLabel,
+      jsonLd: breadcrumbJsonLd([
+        { name: 'Accueil', url: BRAND_URL },
+        { name: 'White Label', url: `${BRAND_URL}/white-label` },
+      ]),
+    };
+  }
+  if (pathname === '/protect/status') {
+    return {
+      ...pageMeta.protectStatus,
+      jsonLd: breadcrumbJsonLd([
+        { name: 'Accueil', url: BRAND_URL },
+        { name: 'Protect', url: `${BRAND_URL}/protect` },
+        { name: 'Statut', url: `${BRAND_URL}/protect/status` },
+      ]),
+    };
+  }
+
+  // M.4 / N.1 — Ressources (liste + article)
+  if (pathname === '/ressources') {
+    return {
+      ...pageMeta.ressources,
+      jsonLd: breadcrumbJsonLd([
+        { name: 'Accueil', url: BRAND_URL },
+        { name: 'Ressources', url: `${BRAND_URL}/ressources` },
+      ]),
+    };
+  }
+  if (pathname.startsWith('/ressources/')) {
+    const slug = pathname.replace(/^\/ressources\//, '');
+    const article = getArticleBySlug(slug);
+    if (article) {
+      const meta = getArticleMeta(article);
+      return {
+        ...meta,
+        jsonLd: {
+          '@context': 'https://schema.org',
+          '@graph': [
+            articleJsonLd({
+              title: article.title,
+              description: article.excerpt,
+              url: meta.url,
+              image: `${BRAND_URL}/og-image.png`,
+              datePublished: article.publishedAt,
+              dateModified: article.updatedAt || article.publishedAt,
+            }),
+            breadcrumbJsonLd([
+              { name: 'Accueil', url: BRAND_URL },
+              { name: 'Ressources', url: `${BRAND_URL}/ressources` },
+              { name: article.title, url: meta.url },
+            ]),
+          ],
+        },
+      };
+    }
+    return { title: 'Article introuvable — Webisafe', noindex: true };
+  }
 
   // Pages privées : noindex
   if (pathname.startsWith('/admin')) return { title: 'Administration — Webisafe', noindex: true };

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Check, X } from 'lucide-react';
+import { Lock, Check, X, Clock, Mail, Loader2 } from 'lucide-react';
 
-export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, scanData }) {
+export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, scanData, scannedUrl }) {
   const recommendationCount = scanData?.recommendations?.length ?? 7;
 
   const features = [
@@ -11,6 +11,64 @@ export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, sca
     "Plan d'action de corrections",
     '1 rescan gratuit dans 30 jours',
   ];
+
+  // I.2 — État du formulaire "Me rappeler dans 24h"
+  const [remindMode, setRemindMode] = useState(false);
+  const [remindEmail, setRemindEmail] = useState('');
+  const [remindLoading, setRemindLoading] = useState(false);
+  const [remindError, setRemindError] = useState('');
+  const [remindSent, setRemindSent] = useState(false);
+
+  const handleRemindSubmit = async (event) => {
+    event.preventDefault();
+    setRemindError('');
+
+    const email = remindEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setRemindError('Adresse email invalide.');
+      return;
+    }
+
+    setRemindLoading(true);
+    try {
+      const response = await fetch('/api/remind-later', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          url: scannedUrl || null,
+          scanId: scanData?.scan_id || scanData?.id || null,
+          source: 'freemium_gate',
+        }),
+      });
+
+      if (!response.ok) {
+        let message = 'Une erreur est survenue. Réessayez.';
+        try {
+          const payload = await response.json();
+          if (payload?.error) message = payload.error;
+        } catch {
+          // ignore parse error
+        }
+        setRemindError(message);
+        return;
+      }
+      setRemindSent(true);
+    } catch {
+      setRemindError('Réseau indisponible. Réessayez plus tard.');
+    } finally {
+      setRemindLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    // Réinitialise le mode rappel à chaque fermeture
+    setRemindMode(false);
+    setRemindEmail('');
+    setRemindError('');
+    setRemindSent(false);
+    onClose();
+  };
 
   return (
     <AnimatePresence>
@@ -36,8 +94,9 @@ export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, sca
                 <span className="text-white font-semibold text-lg">Audit Premium</span>
               </div>
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="text-white/40 hover:text-white/80 transition-colors"
+                aria-label="Fermer"
               >
                 <X size={20} />
               </button>
@@ -91,7 +150,7 @@ export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, sca
               {/* CTA principal — ouvre AuthModal (signup) */}
               <button
                 onClick={() => {
-                  onClose();
+                  handleClose();
                   onUpgrade();
                 }}
                 className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 transition-colors text-white font-semibold text-base shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 relative overflow-hidden"
@@ -100,13 +159,97 @@ export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, sca
                 Obtenir le rapport : 35 000 FCFA
               </button>
 
-              {/* Lien secondaire */}
-              <button
-                onClick={onClose}
-                className="w-full mt-4 py-3 rounded-2xl border border-white/10 text-white font-semibold text-sm text-center transition-colors"
-              >
-                Continuer avec la version gratuite
-              </button>
+              {/* I.2 — Option "Pas maintenant, me rappeler dans 24h" */}
+              {!remindMode && !remindSent && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    onClick={handleClose}
+                    className="py-3 rounded-2xl border border-white/10 text-white/85 hover:bg-white/5 font-medium text-sm transition-colors"
+                  >
+                    Version gratuite
+                  </button>
+                  <button
+                    onClick={() => setRemindMode(true)}
+                    className="py-3 rounded-2xl border border-white/10 text-white/85 hover:bg-white/5 font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Clock size={14} className="text-blue-400" aria-hidden="true" />
+                    Me rappeler 24h
+                  </button>
+                </div>
+              )}
+
+              {remindMode && !remindSent && (
+                <form onSubmit={handleRemindSubmit} className="mt-4 space-y-3">
+                  <label className="block text-white/70 text-xs" htmlFor="remind-email">
+                    Votre email — nous vous renvoyons le rapport dans 24h, une seule fois.
+                  </label>
+                  <div className="relative">
+                    <Mail
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"
+                      aria-hidden="true"
+                    />
+                    <input
+                      id="remind-email"
+                      type="email"
+                      value={remindEmail}
+                      onChange={(e) => setRemindEmail(e.target.value)}
+                      placeholder="vous@exemple.com"
+                      required
+                      autoFocus
+                      disabled={remindLoading}
+                      className="w-full pl-10 pr-4 py-3 bg-[#0d1520] border border-white/10 rounded-2xl text-white placeholder:text-white/30 focus:outline-none focus:border-blue-500/60 transition-colors text-sm"
+                    />
+                  </div>
+                  {remindError && (
+                    <p className="text-rose-400 text-xs">{remindError}</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRemindMode(false);
+                        setRemindError('');
+                      }}
+                      disabled={remindLoading}
+                      className="py-3 rounded-2xl border border-white/10 text-white/70 hover:bg-white/5 font-medium text-sm transition-colors"
+                    >
+                      Retour
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={remindLoading}
+                      className="py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                      {remindLoading ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                          Envoi…
+                        </>
+                      ) : (
+                        'Programmer'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {remindSent && (
+                <div className="mt-4 p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-center">
+                  <p className="text-emerald-300 font-semibold text-sm">
+                    C'est noté.
+                  </p>
+                  <p className="text-white/70 text-xs mt-1">
+                    Nous vous renvoyons votre rapport et l'offre demain à la même heure.
+                  </p>
+                  <button
+                    onClick={handleClose}
+                    className="mt-3 text-blue-400 hover:underline text-xs font-medium"
+                  >
+                    Continuer la lecture du rapport gratuit
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         </motion.div>

@@ -1,3 +1,6 @@
+// H.8 — Erreurs routées vers le logger centralisé (Sentry en prod).
+import { logError } from './logger';
+
 async function postEmail(path, payload) {
   try {
     const response = await fetch(path, {
@@ -14,7 +17,7 @@ async function postEmail(path, payload) {
 
     return { success: true, data };
   } catch (error) {
-    console.error('Erreur email:', error);
+    logError('emailApi.postEmail', error, { path });
     return { success: false, error: error.message };
   }
 }

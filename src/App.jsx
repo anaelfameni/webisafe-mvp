@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState, Suspense, lazy } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
@@ -24,6 +25,22 @@ const Confidentialite = lazy(() => import('./pages/Confidentialite'));
 const APropos = lazy(() => import('./pages/APropos'));
 const Protect = lazy(() => import('./pages/Protect'));
 const Corrections = lazy(() => import('./pages/Corrections'));
+// M.4 — Ressources & articles vérifiés
+const Ressources = lazy(() => import('./pages/Ressources'));
+const Article = lazy(() => import('./pages/Article'));
+// T.1 — Page publique White Label
+const WhiteLabel = lazy(() => import('./pages/WhiteLabel'));
+// S.3 — Page publique de statut Protect
+const ProtectStatus = lazy(() => import('./pages/ProtectStatus'));
+// R.2 — Page publique de rapport partagé via lien tokenisé
+const SharedReport = lazy(() => import('./pages/SharedReport'));
+// R.5 — Support centralisé sur /contact (Support.jsx désactivé)
+// S.4 — Dashboard Protect détaillé
+const ProtectDashboard = lazy(() => import('./pages/ProtectDashboard'));
+// T.2 — Page de configuration branding agence (white label)
+const AgencyBranding = lazy(() => import('./pages/AgencyBranding'));
+// Page publique Fonctionnalités — détaille toutes les métriques mesurées par Webisafe
+const Fonctionnalites = lazy(() => import('./pages/Fonctionnalites'));
 // H.4 — NotFound minimaliste remplacé par la page Error complète
 const NotFoundPage = lazy(() => import('./pages/Error').then((mod) => ({ default: mod.NotFoundPage })));
 
@@ -98,7 +115,9 @@ function AppShell({ user, authLoading, logout, showAuth, setShowAuth, authMode, 
 
       <main>
         <Suspense fallback={<PageLoader />}>
-          <Routes>
+          {/* J.6 — Transitions de pages via AnimatePresence (key = pathname) */}
+          <AnimatePresence mode="wait" initial={false}>
+            <Routes location={location} key={location.pathname}>
             <Route
               path="/"
               element={
@@ -128,8 +147,19 @@ function AppShell({ user, authLoading, logout, showAuth, setShowAuth, authMode, 
             <Route path="/a-propos" element={<APropos />} />
             <Route path="/protect" element={<Protect />} />
             <Route path="/corrections" element={<Corrections />} />
+            <Route path="/ressources" element={<Ressources />} />
+            <Route path="/ressources/:slug" element={<Article />} />
+            <Route path="/white-label" element={<WhiteLabel />} />
+            <Route path="/protect/status" element={<ProtectStatus />} />
+            <Route path="/protect/dashboard" element={<ProtectDashboard user={user} authLoading={authLoading} />} />
+            <Route path="/share/:token" element={<SharedReport />} />
+            {/* /support et /support/:ticketId désactivés — redirigés vers /contact */}
+            <Route path="/agence/branding" element={<AgencyBranding user={user} authLoading={authLoading} />} />
+            <Route path="/fonctionnalites" element={<Fonctionnalites />} />
+            <Route path="/features" element={<Fonctionnalites />} />
             <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+            </Routes>
+          </AnimatePresence>
         </Suspense>
       </main>
 

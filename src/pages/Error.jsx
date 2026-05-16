@@ -5,6 +5,7 @@
 
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Home, RefreshCw, Mail } from 'lucide-react';
+import { SUPPORT_EMAIL } from '../config/brand';
 
 export default function ErrorPage({ 
   code = 500, 
@@ -67,11 +68,11 @@ export default function ErrorPage({
               Le problème persiste ? Contactez notre équipe :
             </p>
             <a
-              href="mailto:webisafe@gmail.com"
+              href={`mailto:${SUPPORT_EMAIL}`}
               className="inline-flex items-center gap-2 text-primary hover:underline text-sm"
             >
               <Mail className="w-4 h-4" />
-              webisafe@gmail.com
+              {SUPPORT_EMAIL}
             </a>
           </div>
 

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Copy, Loader2, ShieldCheck, Smartphone } from 'lucide-react';
+import { CheckCircle2, Copy, Loader2, ShieldCheck, Smartphone, Tag, X } from 'lucide-react';
 import ToastMessage from '../components/ToastMessage';
 import { useScans } from '../hooks/useScans';
 import { fetchLatestPaymentRequest, reportPayment, unlockScanAsAdmin } from '../utils/paymentApi';
 import { canUseAgencyBypass } from '../utils/agencyAccess';
 import { isValidEmail, normalizeURL } from '../utils/validators';
 import { WAVE_PAYMENT_AMOUNT, WAVE_PAYMENT_TOTAL, WAVE_PHONE_DISPLAY, formatFcfa, generateWavePaymentCode, getWaveBusinessLink } from '../utils/wavePayment';
+import { applyPromoDiscount, validatePromoCode } from '../utils/promoCodes';
 
 function PaymentStep({ icon, text }) {
   return (
@@ -36,6 +37,29 @@ export default function Payment({ user }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [toast, setToast] = useState(null);
   const [showManualFallback, setShowManualFallback] = useState(false);
+  // L.7 — Code promo
+  const [promoInput, setPromoInput] = useState('');
+  const [promo, setPromo] = useState(null);
+
+  const finalAmount = useMemo(() => {
+    const base = paymentRequest?.amount || WAVE_PAYMENT_TOTAL;
+    return applyPromoDiscount(base, promo);
+  }, [paymentRequest, promo]);
+
+  const handleApplyPromo = () => {
+    const result = validatePromoCode(promoInput);
+    if (!result) {
+      setToast({ type: 'error', message: 'Code promo invalide ou expiré.' });
+      return;
+    }
+    setPromo(result);
+    setToast({ type: 'success', message: `Code "${result.code}" appliqué (${result.label}).` });
+  };
+
+  const handleRemovePromo = () => {
+    setPromo(null);
+    setPromoInput('');
+  };
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -140,8 +164,10 @@ export default function Payment({ user }) {
         scan_id: scanId,
         user_email: email,
         url_to_audit: urlToAudit,
-        amount: WAVE_PAYMENT_TOTAL,
+        amount: finalAmount,
         wave_phone: wavePhone,
+        promo_code: promo?.code || null,
+        promo_discount: promo?.discount || 0,
       });
 
       setPaymentRequest(currentRequest);
@@ -268,13 +294,19 @@ export default function Payment({ user }) {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary font-bold text-white">W</div>
             <div className="text-left">
               <p className="text-base font-bold text-white">Paiement securisé</p>
-              <p className="text-xs uppercase tracking-[0.24em] text-primary">Wave Business</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-primary">Wave Money</p>
             </div>
           </div>
 
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-xs font-semibold text-emerald-400">
-            <ShieldCheck size={14} />
-            Validation sous 2h ouvrées
+          {/* I.4 — Compte à rebours réaliste précisant la fenêtre ouvrée */}
+          <div className="mt-4 inline-flex flex-col items-center gap-1 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-300">
+            <span className="inline-flex items-center gap-2">
+              <ShieldCheck size={14} aria-hidden="true" />
+              Validation sous 2h ouvrées
+            </span>
+            <span className="text-emerald-200/70 font-normal">
+              Lun-Ven 8h–18h GMT · Hors créneau : traité dès l'ouverture
+            </span>
           </div>
 
           <p className="mt-4 text-sm italic text-white/70">
@@ -283,12 +315,63 @@ export default function Payment({ user }) {
         </div>
 
         <div className="mt-8 text-center">
-          <p className="text-5xl font-bold text-white">{formatFcfa(paymentRequest.amount)}</p>
-          <p className="mt-2 text-sm text-white/50">Audit Premium Webisafe — One-time</p>
+          {promo && (
+            <p className="text-base text-white/40 line-through">{formatFcfa(paymentRequest.amount)}</p>
+          )}
+          <p className="text-5xl font-bold text-white">{formatFcfa(finalAmount)}</p>
+          <p className="mt-2 text-sm text-white/50">Audit Premium Webisafe — paiement unique, sans abonnement</p>
+          {promo && (
+            <p className="mt-1 text-xs font-semibold text-success">
+              Code {promo.code} appliqué : {promo.label}
+            </p>
+          )}
         </div>
 
-        {/* ── Bouton Wave Business ── */}
-        <div className="mt-8">
+        {/* ── L.7 — Champ code promo ── */}
+        <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/40 p-4">
+          <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/60 mb-2">
+            <Tag size={12} /> Code promo (facultatif)
+          </label>
+          {promo ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-success/30 bg-success/10 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-success" />
+                <span className="text-sm font-semibold text-success">{promo.code}</span>
+                <span className="text-xs text-white/60">— {promo.label}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemovePromo}
+                className="inline-flex items-center gap-1 text-xs text-white/50 hover:text-white transition"
+                aria-label="Retirer le code promo"
+              >
+                <X size={12} /> Retirer
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={promoInput}
+                onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyPromo(); } }}
+                placeholder="Ex : EARLY10"
+                className="flex-1 rounded-xl border border-white/15 bg-[#0F172A] px-3 py-2 text-sm uppercase tracking-wider text-white placeholder:text-white/25 focus:border-primary focus:outline-none transition"
+              />
+              <button
+                type="button"
+                onClick={handleApplyPromo}
+                disabled={!promoInput.trim()}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Appliquer
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── S.1 — Bouton Wave Money (Wave non PCI-DSS, terme « Business » retiré) ── */}
+        <div className="mt-6">
           <a
             href={getWaveBusinessLink('audit')}
             target="_blank"
@@ -296,10 +379,11 @@ export default function Payment({ user }) {
             className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#1B4DB6] px-6 py-4 text-lg font-bold text-white shadow-lg shadow-blue-900/30 transition hover:bg-[#1640A0]"
           >
             <Smartphone size={22} />
-            Payer {formatFcfa(paymentRequest.amount)} avec Wave
+            Payer {formatFcfa(finalAmount)} avec Wave
           </a>
           <p className="mt-3 text-center text-xs text-white/40">
             Le lien ouvre l&apos;application Wave sur votre téléphone. Le montant est déjà prérempli.
+            {promo && ' Appliquez la réduction côté Wave en saisissant le montant ci-dessus, ou notre équipe ajustera la commande au moment de la validation.'}
           </p>
         </div>
 
@@ -398,7 +482,7 @@ export default function Payment({ user }) {
             </div>
             <div className="space-y-3">
               <PaymentStep icon="1" text="Ouvrez Wave puis choisissez Envoyer de l'argent." />
-              <PaymentStep icon="2" text={`Entrez ${WAVE_PHONE_DISPLAY} et ${formatFcfa(WAVE_PAYMENT_TOTAL)}.`} />
+              <PaymentStep icon="2" text={`Entrez ${WAVE_PHONE_DISPLAY} et ${formatFcfa(finalAmount)}.`} />
               <PaymentStep icon="3" text={`Dans Note/Motif, collez le code ${paymentRequest.payment_code}.`} />
             </div>
           </div>

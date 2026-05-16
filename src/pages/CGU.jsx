@@ -59,14 +59,27 @@ export default function CGU() {
             </p>
             <p className="mt-3">
               <strong className="text-white">Rapport Premium (one-time) :</strong> 35 000 FCFA. Inclut le rapport PDF
-              complet (11 pages), le plan d'action détaillé, l'accès en ligne au rapport pendant
+              complet (13 pages), le plan d'action détaillé, l'accès en ligne au rapport pendant
               12 mois et un rescan offert dans les 30 jours suivant l'achat.
             </p>
             <p className="mt-3">
-              <strong className="text-white">Webisafe Protect (abonnement) :</strong> 15 000 FCFA / mois.
-              Inclut le monitoring uptime, les rescans hebdomadaires, les alertes critiques et l'accès
-              prioritaire au support. L'abonnement est sans engagement et résiliable à tout moment
-              depuis l'espace client.
+              <strong className="text-white">Webisafe Protect (abonnement) :</strong> 15 000 FCFA / mois en
+              facturation mensuelle, avec remises immédiates pour les paiements anticipés :{' '}
+              <strong className="text-white">-10 % en trimestriel</strong> (40 500 FCFA / 3 mois),{' '}
+              <strong className="text-white">-15 % en semestriel</strong> (76 500 FCFA / 6 mois) et{' '}
+              <strong className="text-white">-20 % en annuel</strong> (144 000 FCFA / an). L'abonnement
+              inclut le monitoring uptime, les rescans hebdomadaires, les alertes critiques et l'accès
+              prioritaire au support.
+            </p>
+            <p className="mt-3">
+              <strong className="text-white">Conditions d'annulation Protect :</strong> l'abonnement est
+              sans engagement de durée et résiliable à tout moment, par email à{' '}
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">{SUPPORT_EMAIL}</a>{' '}
+              ou depuis l'espace client. La résiliation prend effet à la fin du mois en cours pour la
+              formule mensuelle. Pour les formules trimestrielle, semestrielle et annuelle, le solde
+              non consommé est remboursé au prorata des mois entiers restants après application
+              du tarif mensuel standard (15 000 FCFA), déduction faite des mois déjà utilisés à tarif
+              remisé. Le remboursement est effectué sous 14 jours via le moyen de paiement initial.
             </p>
             <p className="mt-3">
               Les paiements sont traités via Wave Money. Les prix sont indiqués en Francs CFA (XOF) et

@@ -1,4 +1,4 @@
-import { json, readJsonBody, sendResendEmail, setCorsHeaders, checkRateLimit, getSupabaseAdminClient, requireAdmin } from '../api_shared/_utils.js';
+import { json, readJsonBody, sendResendEmail, setCorsHeaders, checkRateLimit, getSupabaseAdminClient, requireAdmin, logAdminAction } from '../api_shared/_utils.js';
 import { buildPaymentConfirmedEmail, resolveAppUrl } from '../src/utils/paymentEmails.js';
 
 export default async function handler(req, res) {
@@ -67,6 +67,19 @@ export default async function handler(req, res) {
         url_to_audit: payment.url_to_audit,
       })
     );
+
+    await logAdminAction({
+      req,
+      actor: admin,
+      action: 'payment.confirm',
+      targetType: 'payment_request',
+      targetId: paymentId,
+      metadata: {
+        scan_id: payment.scan_id,
+        payment_code: payment.payment_code,
+        user_email: payment.user_email,
+      },
+    });
 
     return json(res, 200, { success: true, payment_id: paymentId, scan_id: payment.scan_id });
   } catch (error) {

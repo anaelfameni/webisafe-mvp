@@ -32,6 +32,8 @@ import PremiumScoreCard from '../components/PremiumScoreCard';
 import RecommendationCard from '../components/RecommendationCard';
 import HighlightedTechText from '../components/HighlightedTechText';
 import ScanInsightCards from '../components/ScanInsightCards';
+import ShareModal from '../components/ShareModal';
+import AgencyNotesPanel from '../components/AgencyNotesPanel';
 
 import { useAuth } from '../hooks/useAuth';
 import { useScans } from '../hooks/useScans';
@@ -39,6 +41,7 @@ import { isAgencyUser } from '../utils/agencyAccess';
 import { logError } from '../utils/logger';
 
 import { generatePDF } from '../utils/generatePDF';
+import { generateCorrectionPlanPDF } from '../utils/generateCorrectionPlanPDF';
 import { getScoreBadge } from '../utils/calculateScore';
 import { formatDate, extractDomain } from '../utils/validators';
 import { buildPremiumExplanationParagraphs } from '../utils/premiumExplanation';
@@ -391,8 +394,10 @@ export default function Rapport() {
   const [fixPitchDismissed, setFixPitchDismissed] = useState(false);
   const [startingFixFlow, setStartingFixFlow] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingPlan, setDownloadingPlan] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shareTooltip, setShareTooltip] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const [isRescanning, setIsRescanning] = useState(false);
 
   useEffect(() => {
@@ -596,16 +601,58 @@ export default function Rapport() {
     }
   };
 
+  // R.8 — Plan de correction PDF dédié (jsPDF, instantané)
+  const handleDownloadCorrectionPlan = async () => {
+    if (!pdfScan || downloadingPlan) return;
+    trackClarityEvent('correction_plan_downloaded', id);
+    setDownloadingPlan(true);
+    try {
+      // Charge le branding agence si pertinent (silent fail)
+      let branding = null;
+      try {
+        if (isAgencyBypass) {
+          const { data: session } = await import('../lib/supabaseClient').then((m) =>
+            m.supabase.auth.getSession()
+          );
+          const token = session?.session?.access_token;
+          if (token) {
+            const res = await fetch('/api/branding', {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+              const json = await res.json();
+              branding = json?.branding || null;
+            }
+          }
+        }
+      } catch {
+        /* noop */
+      }
+      await generateCorrectionPlanPDF(pdfScan, { branding });
+    } catch (error) {
+      logError('correction-plan-download', error, { scanId: id });
+      alert(error?.message || 'Impossible de générer le plan de correction.');
+    } finally {
+      setDownloadingPlan(false);
+    }
+  };
+
   const handleShare = () => {
+    // R.2 — Ouvre la modale de partage tokenisé pour les utilisateurs authentifiés
+    // ayant un rapport premium. Sinon copie l'URL courante (legacy, lien direct).
     trackClarityEvent('report_shared', id);
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      setCopied(true);
-      setShareTooltip(true);
-      setTimeout(() => {
-        setCopied(false);
-        setShareTooltip(false);
-      }, 4000);
-    });
+    if (user?.id && pdfScan?.paid) {
+      setShareModalOpen(true);
+    } else {
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        setCopied(true);
+        setShareTooltip(true);
+        setTimeout(() => {
+          setCopied(false);
+          setShareTooltip(false);
+        }, 4000);
+      });
+    }
   };
 
   const sections = [
@@ -705,6 +752,16 @@ export default function Rapport() {
               {downloadingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
               {downloadingPdf ? 'Génération...' : 'Télécharger PDF'}
             </button>
+            {/* R.8 — Plan de correction dédié (jsPDF, instantané) */}
+            <button
+              onClick={handleDownloadCorrectionPlan}
+              disabled={downloadingPlan}
+              title="PDF léger focalisé sur les actions correctives, prêt à transmettre à votre équipe technique."
+              className="flex items-center gap-2 px-4 py-2.5 bg-card-bg border border-emerald-400/40 hover:border-emerald-300 hover:bg-emerald-400/10 text-emerald-200 rounded-xl text-sm transition-all"
+            >
+              {downloadingPlan ? <Loader2 size={16} className="animate-spin" /> : <Wrench size={16} />}
+              {downloadingPlan ? 'Génération...' : 'Plan de correction'}
+            </button>
             <button
               onClick={handleShare}
               className="flex items-center gap-2 px-4 py-2.5 bg-card-bg border border-border-color hover:border-primary/50 text-text-primary rounded-xl text-sm transition-all"
@@ -723,6 +780,13 @@ export default function Rapport() {
             Lien copié ! Partagez ce rapport avec votre client ou collègue — il pourra le consulter directement.
           </motion.p>
         )}
+        {/* R.7 — Notes internes (agences/admins uniquement). Le composant rend null si non autorisé. */}
+        {(isAgencyBypass || user?.role === 'admin') && (
+          <div className="mb-6">
+            <AgencyNotesPanel scanId={id} compact />
+          </div>
+        )}
+
         {/* ── Disclaimer grands sites ─────────────────────────────────────── */}
         <LargeSiteDisclaimer url={scan.url} score={norm?.globalScore ?? 0} />
 
@@ -1544,6 +1608,14 @@ export default function Rapport() {
         </div>
 
       </div>
+
+      {/* R.2 — Modale de partage tokenisé */}
+      <ShareModal
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        scanId={id}
+        scanUrl={extractDomain(scan?.url || '')}
+      />
     </div>
   );
 }

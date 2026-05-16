@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Lock } from 'lucide-react';
+import { Lock, Clock, Wrench, AlertTriangle, Sparkles } from 'lucide-react';
 
 // Adapté au nouveau format de recommandation :
 // { priorite, categorie, action, explication, impact, difficulte, temps }
@@ -64,6 +64,16 @@ function getDifficulteColor(label) {
   if (l.includes('technique')) return 'text-orange-400';
   if (l.includes('intermédiaire') || l.includes('intermediaire')) return 'text-yellow-400';
   return 'text-green-400';
+}
+
+function DifficultyBadge({ label }) {
+  const text = String(label || '').split('—')[0].trim() || 'Intermédiaire';
+  const color = getDifficulteColor(label);
+  return (
+    <span className={`text-[11px] font-semibold uppercase tracking-wider ${color}`}>
+      {text}
+    </span>
+  );
 }
 
 function getCategorieStyle(categorie) {
