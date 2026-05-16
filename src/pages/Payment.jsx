@@ -173,8 +173,10 @@ export default function Payment({ user }) {
       setPaymentRequest(currentRequest);
 
       setSubmitted(true);
-    } catch {
-      setToast({ type: 'error', message: 'Erreur reseau. Reessayez.' });
+    } catch (error) {
+      const msg = error?.message || 'Erreur réseau. Réessayez.';
+      console.error('[Payment] reportPayment failed:', error);
+      setToast({ type: 'error', message: msg });
     } finally {
       setSubmitting(false);
     }

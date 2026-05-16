@@ -83,7 +83,7 @@ export async function fetchPaymentRequests(limit = 20) {
 
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const response = await fetch(`/api/payment-requests?limit=${encodeURIComponent(limit)}`, {
+    const response = await fetch(`/api/payment-admin?limit=${encodeURIComponent(limit)}`, {
       headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
     });
 
@@ -143,11 +143,11 @@ export async function reportPayment(payload) {
 }
 
 export function sendConfirmPayment(payload) {
-  return postApi('/api/confirm-payment', payload, { auth: true });
+  return postApi('/api/payment-admin', { ...payload, action: 'confirm' }, { auth: true });
 }
 
 export function sendRejectPayment(payload) {
-  return postApi('/api/reject-payment', payload, { auth: true });
+  return postApi('/api/payment-admin', { ...payload, action: 'reject' }, { auth: true });
 }
 
 export function unlockScanAsAdmin(payload) {
