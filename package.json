@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview",
+    "preview": "npm run build && wrangler dev",
     "test": "vitest",
     "sitemap:generate": "node scripts/generate-sitemap.js",
-    "prebuild": "node scripts/generate-sitemap.js"
+    "prebuild": "node scripts/generate-sitemap.js",
+    "deploy": "npm run build && wrangler deploy"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.37.1",
     "@playwright/test": "^1.59.1",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.5.0",
@@ -21,7 +23,8 @@
     "vite": "^6.4.2",
     "vite-plugin-pwa": "^0.21.2",
     "vite-plugin-sitemap": "^0.8.2",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "wrangler": "^4.92.0"
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",
