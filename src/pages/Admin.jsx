@@ -93,7 +93,7 @@ export default function Admin({ user, authLoading = false }) {
 
   const loadSubscriptions = useCallback(async (silent = false) => {
     try {
-      const res = await fetch('/api/subscriptions', { headers: await getAdminHeaders() });
+      const res = await fetch('/api/subscribe', { headers: await getAdminHeaders() });
       if (res.ok) {
         const data = await res.json();
         setSubscriptions(data.subscriptions || []);
