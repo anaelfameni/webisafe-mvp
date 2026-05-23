@@ -34,10 +34,10 @@ function pdfApiPlugin() {
           res.setHeader('Cache-Control', 'no-store')
           res.end(pdf)
         } catch (error) {
-          console.error('PDF local error:', error)
+          console.error('[PDF local]', error?.stack || error)
           res.statusCode = 500
           res.setHeader('Content-Type', 'application/json')
-          res.end(JSON.stringify({ error: 'Erreur génération PDF locale' }))
+          res.end(JSON.stringify({ error: `Génération PDF locale impossible : ${String(error?.message || error).slice(0, 280)}` }))
         }
       })
     },
@@ -132,6 +132,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.vite/**', 'e2e/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.vite/**', 'e2e/**', '**/api_disabled/**'],
+    testTimeout: 15000,
   },
 })

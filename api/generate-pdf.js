@@ -17,6 +17,10 @@ export default async function handler(req, res) {
 
   try {
     const scanData = req.body && typeof req.body === 'object' ? req.body : await readJsonBody(req);
+    if (!scanData || (typeof scanData === 'object' && Object.keys(scanData).length === 0)) {
+      return json(res, 400, { error: 'Données du scan manquantes pour générer le PDF.' });
+    }
+
     const pdf = await generatePdf(scanData);
     const filename = buildPdfFilename(scanData);
 
@@ -26,7 +30,12 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     res.end(pdf);
   } catch (error) {
-    console.error('PDF Error:', error);
-    return json(res, 500, { error: 'Erreur génération PDF' });
+    // H.4 — Loguer le détail côté serveur mais renvoyer un message d'erreur
+    // utile au client (sans fuite de stack trace) pour faciliter le diagnostic.
+    console.error('[PDF] Génération échouée :', error?.stack || error);
+    const safeMessage = String(error?.message || 'Erreur interne').slice(0, 280);
+    return json(res, 500, {
+      error: `Génération PDF impossible : ${safeMessage}`,
+    });
   }
 }
