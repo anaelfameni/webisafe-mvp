@@ -83,7 +83,7 @@ function clamp(n, min, max) {
  * Score de 100 = IMPOSSIBLE sauf 0 failedCheck (et on plafonne à 97 même là).
  */
 function applyScoreCap(score, failedChecks = []) {
-    if (failedChecks.length === 0) return Math.min(score, 97);
+    if (failedChecks.length === 0) return score;
     const cap = Math.max(15, 89 - (failedChecks.length - 1) * 8);
     return Math.min(score, cap);
 }
@@ -201,24 +201,17 @@ export function combineSecurityScores({ legacyScore, advancedScore, extendedScor
     // On garde le legacyScore comme référence et on l'ajuste légèrement (±3) avec advanced/extended.
     let blended = base;
     if (Number.isFinite(Number(advancedScore))) {
-        const flooredAdvanced = (https && malwareDetected !== true)
-            ? Math.max(Number(advancedScore), 60)
-            : Number(advancedScore);
+        const flooredAdvanced = Number(advancedScore);
         blended = Math.round(blended * 0.95 + flooredAdvanced * 0.05);
     }
     if (Number.isFinite(Number(extendedScore))) {
-        const flooredExtended = (https && malwareDetected !== true)
-            ? Math.max(Number(extendedScore), 60)
-            : Number(extendedScore);
+        const flooredExtended = Number(extendedScore);
         blended = Math.round(blended * 0.95 + flooredExtended * 0.05);
     }
 
     let score = Math.max(base, blended);
-    // Minimum garanti pour les sites HTTPS sans malware :
-    // HTTPS + chiffrement TLS + pas de menace active = niveau de sécurité fondamental atteint.
-    // Un tel site (Google, Amazon, cybastiontech, etc.) mérite au minimum 90 ("Très bon").
-    // Les headers manquants restent visibles dans les recommandations.
-    if (https && malwareDetected !== true) score = Math.max(score, 90);
+    // Le score reflète honnêtement la posture réelle du site.
+    // Les headers manquants sont pénalisés — les recommandations guident l'amélioration.
     return Math.min(score, 99);
 }
 
@@ -386,7 +379,7 @@ async function scanPerformance(url, apiKey) {
     try {
         const psUrl =
             `https://www.googleapis.com/pagespeedonline/v5/runPagespeed` +
-            `?url=${encodeURIComponent(url)}&strategy=mobile&category=performance&key=${apiKey}`;
+            `?url=${encodeURIComponent(url)}&strategy=mobile&category=performance&category=accessibility&key=${apiKey}`;
         const res = await fetch(psUrl, { signal: controller.signal });
         if (!res.ok) throw new Error(`PageSpeed HTTP ${res.status}`);
         const data = await res.json();
@@ -445,6 +438,15 @@ async function scanPerformance(url, apiKey) {
             ? Math.max(fieldScore, cappedLabScore)
             : cappedLabScore;
 
+        // Accessibility score from Lighthouse (real WCAG-based audit)
+        const accessibilityScore = lr.categories?.accessibility?.score != null
+            ? Math.round(lr.categories.accessibility.score * 100)
+            : null;
+
+        // Tap targets audit from Lighthouse
+        const tapTargetsAudit = lr.audits?.['tap-targets'];
+        const tapTargetsOk = tapTargetsAudit?.score != null ? tapTargetsAudit.score >= 0.9 : null;
+
         return calibratePerformanceResult({
             score: finalScore,
             raw_score: labScore,
@@ -457,6 +459,8 @@ async function scanPerformance(url, apiKey) {
             nb_requetes: requestCount,
             failed_checks: failedChecks,
             opportunities,
+            accessibility_score: accessibilityScore,
+            tap_targets_ok: tapTargetsOk,
             partial: false,
         });
     } catch (err) {
@@ -833,7 +837,7 @@ async function scanSecurity(url, vtApiKey) {
         malware_detected: malwareDetected,
         https: isHttps,
         final_url: finalUrl,
-        ssl_grade: isHttps ? 'A' : 'Absent',
+        ssl_grade: isHttps ? 'Non vérifié' : 'Absent',
         headers_presents: headersPresent,
         headers_manquants: headersMissing,
         failed_checks: failedChecks,
@@ -965,10 +969,6 @@ async function scanSEO(url) {
     else if (effectiveH1Count > 1) failedChecks.push('multiple_h1');
 
     let cappedScore = applyScoreCap(Math.min(100, rawScore), failedChecks);
-    // Floor minimum pour les pages applicatives (ex: Google) qui manquent d'éléments de landing
-    if (title.length > 0 && isIndexable) {
-        cappedScore = Math.max(63, cappedScore);
-    }
     console.log(`[SEO] raw=${rawScore} failed=[${failedChecks.join(',')}] capped=${cappedScore}`);
 
     // ── Signaux SEO enrichis + Visibilité IA + recommandations business ─────
@@ -1152,8 +1152,8 @@ async function scanUX(url) {
     return {
         score: finalScore,
         raw_score: rawScore,
-        accessibility_score: rawScore,
-        tap_targets_ok: true,
+        accessibility_score: null, // Will be injected from Lighthouse after Promise.allSettled
+        tap_targets_ok: null,     // Will be injected from Lighthouse after Promise.allSettled
         issues,
         issues_count: issues.length,
         critical_count: issues.filter(i => i.severity === 'high').length,
@@ -1175,7 +1175,7 @@ function calculateGlobalScore(perf, sec, seo, ux) {
     if (seo != null) { score += seo * weights.seo; totalW += weights.seo; }
     if (ux != null) { score += ux * weights.ux; totalW += weights.ux; }
     if (totalW === 0) return 0;
-    return Math.min(Math.round(score / totalW), 97);
+    return Math.min(Math.round(score / totalW), 100);
 }
 
 function getGrade(score) {
@@ -1336,6 +1336,12 @@ export default async function handler(req, res) {
         const extendedSec = extendedSecResult.status === 'fulfilled' ? extendedSecResult.value : null;
 
         if (perf) perf.server_location = geo;
+
+        // Inject real Lighthouse accessibility & tap_targets into UX results
+        if (ux && perf) {
+            if (perf.accessibility_score != null) ux.accessibility_score = perf.accessibility_score;
+            if (perf.tap_targets_ok != null) ux.tap_targets_ok = perf.tap_targets_ok;
+        }
 
         if (sec && advancedSec) {
             sec.legacy_score = sec.legacy_score ?? sec.score;
