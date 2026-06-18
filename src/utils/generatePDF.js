@@ -1,4 +1,5 @@
 ﻿import { buildPdfAuditModel, buildPdfFilename, sanitizePdfText } from '../../lib/pdfModel.js';
+import { supabase } from '../lib/supabaseClient.js';
 
 export { buildPdfAuditModel, buildPdfFilename, sanitizePdfText };
 
@@ -21,9 +22,16 @@ export async function generatePDF(reportData) {
     throw new Error('La génération PDF Puppeteer doit être appelée depuis le navigateur ou une route serveur.');
   }
 
+  // Récupère le token de session pour l'auth Bearer requise par /api/generate-pdf
+  const { data: { session } } = await supabase.auth.getSession().catch(() => ({ data: {} }));
+  const headers = { 'Content-Type': 'application/json' };
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
+  }
+
   const response = await fetch('/api/generate-pdf', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(reportData || {}),
   });
 
