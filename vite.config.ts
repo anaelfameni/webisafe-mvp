@@ -67,6 +67,7 @@ export default defineConfig({
       ],
       exclude: ['/payment', '/admin', '/rapport/:id'],
       lastmod: new Date(),
+      generateRobotsTxt: false,
     }),
     // O.4 — Service Worker pour cache statique (PWA légère, pas d'app shell offline complète)
     VitePWA({

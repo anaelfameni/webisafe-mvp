@@ -308,7 +308,7 @@ export default function AgenceDashboard({ user, authLoading = false }) {
               icon={<Users size={40} />}
               title="Aucun client pour l’instant"
               description="Les sites audités par le compte agence apparaîtront ici avec leurs scores moyens."
-              cta={{ label: ‘Lancer un audit’, to: ‘/’ }}
+              cta={{ label: "Lancer un audit", to: "/" }}
             />
           ) : (
             <div className="space-y-3">
