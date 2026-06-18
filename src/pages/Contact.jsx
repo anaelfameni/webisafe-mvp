@@ -24,10 +24,11 @@ export default function Contact() {
     setError(null);
 
     try {
-      const response = await fetch('/api/contact', {
+      const response = await fetch('/api/misc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'contact',
           name: formData.name,
           email: formData.email,
           subject: formData.subject,

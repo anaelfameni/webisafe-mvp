@@ -28,10 +28,6 @@
       "memory": 256,
       "maxDuration": 15
     },
-    "api/admin-scans.js": {
-      "memory": 256,
-      "maxDuration": 15
-    },
     "api/correction-request.js": {
       "memory": 256,
       "maxDuration": 15
@@ -47,6 +43,10 @@
     "api/cron/rescan-reminder.js": {
       "memory": 256,
       "maxDuration": 30
+    },
+    "api/misc.js": {
+      "memory": 256,
+      "maxDuration": 15
     }
   },
   "crons": [

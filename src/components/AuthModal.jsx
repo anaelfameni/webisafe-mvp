@@ -84,10 +84,10 @@ export default function AuthModal({ isOpen, onClose, onAuth, initialMode = 'logi
       }
       setLoading(true);
       try {
-        const res = await fetch('/api/forgot-password', {
+        const res = await fetch('/api/misc', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ action: 'forgot-password', email }),
         });
         const data = await res.json();
         if (res.ok && data.success) {

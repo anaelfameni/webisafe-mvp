@@ -136,7 +136,7 @@ export function notifyAdmin(payload) {
 }
 
 export async function reportPayment(payload) {
-  const response = await postApi('/api/report-payment', payload);
+  const response = await postApi('/api/payment-admin', { ...payload, action: 'report' });
   const payment = response?.payment || response;
   upsertCachedPaymentRequest(payment);
   return payment;
@@ -160,7 +160,7 @@ export function markScanPaid(scanId) {
 
 export async function fetchScans(limit = 50) {
   const { data: { session } } = await supabase.auth.getSession();
-  const response = await fetch(`/api/admin-scans?limit=${encodeURIComponent(limit)}`, {
+  const response = await fetch(`/api/payment-admin?resource=scans&limit=${encodeURIComponent(limit)}`, {
     headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
   });
 
