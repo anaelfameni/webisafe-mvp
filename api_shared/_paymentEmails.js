@@ -49,18 +49,26 @@ export function buildAdminPaymentNotificationEmail({
   user_email,
   url_to_audit,
   wave_phone,
+  scan_id,
   timestamp,
 }) {
   const paymentCode = escapeHtml(payment_code);
   const clientEmail = escapeHtml(user_email);
   const auditUrl = escapeHtml(url_to_audit);
   const wavePhone = escapeHtml(wave_phone);
-  const ctaUrl = `${appUrl}/admin`;
+  const scanId = escapeHtml(scan_id || '');
+
+  // Lien direct vers le panel admin avec le code paiement pré-renseigné en query param.
+  // L'admin arrive directement sur la ligne concernée sans chercher manuellement.
+  const ctaUrl = `${appUrl}/admin?q=${encodeURIComponent(payment_code || '')}`;
 
   const body = `
     <p style="margin:0 0 22px;font-size:15px;line-height:1.7;color:#cbd5e1">
       Un nouveau paiement Wave nécessite votre vérification manuelle avant activation du rapport premium.
     </p>
+    <div style="margin:0 0 18px;padding:14px 20px;border-radius:14px;background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.30);color:#fca5a5;font-size:14px;font-weight:700">
+      ⏱ À valider sous 2h ouvrées — le client attend sa confirmation par email.
+    </div>
     <div style="margin:0 0 22px;padding:22px;border-radius:20px;background:rgba(15,23,42,0.72);border:1px solid rgba(96,165,250,0.22)">
       <div style="font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#7fb0ff;margin-bottom:8px">Code paiement</div>
       <div style="font-size:28px;font-weight:900;letter-spacing:0.04em;color:#1566F0">${paymentCode}</div>
@@ -70,21 +78,23 @@ export function buildAdminPaymentNotificationEmail({
       <tr><td style="padding:12px 0;border-bottom:1px solid rgba(148,163,184,0.14);color:#94a3b8">Site audité</td><td style="padding:12px 0;border-bottom:1px solid rgba(148,163,184,0.14);color:#f8fafc;text-align:right">${auditUrl}</td></tr>
       <tr><td style="padding:12px 0;border-bottom:1px solid rgba(148,163,184,0.14);color:#94a3b8">Numéro Wave client</td><td style="padding:12px 0;border-bottom:1px solid rgba(148,163,184,0.14);color:#f8fafc;text-align:right">${wavePhone}</td></tr>
       <tr><td style="padding:12px 0;border-bottom:1px solid rgba(148,163,184,0.14);color:#94a3b8">Montant</td><td style="padding:12px 0;border-bottom:1px solid rgba(148,163,184,0.14);color:#f8fafc;text-align:right">35 000 FCFA</td></tr>
-      <tr><td style="padding:12px 0;color:#94a3b8">Heure</td><td style="padding:12px 0;color:#f8fafc;text-align:right">${escapeHtml(timestamp)}</td></tr>
+      ${scanId ? `<tr><td style="padding:12px 0;border-bottom:1px solid rgba(148,163,184,0.14);color:#94a3b8">Scan ID</td><td style="padding:12px 0;border-bottom:1px solid rgba(148,163,184,0.14);color:#7fb0ff;text-align:right;font-family:monospace;font-size:13px">${scanId}</td></tr>` : ''}
+      <tr><td style="padding:12px 0;color:#94a3b8">Reçu le</td><td style="padding:12px 0;color:#f8fafc;text-align:right">${escapeHtml(timestamp)}</td></tr>
     </table>
     <div style="margin:0 0 24px;padding:18px 20px;border-radius:18px;background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.28);color:#fde68a;font-size:14px;line-height:1.7">
-      Verifiez dans votre app Wave que vous avez bien recu 35 000 FCFA avec la note ${paymentCode} avant de valider.
+      Vérifiez dans votre app Wave que vous avez bien reçu <strong>35 000 FCFA</strong> avec la note <strong>${paymentCode}</strong> avant de valider.
     </div>
-    <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;background:#1566F0;color:#ffffff;text-decoration:none;padding:15px 24px;border-radius:14px;font-weight:800;box-shadow:0 16px 36px rgba(21,102,240,0.34)">Valider dans le Panel Admin</a>
+    <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;background:#1566F0;color:#ffffff;text-decoration:none;padding:15px 24px;border-radius:14px;font-weight:800;box-shadow:0 16px 36px rgba(21,102,240,0.34)">Valider ce paiement →</a>
+    <p style="margin:16px 0 0;font-size:12px;color:#64748b">Lien direct : ${escapeHtml(ctaUrl)}</p>
   `;
 
   return {
     to: 'webisafe@gmail.com',
-    subject: `[ACTION REQUISE] Nouveau paiement Wave - ${String(payment_code || '').replace(/[\r\n]+/g, ' ')}`,
+    subject: `[ACTION REQUISE ⚡] Paiement Wave — ${String(user_email || '').replace(/[\r\n]+/g, ' ')} — ${String(payment_code || '').replace(/[\r\n]+/g, ' ')}`,
     html: createEmailShell({
-      title: 'Nouveau paiement a valider',
+      title: 'Nouveau paiement à valider',
       body,
-      footer: 'Email automatique Webisafe - Ne pas repondre',
+      footer: 'Email automatique Webisafe — Ne pas répondre',
       appUrl,
     }),
   };
@@ -171,6 +181,41 @@ export function buildPaymentConfirmedEmail({
       body,
       footer: 'Merci de votre confiance.',
       appUrl,
+    }),
+  };
+}
+
+export function buildRescanReminderEmail({ appUrl, scan_id, user_email, url_to_audit }) {
+  const reportUrl = `${(appUrl || DEFAULT_APP_URL)}/rapport/${escapeHtml(scan_id)}`;
+  const auditUrl = escapeHtml(url_to_audit || '');
+
+  const body = `
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.8;color:#dbe7ff">Bonjour,</p>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.8;color:#cbd5e1">
+      Il y a maintenant plus de <strong style="color:#ffffff">30 jours</strong> que vous avez obtenu
+      votre audit premium pour <strong style="color:#ffffff">${auditUrl}</strong>.
+    </p>
+    <p style="margin:0 0 22px;font-size:15px;line-height:1.8;color:#cbd5e1">
+      Comme promis dans votre offre Premium, votre <strong style="color:#ffffff">rescan gratuit</strong>
+      est maintenant disponible. Voyez comment votre site a évolué depuis votre premier audit.
+    </p>
+    <div style="margin:0 0 24px;padding:20px;border-radius:18px;background:rgba(34,197,94,0.10);border:1px solid rgba(34,197,94,0.28);color:#bbf7d0;font-size:14px;line-height:1.8">
+      ✅ <strong>1 rescan gratuit inclus</strong> — valable maintenant, aucun paiement requis.
+    </div>
+    <a href="${escapeHtml(reportUrl)}" style="display:inline-block;background:#1566F0;color:#ffffff;text-decoration:none;padding:15px 28px;border-radius:14px;font-weight:800;font-size:15px;box-shadow:0 16px 36px rgba(21,102,240,0.34)">Demander mon rescan gratuit →</a>
+    <p style="margin:20px 0 0;font-size:13px;color:#64748b">
+      Ou contactez-nous sur WhatsApp : +225 05 95 33 56 62
+    </p>
+  `;
+
+  return {
+    to: user_email,
+    subject: 'Votre rescan gratuit Webisafe est disponible',
+    html: createEmailShell({
+      title: '🔄 Votre rescan gratuit est prêt',
+      body,
+      footer: 'Vous recevez cet email car vous avez souscrit à un audit premium Webisafe.',
+      appUrl: appUrl || DEFAULT_APP_URL,
     }),
   };
 }

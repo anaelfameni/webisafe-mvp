@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import ToastMessage from '../components/ToastMessage';
+import EmptyState from '../components/EmptyState';
 import { useScans } from '../hooks/useScans';
 import { getDashboardAccessState } from '../utils/agencyAccess';
 import { loadAgencySettings, normalizeAgencySettings, saveAgencySettings } from '../utils/agencySettings';
@@ -136,14 +137,6 @@ function ToggleRow({ label, description, checked, onChange }) {
   );
 }
 
-function EmptyState({ title, text }) {
-  return (
-    <div className="rounded-3xl border border-dashed border-white/12 bg-white/[0.03] p-8 text-center">
-      <p className="text-lg font-black text-white">{title}</p>
-      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-white/50">{text}</p>
-    </div>
-  );
-}
 
 export default function AgenceDashboard({ user, authLoading = false }) {
   const navigate = useNavigate();
@@ -310,7 +303,14 @@ export default function AgenceDashboard({ user, authLoading = false }) {
             </div>
             <button onClick={() => setActivePage('clients')} className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-xs font-black text-cyan-100">Tous les clients</button>
           </div>
-          {clients.length === 0 ? <EmptyState title="Aucun client pour l’instant" text="Les sites audités par le compte agence apparaîtront ici avec leurs scores moyens." /> : (
+          {clients.length === 0 ? (
+            <EmptyState
+              icon={<Users size={40} />}
+              title="Aucun client pour l’instant"
+              description="Les sites audités par le compte agence apparaîtront ici avec leurs scores moyens."
+              cta={{ label: ‘Lancer un audit’, to: ‘/’ }}
+            />
+          ) : (
             <div className="space-y-3">
               {clients.slice(0, 5).map((client, index) => (
                 <div key={client.domain} className="grid gap-4 rounded-3xl border border-white/10 bg-slate-950/55 p-4 md:grid-cols-[auto_1fr_auto] md:items-center">
@@ -341,7 +341,14 @@ export default function AgenceDashboard({ user, authLoading = false }) {
                 <p className="text-sm text-white/45">Rapports récents à ouvrir ou remettre au client.</p>
               </div>
             </div>
-            {recentReports.length === 0 ? <EmptyState title="Aucun rapport généré" text="Les rapports premium apparaîtront ici dès que des audits seront disponibles." /> : (
+            {recentReports.length === 0 ? (
+              <EmptyState
+                icon={<FileText size={40} />}
+                title="Aucun rapport généré"
+                description="Les rapports premium apparaîtront ici dès que des audits seront disponibles."
+                cta={{ label: 'Lancer un audit', to: '/' }}
+              />
+            ) : (
               <div className="space-y-3">
                 {recentReports.slice(0, 4).map((scan) => (
                   <button key={scan.id || scan.url} onClick={() => scan.id && navigate(`/rapport/${encodeURIComponent(scan.id)}`, { state: { agencyBypass: true, agencyScan: scan } })} className="flex w-full items-center justify-between gap-4 rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-left transition hover:border-violet-300/25">
@@ -380,7 +387,14 @@ export default function AgenceDashboard({ user, authLoading = false }) {
         </div>
         <span className="rounded-full border border-primary/25 bg-primary/10 px-4 py-2 text-xs font-bold text-primary">{clients.length} client(s)</span>
       </div>
-      {clients.length === 0 ? <EmptyState title="Aucun projet client" text="Les domaines audités par le compte agence seront regroupés automatiquement dans cette section." /> : (
+      {clients.length === 0 ? (
+        <EmptyState
+          icon={<Users size={40} />}
+          title="Aucun projet client"
+          description="Les domaines audités par le compte agence seront regroupés automatiquement dans cette section."
+          cta={{ label: 'Auditer un site', to: '/' }}
+        />
+      ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-left text-sm">
             <thead className="text-xs uppercase tracking-[0.18em] text-white/35">
@@ -410,7 +424,14 @@ export default function AgenceDashboard({ user, authLoading = false }) {
       <h1 className="text-2xl font-black text-white">Audits récents</h1>
       <p className="mt-1 text-sm text-white/50">Historique opérationnel des audits réalisés par l’agence.</p>
       <div className="mt-6 space-y-3">
-        {recentAudits.length === 0 ? <EmptyState title="Aucun audit disponible" text="Les audits lancés par le compte agence apparaîtront ici." /> : recentAudits.map((scan) => (
+        {recentAudits.length === 0 ? (
+          <EmptyState
+            icon={<Activity size={40} />}
+            title="Aucun audit disponible"
+            description="Les audits lancés par le compte agence apparaîtront ici."
+            cta={{ label: 'Lancer un audit', to: '/' }}
+          />
+        ) : recentAudits.map((scan) => (
           <div key={scan.id || scan.url} className="grid gap-4 rounded-3xl border border-white/10 bg-slate-950/55 p-4 md:grid-cols-[1.2fr_0.7fr_0.7fr_auto] md:items-center">
             <div className="min-w-0">
               <p className="truncate font-black text-white">{extractDomain(scan.url) || scan.url}</p>
@@ -431,7 +452,14 @@ export default function AgenceDashboard({ user, authLoading = false }) {
         <h1 className="text-2xl font-black text-white">Rapports agence</h1>
         <p className="mt-1 text-sm text-white/50">Rapports premium à partager avec vos clients, avec accès direct agence.</p>
       </div>
-      {recentReports.length === 0 ? <EmptyState title="Aucun rapport généré" text="Les rapports premium apparaîtront ici dès que des audits seront disponibles." /> : (
+      {recentReports.length === 0 ? (
+        <EmptyState
+          icon={<FileText size={40} />}
+          title="Aucun rapport généré"
+          description="Les rapports premium apparaîtront ici dès que des audits seront disponibles."
+          cta={{ label: 'Lancer un audit', to: '/' }}
+        />
+      ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {recentReports.map((scan) => (
             <article key={scan.id || scan.url} className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">

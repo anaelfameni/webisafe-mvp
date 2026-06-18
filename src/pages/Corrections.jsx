@@ -22,6 +22,8 @@ import { buildPackImprovements } from '../utils/correctionPacks';
 import { useScans } from '../hooks/useScans';
 import { extractDomain, normalizeURL, isValidURL } from '../utils/validators';
 
+const PACK_ALIAS = { combo: 'standard' };
+
 const PACKS = [
   {
     id: 'rapide',
@@ -154,8 +156,11 @@ export default function Corrections() {
   const [searchParams] = useSearchParams();
   const { scans } = useScans();
   const prefilledUrl = searchParams.get('url') || '';
+  const prefilledPackParam = searchParams.get('pack') || '';
+  const initialPack = PACK_ALIAS[prefilledPackParam]
+    ?? (PACKS.some((p) => p.id === prefilledPackParam) ? prefilledPackParam : 'standard');
 
-  const [selectedPack, setSelectedPack] = useState('standard');
+  const [selectedPack, setSelectedPack] = useState(initialPack);
   const [form, setForm] = useState({
     name: '',
     email: '',

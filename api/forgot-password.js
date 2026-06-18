@@ -5,7 +5,7 @@ import { setCorsHeaders, checkRateLimit, sendResendEmail } from '../api_shared/_
 // d'emails et le spam de l'API Resend.
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || null;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || null;
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();

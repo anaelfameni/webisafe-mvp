@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useLiveStats } from '../hooks/useLiveStats';
-import { Zap, Shield, Search, Smartphone, ArrowRight, TrendingDown, Eye, Activity, Globe, Radio, Clock, Snail, ShieldAlert, CheckCircle, FileText, MapPin, Image as ImageIcon, Circle, AlertCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Zap, Shield, Search, Smartphone, ArrowRight, TrendingDown, Eye, Activity, Globe, Radio, Clock, Snail, ShieldAlert, Circle, AlertCircle, AlertTriangle } from 'lucide-react';
 import { SUPPORT_PHONE, SCAN_DURATION_AVG_LABEL, SCAN_DURATION_RANGE_LABEL } from '../config/brand';
 import toast from 'react-hot-toast';
 import URLInput from '../components/URLInput';
@@ -43,9 +43,11 @@ export default function Home() {
 
   useEffect(() => {
     if (location.state?.scrollToTop) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.getElementById('hero')?.scrollIntoView({ behavior: 'smooth' });
+      // Efface le state pour éviter le re-scroll si l'utilisateur navigue en arrière
+      navigate(location.pathname, { replace: true, state: { ...location.state, scrollToTop: false } });
     }
-  }, [location.state]);
+  }, [location.state, location.pathname, navigate]);
 
   const normalizeUrl = (input) => {
     let normalized = input.trim();
@@ -116,7 +118,7 @@ export default function Home() {
 
   const solutionCards = [
     { icon: <Zap size={24} />, title: 'Performance', description: 'Votre site charge-t-il assez vite ? Un retard de 1 seconde = 7% de clients perdus.', color: 'text-warning' },
-    { icon: <Shield size={24} />, title: 'Sécurité', description: 'Votre site est-il une cible facile ? 73% des sites africains ont une faille non détectée.', color: 'text-danger' },
+    { icon: <Shield size={24} />, title: 'Sécurité', description: 'Votre site est-il une cible facile ? La majorité des PME africaines ignorent les failles qui exposent leurs données.', color: 'text-danger' },
     { icon: <Search size={24} />, title: 'SEO', description: 'Google vous trouve-t-il ? Un site invisible sur Google = zéro nouveau client organique.', color: 'text-success' },
     { icon: <Smartphone size={24} />, title: 'UX Mobile', description: 'Votre site fonctionne-t-il sur téléphone ? 78% de vos visiteurs sont sur mobile.', color: 'text-primary' },
   ];
@@ -174,7 +176,7 @@ export default function Home() {
             {/* E.1 — Emoji médecin remplacé par icône Lucide neutre */}
             <Activity size={14} className="text-primary" aria-hidden="true" />
             <span className="text-primary text-sm font-medium">
-              Audit complet en {SCAN_DURATION_AVG_LABEL} — Sécurité, performance et SEO
+              Audit complet · Rapport actionnable · Corrections incluses
             </span>
           </motion.div>
 
@@ -198,7 +200,7 @@ export default function Home() {
             transition={{ delay: 0.4, duration: 1.2, ease: 'easeOut' }}
             className="text-text-secondary text-lg lg:text-xl mb-6 max-w-2xl mx-auto"
           >
-            Performance · Sécurité · SEO · UX
+            Sécurité · Performance · SEO · UX
           </motion.p>
 
           <motion.div
@@ -352,12 +354,11 @@ export default function Home() {
               </div>
 
               <div className="lg:col-span-4 grid grid-cols-2 gap-4">
-                {/* E.3 — Emojis catégories remplacés par Lucide icons */}
                 {[
-                  { Icon: Zap, name: 'Performance', score: 68, color: 'bg-warning', iconClass: 'text-warning' },
-                  { Icon: Shield, name: 'Sécurité', score: 45, color: 'bg-danger', iconClass: 'text-danger' },
-                  { Icon: Search, name: 'SEO', score: 82, color: 'bg-success', iconClass: 'text-success' },
-                  { Icon: Smartphone, name: 'UX Mobile', score: 71, color: 'bg-primary', iconClass: 'text-primary' },
+                  { Icon: Zap, name: 'Performance', score: 72, color: 'bg-warning', iconClass: 'text-warning' },
+                  { Icon: Shield, name: 'Sécurité', score: 61, color: 'bg-warning', iconClass: 'text-warning' },
+                  { Icon: Search, name: 'SEO', score: 79, color: 'bg-success', iconClass: 'text-success' },
+                  { Icon: Smartphone, name: 'UX Mobile', score: 76, color: 'bg-primary', iconClass: 'text-primary' },
                 ].map((cat, index) => {
                   const CatIcon = cat.Icon;
                   return (
@@ -378,47 +379,65 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="space-y-3">
-              <p className="text-white font-semibold text-sm mb-3">Remarques prioritaires :</p>
-              {/* E.3 — Emojis 🟢🟠🔴 remplacés par <Circle> coloré */}
+            <div className="space-y-2">
+              <p className="text-white font-semibold text-sm mb-3">Ce que Webisafe a trouvé :</p>
               {[
-                { severity: 'ok', title: 'Texte ok sur mobile' },
-                { severity: 'ok', title: 'Images compressées' },
-                { severity: 'warn', title: 'Meta description absente' },
-                { severity: 'critical', title: 'Headers de sécurité manquants' },
-                { severity: 'critical', title: 'Sitemap.xml non trouvé' },
-              ].map((rec, index) => {
+                {
+                  severity: 'ok',
+                  problem: 'Affichage mobile parfait',
+                  action: 'Aucune action requise',
+                  detail: null,
+                },
+                {
+                  severity: 'ok',
+                  problem: 'Images déjà bien optimisées',
+                  action: 'Format et poids OK',
+                  detail: null,
+                },
+                {
+                  severity: 'warn',
+                  problem: "Vos pages n'ont pas de résumé visible dans Google",
+                  action: 'Ajouter une description par page',
+                  detail: 'balise meta description',
+                },
+                {
+                  severity: 'critical',
+                  problem: 'Votre site est exposé à certaines attaques web',
+                  action: 'Activer HSTS + CSP + protection iframe',
+                  detail: 'HSTS, CSP, X-Frame-Options',
+                },
+                {
+                  severity: 'critical',
+                  problem: 'Google ne voit pas tout votre site',
+                  action: 'Générer sitemap.xml + robots.txt',
+                  detail: 'sitemap.xml manquant',
+                },
+              ].map((item, index) => {
                 const dotColor =
-                  rec.severity === 'ok' ? 'text-success'
-                  : rec.severity === 'warn' ? 'text-warning'
+                  item.severity === 'ok' ? 'text-success'
+                  : item.severity === 'warn' ? 'text-warning'
                   : 'text-danger';
+                const actionColor =
+                  item.severity === 'ok' ? 'text-success/70'
+                  : item.severity === 'warn' ? 'text-warning/80'
+                  : 'text-danger/80';
                 return (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-dark-navy rounded-lg">
-                    <Circle size={10} className={`${dotColor} fill-current flex-shrink-0`} />
-                    <span className="text-text-primary text-sm">{rec.title}</span>
+                  <div key={index} className="flex items-start gap-3 p-3 bg-dark-navy rounded-lg">
+                    <Circle size={10} className={`${dotColor} fill-current flex-shrink-0 mt-1.5`} />
+                    <div className="flex-1 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-4 min-w-0">
+                      <div className="min-w-0">
+                        <span className="text-text-primary text-sm">{item.problem}</span>
+                        {item.detail && (
+                          <p className="text-text-secondary text-xs mt-0.5">{item.detail}</p>
+                        )}
+                      </div>
+                      <span className={`text-xs font-medium sm:text-right sm:whitespace-nowrap sm:flex-shrink-0 ${actionColor}`}>
+                        {item.action}
+                      </span>
+                    </div>
                   </div>
                 );
               })}
-
-              <div className="mt-5 pt-4 border-t border-border-color">
-                <p className="text-white font-semibold text-sm mb-3">Plan de correction :</p>
-                {/* E.3 — Emojis ✅🖼️📝🛡️📍 remplacés par Lucide icons */}
-                {[
-                  { Icon: CheckCircle, iconClass: 'text-success', fix: 'Responsive validé — texte lisible sans zoom' },
-                  { Icon: ImageIcon, iconClass: 'text-primary', fix: 'Convertir images en WebP/AVIF, lazy-load' },
-                  { Icon: FileText, iconClass: 'text-primary', fix: 'Ajouter <meta name="description"> par page' },
-                  { Icon: ShieldCheck, iconClass: 'text-primary', fix: 'Activer HSTS + CSP + X-Frame-Options' },
-                  { Icon: MapPin, iconClass: 'text-primary', fix: 'Générer sitemap.xml + robots.txt' },
-                ].map((item, index) => {
-                  const ItemIcon = item.Icon;
-                  return (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/10 rounded-lg">
-                      <ItemIcon size={16} className={`${item.iconClass} flex-shrink-0`} />
-                      <span className="text-text-primary text-sm">{item.fix}</span>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
           </motion.div>
         </div>

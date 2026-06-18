@@ -25,6 +25,7 @@ import {
   Lock,
   XCircle,
   CheckCircle2,
+  ChevronDown,
 } from 'lucide-react';
 
 import CriticalAlertsBanner from '../components/CriticalAlertsBanner';
@@ -235,9 +236,16 @@ function buildSmartNarrative(norm) {
   }
 
   // Ligne 3 : alertes critiques
-  const criticalCount = alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length;
-  if (criticalCount > 0) {
-    lines.push(`${criticalCount} alerte(s) critique(s) détectée(s) nécessitant une correction rapide pour éviter un impact business.`);
+  // "critique" = severity critical uniquement ; "élevée" = high — on les compte séparément
+  // pour que le texte corresponde exactement à ce que le banner affiche.
+  const criticalOnlyCount = alerts.filter(a => a.severity === 'critical').length;
+  const highCount = alerts.filter(a => a.severity === 'high').length;
+  const urgentCount = criticalOnlyCount + highCount;
+  if (criticalOnlyCount > 0 && highCount > 0) {
+    lines.push(`${criticalOnlyCount} alerte(s) critique(s) et ${highCount} alerte(s) élevée(s) détectée(s) nécessitant une correction rapide pour éviter un impact business.`);
+  } else if (urgentCount > 0) {
+    const label = criticalOnlyCount > 0 ? 'critique(s)' : 'élevée(s)';
+    lines.push(`${urgentCount} alerte(s) ${label} détectée(s) nécessitant une correction rapide pour éviter un impact business.`);
   } else if (g >= 80) {
     lines.push("Aucune alerte critique détectée — votre site inspire confiance aux visiteurs et aux moteurs de recherche.");
   }
@@ -345,6 +353,11 @@ function normalizeScan(scan) {
     scan.created_at ??
     null;
 
+  // Le score sécurité est déjà consolidé côté serveur par combineSecurityScores()
+  // dans api/scan.js (basique×0.55 + avancé×0.35 + étendu×0.10) avant d'être
+  // stocké en base. On l'utilise tel quel pour que rapport web et PDF affichent
+  // exactement le même chiffre — jamais de recalcul frontend.
+
   return {
     raw: scan,
     globalScore,
@@ -370,6 +383,71 @@ function normalizeScan(scan) {
     extendedSecurityScore,
     recommendations: scan.recommendations ?? scan.recommandations ?? [],
   };
+}
+
+// ── Accordéon "Détails techniques" ───────────────────────────────────────────
+// Composant extrait au niveau module pour respecter la règle des hooks React :
+// useState ne peut pas être appelé dans une IIFE imbriquée dans du JSX.
+function TechnicalDetailsAccordion({ activeChecks, passiveChecks }) {
+  const [open, setOpen] = useState(false);
+  if (activeChecks.length === 0 && passiveChecks.length === 0) return null;
+  const hasRawData = activeChecks.some(c => c.technical_detail);
+  if (!hasRawData && passiveChecks.length === 0) return null;
+
+  return (
+    <div className="mt-4">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2 text-white/40 hover:text-white/70 text-xs font-medium transition-colors py-1"
+        aria-expanded={open}
+      >
+        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        {open ? 'Masquer les détails techniques' : 'Voir les détails techniques'}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-3 pt-3">
+              {activeChecks.filter(c => c.technical_detail).map((check, i) => (
+                <div key={`raw-${i}`} className="rounded-xl border border-white/8 bg-black/20 p-3">
+                  <p className="text-white/50 text-[11px] font-semibold mb-1">{check.title} — données brutes</p>
+                  <p className="text-white/30 text-[11px] font-mono break-all">{check.technical_detail}</p>
+                </div>
+              ))}
+              {passiveChecks.map((check, i) => (
+                <div key={`passive-${i}`} className="rounded-xl border border-white/10 bg-card-bg/30 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-white text-sm font-semibold">{check.title}</p>
+                      <p className="text-white/65 text-xs mt-1">{check.description}</p>
+                      {check.technical_detail && (
+                        <p className="text-white/35 text-xs mt-1 font-mono break-all">{check.technical_detail}</p>
+                      )}
+                    </div>
+                    <SeverityPill severity={check.criticality} />
+                  </div>
+                  {check.recommendation && check.status !== 'pass' && (
+                    <p className="inline-flex items-start gap-1.5 text-primary/90 text-xs mt-2">
+                      <Lightbulb size={12} className="mt-0.5 flex-shrink-0" aria-hidden="true" /> {check.recommendation}
+                    </p>
+                  )}
+                  {check.difficulty && check.difficulty !== '—' && check.status !== 'pass' && (
+                    <p className="text-white/40 text-xs mt-1">Difficulté : {check.difficulty} · Estimation : {check.time_estimate}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 // ── Page principale ───────────────────────────────────────────────────────────
@@ -671,7 +749,7 @@ export default function Rapport() {
             </button>
             <div className="flex flex-col">
               <h1 className="text-xl font-bold text-white">
-                RAPPORT D'AUDIT PREMIUM : {extractDomain(scan.url)}
+                Rapport d'audit premium : {extractDomain(scan.url)}
               </h1>
               {/* Date + durée du scan */}
               <div className="flex items-center gap-2 mt-0.5">
@@ -742,6 +820,56 @@ export default function Rapport() {
         {/* ── Disclaimer grands sites ─────────────────────────────────────── */}
         <LargeSiteDisclaimer url={scan.url} score={norm?.globalScore ?? 0} />
 
+        {/* ── Executive Summary ───────────────────────────────────────────── */}
+        {(() => {
+          const globalScore = norm?.scores?.global ?? scan?.global_score ?? null;
+          const alerts = norm?.criticalAlerts ?? [];
+          // Priorité : critical > high > warning, puis par score_impact décroissant
+          const severityRank = { critical: 0, high: 1, warning: 2 };
+          const topAlert = [...alerts].sort((a, b) => {
+            const sr = (severityRank[a.severity] ?? 9) - (severityRank[b.severity] ?? 9);
+            if (sr !== 0) return sr;
+            return (b.score_impact ?? 0) - (a.score_impact ?? 0);
+          })[0] ?? null;
+          const badge = getScoreBadge(globalScore ?? 0);
+          if (globalScore == null) return null;
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="mb-6 rounded-2xl border border-white/10 bg-[#0d1526]/80 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4"
+            >
+              {/* Score pill */}
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="flex flex-col items-center justify-center w-14 h-14 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-xl font-black text-white leading-none">{globalScore}</span>
+                  <span className="text-[10px] text-white/40 leading-none">/100</span>
+                </div>
+                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${badge.color}`}>{badge.text}</span>
+              </div>
+              <div className="h-px sm:h-10 sm:w-px bg-white/10 shrink-0" />
+              {/* Problème principal + action */}
+              <div className="flex-1 min-w-0">
+                {topAlert ? (
+                  <>
+                    <p className="text-white text-sm font-semibold leading-snug">
+                      <span className="text-danger">⚠ </span>{topAlert.title}
+                    </p>
+                    {topAlert.recommendation && (
+                      <p className="text-white/55 text-xs mt-1 leading-relaxed line-clamp-2">
+                        Action prioritaire : {topAlert.recommendation}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-white/70 text-sm">Aucun problème critique détecté — votre site présente une bonne posture globale.</p>
+                )}
+              </div>
+            </motion.div>
+          );
+        })()}
+
         {/* Alertes critiques moved below score card to group badges */}
 
         {/* ── Navigation sections ─────────────────────────────────────────── */}
@@ -787,30 +915,63 @@ export default function Rapport() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-            {[
-              { name: 'Performance', score: norm?.scores?.performance, Icon: Zap },
-              { name: 'Sécurité', score: norm?.scores?.security, Icon: Shield },
-              { name: 'SEO', score: norm?.scores?.seo, Icon: Search },
-              { name: 'UX Mobile', score: norm?.scores?.ux, Icon: Smartphone },
-            ].map((cat) => {
-              const badge = getScoreBadge(cat.score ?? 0);
-              const Icon = cat.Icon;
-              return (
-                <div key={cat.name} className="bg-dark-navy rounded-xl p-4 text-center">
-                  <Icon size={24} className="text-primary mx-auto" aria-hidden="true" />
-                  <p className="text-white font-bold text-xl mt-2">
-                    {cat.score ?? 'N/A'}
-                    {cat.score != null && <span className="text-white text-sm">/100</span>}
-                  </p>
-                  <p className="text-white text-xs mt-1">{cat.name}</p>
-                  <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-2 ${badge.color}`}>
-                    {badge.text}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          {(() => {
+            const alerts = norm?.criticalAlerts ?? [];
+            const secAlertCount = alerts.filter(a => a.category === 'security').length;
+            const perfAlertCount = alerts.filter(a => a.category === 'performance').length;
+            const uxAlertCount = alerts.filter(a => a.category === 'ux').length;
+            const missingHeaderCount = (norm?.missingHeaders ?? []).length;
+            const opportunityCount = (norm?.opportunities ?? []).length;
+            const uxIssueCount = (norm?.uxIssues ?? []).length;
+
+            const secIssueCount = secAlertCount + missingHeaderCount;
+            const perfIssueCount = perfAlertCount + opportunityCount;
+            const uxTotalCount = uxAlertCount + uxIssueCount;
+
+            const extSecScore = norm?.extendedSecurityScore;
+
+            const cats = [
+              { name: 'Performance', score: norm?.scores?.performance, Icon: Zap, issueCount: perfIssueCount },
+              {
+                name: 'Sécurité', score: norm?.scores?.security, Icon: Shield,
+                issueCount: secIssueCount,
+              },
+              { name: 'SEO', score: norm?.scores?.seo, Icon: Search, issueCount: null },
+              { name: 'UX Mobile', score: norm?.scores?.ux, Icon: Smartphone, issueCount: uxTotalCount },
+            ];
+
+            return (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                {cats.map((cat) => {
+                  const badge = getScoreBadge(cat.score ?? 0);
+                  const Icon = cat.Icon;
+                  return (
+                    <div key={cat.name} className="bg-dark-navy rounded-xl p-4 text-center">
+                      <Icon size={24} className="text-primary mx-auto" aria-hidden="true" />
+                      <p className="text-white font-bold text-xl mt-2">
+                        {cat.score ?? 'N/A'}
+                        {cat.score != null && <span className="text-white text-sm">/100</span>}
+                      </p>
+                      <p className="text-white text-xs mt-1">{cat.name}</p>
+                      <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-2 ${badge.color}`}>
+                        {badge.text}
+                      </span>
+                      {cat.secondaryScore != null && (
+                        <p className="text-white/50 text-[10px] mt-1.5 leading-tight">
+                          {cat.secondaryLabel} : {cat.secondaryScore}/100
+                        </p>
+                      )}
+                      {cat.issueCount != null && cat.issueCount > 0 && (
+                        <p className="text-orange-300/80 text-[10px] mt-1 font-medium">
+                          {cat.issueCount} problème{cat.issueCount > 1 ? 's' : ''} détecté{cat.issueCount > 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </section>
 
         {/* ── NARRATIVE ──────────────────────────────────────────────────── */}
@@ -931,7 +1092,11 @@ export default function Rapport() {
           <div className="bg-card-bg border border-border-color rounded-2xl p-6">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Shield size={18} aria-hidden="true" /> Sécurité</h2>
 
-            <MetricRow label="Score Sécurité" value={`${norm?.scores?.security ?? 'N/A'}/100`} />
+            <MetricRow
+              label="Score Sécurité"
+              value={`${norm?.scores?.security ?? 'N/A'}/100`}
+              hint={norm?.extendedSecurityScore != null ? `Score consolidé — inclut sécurité headers et sécurité avancée (email, WAF, exposition). Voir l'onglet Sécurité Avancée pour le détail.` : undefined}
+            />
             <MetricRow
               label="SSL Grade"
               value={secM?.ssl_grade ?? 'N/A'}
@@ -946,8 +1111,9 @@ export default function Rapport() {
               value={
                 secM?.malware_detected === true ? (<span className="inline-flex items-center gap-1"><AlertOctagon size={14} className="text-red-400" aria-hidden="true" /> Détecté</span>)
                   : secM?.malware_detected === false ? 'Aucun'
-                    : 'Non vérifié'
+                    : 'Vérification indisponible'
               }
+              hint={secM?.malware_detected == null ? 'L\'API VirusTotal n\'a pas répondu lors du scan. Relancez l\'audit pour une nouvelle tentative.' : undefined}
               status={
                 secM?.malware_detected === true ? 'fail'
                   : secM?.malware_detected === false ? 'pass'
@@ -997,9 +1163,15 @@ export default function Rapport() {
                 />
                 <MetricRow
                   label="Subresource Integrity"
-                  value={sri?.external_scripts_count != null ? `${sri.missing_integrity_count ?? 0}/${sri.external_scripts_count} sans integrity` : 'Non mesuré'}
-                  status={checkStatusToMetricStatus(sri?.status)}
-                  hint="SRI limite le risque de compromission via CDN tiers."
+                  value={
+                    sri?.external_scripts_count != null
+                      ? sri.external_scripts_count === 0
+                        ? 'Aucune ressource externe — non applicable'
+                        : `${sri.missing_integrity_count ?? 0}/${sri.external_scripts_count} sans integrity`
+                      : 'Non mesuré'
+                  }
+                  status={sri?.external_scripts_count === 0 ? 'unknown' : checkStatusToMetricStatus(sri?.status)}
+                  hint={sri?.external_scripts_count === 0 ? 'Aucun script tiers chargé : le risque de supply chain via CDN est nul.' : 'SRI limite le risque de compromission via CDN tiers.'}
                 />
                 <MetricRow
                   label="WordPress"
@@ -1008,18 +1180,38 @@ export default function Rapport() {
                   hint="Contrôle wp-login, XML-RPC, API utilisateurs et fichiers publics."
                 />
                 {complianceBadges.length > 0 && (
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                    {complianceBadges.map((badge) => (
-                      <div key={badge.key} className="rounded-xl border border-white/10 bg-card-bg/30 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-white text-xs font-semibold">{badge.label}</p>
-                          <span className={`text-xs ${badge.status === 'pass' ? 'text-green-300' : 'text-yellow-300'}`}>
-                            {badge.status === 'pass' ? 'Prêt' : 'À préparer'}
-                          </span>
-                        </div>
-                        <p className="text-white/45 text-[11px] mt-1">{badge.explanation}</p>
-                      </div>
-                    ))}
+                  <div className="mt-4">
+                    <p className="text-white/40 text-[11px] italic mb-2">
+                      Signaux techniques utiles pour la préparation. Ne constitue pas une certification.
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {complianceBadges.map((badge) => {
+                        const hasCms = cmsDetection?.primary;
+                        const isEcommerce = hasCms && /shopify|prestashop|woocommerce|magento/i.test(hasCms);
+                        // Contexte d'applicabilité par badge pour guider le client non-technique
+                        const BADGE_CONTEXT = {
+                          pci_dss_preparation: !isEcommerce ? 'Applicable si vous traitez des paiements en ligne par carte.' : null,
+                          gdpr_preparation: 'Applicable si vous collectez des données personnelles de résidents européens.',
+                          iso_27001_preparation: 'Applicable si votre organisation gère des systèmes d\'information sensibles.',
+                          cyber_insurance: 'Utile si vous souhaitez souscrire une assurance cyber pour votre entreprise.',
+                        };
+                        const context = BADGE_CONTEXT[badge.key] ?? null;
+                        return (
+                          <div key={badge.key} className="rounded-xl border border-white/10 bg-card-bg/30 p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-white text-xs font-semibold">{badge.label}</p>
+                              <span className={`text-xs ${badge.status === 'pass' ? 'text-green-300' : 'text-yellow-300'}`}>
+                                {badge.status === 'pass' ? 'Prêt' : 'À préparer'}
+                              </span>
+                            </div>
+                            <p className="text-white/45 text-[11px] mt-1">{badge.explanation}</p>
+                            {context && (
+                              <p className="text-white/30 text-[10px] mt-1.5 italic">{context}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1125,6 +1317,7 @@ export default function Rapport() {
               })()}
               hint={(() => {
                 const c = norm?.extendedChecks?.find(c => c.check_name === 'subdomains');
+                if (c?.status === 'error') return 'L\'API publique crt.sh n\'a pas répondu (limite atteinte ou timeout). Résultat non disponible pour ce scan.';
                 return getCheckHint('subdomains', c?.status, c);
               })()}
             />
@@ -1209,37 +1402,64 @@ export default function Rapport() {
               })()}
             />
 
-            {Array.isArray(norm?.extendedChecks) && norm.extendedChecks.length > 0 && (
-              <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/60 p-5">
-                <p className="text-white font-semibold text-sm mb-3">
-                  Détail des vérifications étendues
-                </p>
-                <div className="space-y-3">
-                  {norm.extendedChecks
-                    .filter(check => check.status !== 'error')
-                    .map((check, i) => (
+            {Array.isArray(norm?.extendedChecks) && norm.extendedChecks.length > 0 && (() => {
+              // Checks passifs ou informatifs uniquement — masqués par défaut
+              const PASSIVE_CHECKS = new Set(['takeover', 'zone_transfer', 'wayback', 'tech_cve']);
+              // Ces checks sont déjà affichés dans la section Sécurité de base et dans le plan
+              // d'action — les dupliquer ici génère exactement le même texte deux fois.
+              const DEDUPLICATED_CHECKS = new Set(['dns_spf', 'dns_dmarc', 'csp', 'headers']);
+              const activeChecks = norm.extendedChecks.filter(c =>
+                c.status !== 'error' &&
+                !PASSIVE_CHECKS.has(c.check_name) &&
+                !DEDUPLICATED_CHECKS.has(c.check_name)
+              );
+              const passiveChecks = norm.extendedChecks.filter(c => PASSIVE_CHECKS.has(c.check_name));
+
+              return (
+                <div className="mt-6 rounded-2xl border border-white/10 bg-[#0F172A]/60 p-5">
+                  <p className="text-white font-semibold text-sm mb-3">Détail des vérifications étendues</p>
+                  {/* Renvoi vers plan d'action pour checks dédupliqués (SPF, DMARC, CSP) */}
+                  {norm.extendedChecks.some(c => DEDUPLICATED_CHECKS.has(c.check_name) && c.status === 'fail') && (
+                    <p className="text-white/35 text-[11px] mb-3 italic">
+                      Les corrections SPF, DMARC et CSP sont détaillées dans le{' '}
+                      <button
+                        onClick={() => document.getElementById('recommendations')?.scrollIntoView({ behavior: 'smooth' })}
+                        className="text-primary/70 hover:text-primary underline underline-offset-2 transition-colors"
+                      >
+                        plan d'action
+                      </button>.
+                    </p>
+                  )}
+                  <div className="space-y-3">
+                    {activeChecks.map((check, i) => (
                       <div key={i} className="rounded-xl border border-white/10 bg-card-bg/30 p-4">
                         <div className="flex items-start justify-between gap-3">
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-white text-sm font-semibold">{check.title}</p>
                             <p className="text-white/65 text-xs mt-1">{check.description}</p>
-                            {check.technical_detail && (
-                              <p className="text-white/40 text-xs mt-1">{check.technical_detail}</p>
-                            )}
                           </div>
                           <SeverityPill severity={check.criticality} />
                         </div>
                         {check.recommendation && check.status !== 'pass' && (
-                          <p className="inline-flex items-start gap-1.5 text-primary/90 text-xs mt-2"><Lightbulb size={12} className="mt-0.5 flex-shrink-0" aria-hidden="true" /> {check.recommendation}</p>
+                          <p className="inline-flex items-start gap-1.5 text-primary/90 text-xs mt-2">
+                            <Lightbulb size={12} className="mt-0.5 flex-shrink-0" aria-hidden="true" /> {check.recommendation}
+                          </p>
                         )}
                         {check.difficulty && check.difficulty !== '—' && check.status !== 'pass' && (
                           <p className="text-white/40 text-xs mt-1">Difficulté : {check.difficulty} · Estimation : {check.time_estimate}</p>
                         )}
                       </div>
                     ))}
+                  </div>
+
+                  {/* Accordéon données brutes + checks passifs */}
+                  <TechnicalDetailsAccordion
+                    activeChecks={activeChecks}
+                    passiveChecks={passiveChecks}
+                  />
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </section>
 

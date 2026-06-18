@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Check, X, Clock, Mail, Loader2 } from 'lucide-react';
+import { PAYMENT_CONFIG } from '../config/brand';
 
 export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, scanData, scannedUrl }) {
   const recommendationCount = scanData?.recommendations?.length ?? 7;
@@ -156,7 +157,7 @@ export default function FreemiumGate({ isOpen, onClose, onUnlock, onUpgrade, sca
                 className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 transition-colors text-white font-semibold text-base shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 relative overflow-hidden"
               >
                 <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent animate-[shimmer_2.7s_infinite]" />
-                Obtenir le rapport : 35 000 FCFA
+                Obtenir le rapport : {PAYMENT_CONFIG.premiumAmount.toLocaleString('fr-FR')} {PAYMENT_CONFIG.currency}
               </button>
 
               {/* I.2 — Option "Pas maintenant, me rappeler dans 24h" */}

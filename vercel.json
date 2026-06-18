@@ -5,7 +5,7 @@
   "functions": {
     "api/scan.js": {
       "memory": 1024,
-      "maxDuration": 60,
+      "maxDuration": 90,
       "regions": ["cpt1"]
     },
     "api/generate-pdf.js": {
@@ -35,8 +35,26 @@
     "api/correction-request.js": {
       "memory": 256,
       "maxDuration": 15
+    },
+    "api/checkout/create-session.js": {
+      "memory": 256,
+      "maxDuration": 15
+    },
+    "api/webhook/wave.js": {
+      "memory": 256,
+      "maxDuration": 15
+    },
+    "api/cron/rescan-reminder.js": {
+      "memory": 256,
+      "maxDuration": 30
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/rescan-reminder",
+      "schedule": "0 9 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/sitemap.xml",

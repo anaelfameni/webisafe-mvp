@@ -1,21 +1,7 @@
-// Calcul des scores pondérés Webisafe
-// Performance: 30% | Sécurité: 35% | SEO: 20% | UX: 15%
-
-export function calculateGlobalScore(scores) {
-  const weights = {
-    performance: 0.30,
-    security: 0.35,
-    seo: 0.20,
-    ux: 0.15,
-  };
-
-  return Math.round(
-    (scores.performance || 0) * weights.performance +
-    (scores.security || 0) * weights.security +
-    (scores.seo || 0) * weights.seo +
-    (scores.ux || 0) * weights.ux
-  );
-}
+// Utilitaires d'affichage des scores Webisafe.
+// Le calcul du score global est fait côté serveur dans api/scan.js :
+// Performance 30% | Sécurité 30% | SEO 25% | UX 15%
+// Ne pas recalculer ici — utiliser metrics.global_score retourné par l'API.
 
 export function calculatePerformanceScore(data) {
   let score = 100;

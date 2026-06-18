@@ -22,7 +22,7 @@ import { useScans } from '../hooks/useScans';
 import { useAuth } from '../hooks/useAuth';
 import { normalizeURL, extractDomain } from '../utils/validators';
 import { sendNurtureEmail } from '../utils/emailApi';
-import { SUPPORT_PHONE } from '../config/brand';
+import { SUPPORT_PHONE, PAYMENT_CONFIG } from '../config/brand';
 import { logError } from '../utils/logger';
 import { trackClarityEvent } from '../lib/clarity';
 
@@ -113,27 +113,27 @@ function getPerformanceMetrics(scanData) {
   return [
     {
       label: 'LCP',
-      value: vitals.lcp.value != null ? `${vitals.lcp.value}ms` : 'Non mesure',
+      value: vitals.lcp.value != null ? `${vitals.lcp.value}ms` : 'Non mesuré',
       status: getVitalStatus(vitals.lcp.rating),
     },
     {
       label: 'CLS',
-      value: vitals.cls.value ?? 'Non mesure',
+      value: vitals.cls.value ?? 'Non mesuré',
       status: getVitalStatus(vitals.cls.rating),
     },
     {
       label: 'FCP',
-      value: vitals.fcp.value != null ? `${vitals.fcp.value}ms` : 'Non mesure',
+      value: vitals.fcp.value != null ? `${vitals.fcp.value}ms` : 'Non mesuré',
       status: getVitalStatus(vitals.fcp.rating),
     },
     {
       label: 'Taille Page',
-      value: perf?.poids_page_mb != null ? `${perf.poids_page_mb}MB` : 'Non mesure',
+      value: perf?.poids_page_mb != null ? `${perf.poids_page_mb}MB` : 'Non mesuré',
       status: perf?.poids_page_mb == null ? 'unknown' : perf.poids_page_mb > 3 ? 'fail' : perf.poids_page_mb > 2 ? 'warn' : 'pass',
     },
     {
-      label: 'Requetes',
-      value: perf?.nb_requetes != null ? String(perf.nb_requetes) : 'Non mesure',
+      label: 'Requêtes',
+      value: perf?.nb_requetes != null ? String(perf.nb_requetes) : 'Non mesuré',
       status: perf?.nb_requetes == null ? 'unknown' : perf.nb_requetes > 100 ? 'fail' : perf.nb_requetes > 60 ? 'warn' : 'pass',
     },
   ];
@@ -919,7 +919,7 @@ export default function Analyse() {
           <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center gap-3">
             <div className="flex-1 text-center sm:text-left">
               <p className="text-white font-semibold text-sm">
-                Débloquer le rapport complet — 35 000 FCFA
+                Débloquer le rapport complet — {PAYMENT_CONFIG.premiumAmount.toLocaleString('fr-FR')} {PAYMENT_CONFIG.currency}
               </p>
               <p className="text-white text-xs">
                 PDF · Plan d'action · 1 rescan offert dans 30 jours
@@ -966,7 +966,7 @@ export default function Analyse() {
         scanUrl={normalizeURL(url)}
         globalScore={globalScore}
         initialEmail={userEmail}
-        amount={35000}
+        amount={PAYMENT_CONFIG.premiumAmount}
       />
     </div>
   );

@@ -19,6 +19,7 @@ import { supabase } from '../lib/supabaseClient';
 import { shouldShowDashboardWelcome } from '../utils/dashboardWelcome';
 import { getDashboardAccessState } from '../utils/agencyAccess';
 import ScoreEvolutionChart from '../components/ScoreEvolutionChart';
+import EmptyState from '../components/EmptyState';
 import { generatePDF } from '../utils/generatePDF';
 
 // ── KPI Card ─────────────────────────────────────────────────────────────────
@@ -228,10 +229,12 @@ function PageOverview({ user, scans, isPaid, validatedPremiumMap, navigate, upti
               <p className="mt-2 text-sm leading-6 text-white/50">Continuez à suivre vos scores après chaque correction ou mise à jour du site.</p>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-white/15 bg-slate-950/45 p-6 text-center">
-              <p className="font-bold text-white">Aucun site analysé</p>
-              <p className="mt-2 text-sm text-white/45">Lancez votre premier scan pour afficher vos alertes ici.</p>
-            </div>
+            <EmptyState
+              icon={<Globe size={36} />}
+              title="Aucun site analysé"
+              description="Lancez votre premier scan pour afficher vos alertes et l'état de votre site ici."
+              cta={{ label: 'Lancer un scan', to: '/' }}
+            />
           )}
           {uptime && (
             <div className="mt-4 grid grid-cols-2 gap-3">
@@ -323,11 +326,12 @@ function PageReports({ scans, isPaid, validatedPremiumMap, navigate }) {
       <div>
         <h3 className="text-white font-bold mb-4 flex items-center gap-2"><History size={16} /> Historique des scans</h3>
         {scans.length === 0 ? (
-          <div className="bg-card-bg border border-border-color rounded-2xl p-12 text-center">
-            <BarChart3 size={48} className="text-white/20 mx-auto mb-4" />
-            <p className="text-white font-semibold mb-2">Aucun scan</p>
-            <Link to="/" className="inline-flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-xl text-sm font-semibold mt-2">Scanner maintenant <ArrowRight size={14} /></Link>
-          </div>
+          <EmptyState
+            icon={<BarChart3 size={40} />}
+            title="Aucun rapport disponible"
+            description="Vous n'avez encore lancé aucun scan. Analysez votre site pour générer votre premier rapport."
+            cta={{ label: 'Scanner maintenant', to: '/' }}
+          />
         ) : (
           <div className="space-y-3">
             {scans.map((scan, i) => {
@@ -387,31 +391,40 @@ function PageHistory({ scans, navigate }) {
         </motion.div>
       )}
 
-      <div className="space-y-3">
-        {scans.map((scan, i) => {
-          const scoreColor = getScoreColor(scan.scores?.global || 0);
-          const badge = getScoreBadge(scan.scores?.global || 0);
-          return (
-            <div key={scan.id} className="bg-card-bg border border-border-color rounded-xl p-4 flex items-center gap-4">
-              <div className="w-2 self-stretch rounded-full" style={{ background: scoreColor }} />
-              <div className="flex-shrink-0 text-center">
-                <p className="text-lg font-bold" style={{ color: scoreColor }}>{scan.scores?.global ?? '—'}</p>
-                <p className="text-white/30 text-xs">score</p>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-medium truncate">{extractDomain(scan.url)}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-white/40 text-xs">{formatDate(scan.scanDate || scan.savedAt)}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${badge.color}`}>{badge.text}</span>
+      {scans.length === 0 ? (
+        <EmptyState
+          icon={<History size={40} />}
+          title="Aucun historique disponible"
+          description="Lancez votre premier scan pour commencer à suivre l'évolution des scores de votre site dans le temps."
+          cta={{ label: 'Lancer mon premier scan', to: '/' }}
+        />
+      ) : (
+        <div className="space-y-3">
+          {scans.map((scan, i) => {
+            const scoreColor = getScoreColor(scan.scores?.global || 0);
+            const badge = getScoreBadge(scan.scores?.global || 0);
+            return (
+              <div key={scan.id} className="bg-card-bg border border-border-color rounded-xl p-4 flex items-center gap-4">
+                <div className="w-2 self-stretch rounded-full" style={{ background: scoreColor }} />
+                <div className="flex-shrink-0 text-center">
+                  <p className="text-lg font-bold" style={{ color: scoreColor }}>{scan.scores?.global ?? '—'}</p>
+                  <p className="text-white/30 text-xs">score</p>
                 </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">{extractDomain(scan.url)}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-white/40 text-xs">{formatDate(scan.scanDate || scan.savedAt)}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${badge.color}`}>{badge.text}</span>
+                  </div>
+                </div>
+                <button onClick={() => navigate(`/rapport/${scan.id}`)} className="text-primary text-xs hover:underline flex items-center gap-1">
+                  Rapport <ChevronRight size={12} />
+                </button>
               </div>
-              <button onClick={() => navigate(`/rapport/${scan.id}`)} className="text-primary text-xs hover:underline flex items-center gap-1">
-                Rapport <ChevronRight size={12} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

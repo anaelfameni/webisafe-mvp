@@ -54,8 +54,13 @@ function getTemps(rec) {
 
 function getDifficulte(rec) {
   const raw = rec.difficulte || rec.difficulty || '';
-  if (raw && String(raw).trim()) return String(raw).trim();
-  return FAULT_DIFFICULTY_MAP[rec.faultType] || FAULT_DIFFICULTY_MAP.default;
+  const cleaned = String(raw).trim();
+  if (!cleaned) return FAULT_DIFFICULTY_MAP[rec.faultType] || FAULT_DIFFICULTY_MAP.default;
+  // Supprime les doublons "A — A" ou "A — B — A" générés par certaines APIs
+  const parts = cleaned.split('—').map(p => p.trim()).filter(Boolean);
+  const seen = new Set();
+  const deduped = parts.filter(p => { const lp = p.toLowerCase(); if (seen.has(lp)) return false; seen.add(lp); return true; });
+  return deduped.join(' — ');
 }
 
 function getDifficulteColor(label) {
@@ -249,11 +254,17 @@ export default function RecommendationCard({ recommendation, index, isLocked }) 
         )}
 
         {/* Difficulté */}
-        <div className="flex items-center gap-2 pt-2 border-t border-white/5">
-          <Wrench size={12} className="text-white/30" />
-          <DifficultyBadge label={difficulteDisplay} />
-          <span className="text-white/40 text-xs ml-1">— {difficulteDisplay.replace(/^[^—]+—\s*/, '')}</span>
-        </div>
+        {(() => {
+          const parts = difficulteDisplay.split('—');
+          const detail = parts.length > 1 ? parts.slice(1).join('—').trim() : null;
+          return (
+            <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+              <Wrench size={12} className="text-white/30" />
+              <DifficultyBadge label={difficulteDisplay} />
+              {detail && <span className="text-white/40 text-xs ml-1">— {detail}</span>}
+            </div>
+          );
+        })()}
       </motion.div>
     );
   }

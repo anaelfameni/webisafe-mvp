@@ -93,8 +93,8 @@ export default function PricingSection({ onScan, hideHeader = false }) {
         ? `Facturé ${formatFcfa(protectPricing.total)} FCFA tous les ${protectPricing.option.months} mois · économie ${formatFcfa(protectPricing.savings)} FCFA`
         : 'Facturation mensuelle · sans engagement',
       description: 'Votre site surveillé 24h/24, alertes automatiques et rapport mensuel sans rien faire.',
-      bonus: 'Offre mai 2026 : audit initial offert (35 000 FCFA)',
-      setup: 'Dès juin 2026 : audit initial 35 000 FCFA requis',
+      bonus: 'Offre Juin–Juillet 2026 : audit initial offert (35 000 FCFA)',
+      setup: 'Dès Août 2026 : audit initial 35 000 FCFA requis',
       features: [
         'Audit initial inclus (valeur 35 000 FCFA)',
         'Scan mensuel automatique complet',
@@ -154,8 +154,8 @@ export default function PricingSection({ onScan, hideHeader = false }) {
         </motion.div>
       )}
 
-      {/* J.1 — Grille 3 plans : 1 col mobile, 2 cols tablette, 3 cols desktop */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+      {/* J.1 — Grille 4 plans : 1 col mobile, 2 cols tablette, 4 cols desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {plans.map((plan, index) => (
             <motion.div
               key={index}
@@ -242,7 +242,7 @@ export default function PricingSection({ onScan, hideHeader = false }) {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.3 }}
-            className="relative bg-card-bg border border-border-color rounded-2xl p-6 flex flex-col"
+            className="relative bg-card-bg border border-border-color rounded-2xl p-6 flex flex-col md:col-span-2 lg:col-span-2 lg:col-start-2"
           >
             <span className="inline-block self-start text-xs font-semibold px-3 py-1 rounded-full mb-4 bg-success/10 text-success">
               Agences

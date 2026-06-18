@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { SUPPORT_EMAIL, SUB_PROCESSORS, LEGAL_ENTITY } from '../config/brand';
+import { SUPPORT_EMAIL, SUB_PROCESSORS, LEGAL_ENTITY, LEGAL_LAST_UPDATED, LEGAL_VERSION } from '../config/brand';
 
 export default function Confidentialite() {
   useEffect(() => { window.scrollTo(0, 0); }, []);
@@ -15,7 +15,7 @@ export default function Confidentialite() {
         <h1 className="text-3xl font-bold text-white mb-2">
           Politique de Confidentialité
         </h1>
-        <p className="text-white/40 text-sm mb-10">Dernière mise à jour : 10 mai 2026 — Version 2.0</p>
+        <p className="text-white/40 text-sm mb-10">Dernière mise à jour : {LEGAL_LAST_UPDATED} — Version {LEGAL_VERSION}</p>
 
         <div className="space-y-8 text-white/70 text-sm leading-7">
 

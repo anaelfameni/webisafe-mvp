@@ -1,6 +1,7 @@
 import { generatePdf } from '../lib/generatePdf.js';
 import { buildPdfFilename } from '../lib/pdfModel.js';
-import { json, readJsonBody, setCorsHeaders, checkRateLimit } from '../api_shared/_utils.js';
+import { getPdfFromCache, savePdfToCache } from '../lib/pdfCache.js';
+import { json, readJsonBody, setCorsHeaders, checkRateLimit, requireAuthenticatedUser } from '../api_shared/_utils.js';
 
 export const config = { maxDuration: 60 };
 
@@ -9,10 +10,15 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
 
-  // H.10 — Rate limit endpoint coûteux (Puppeteer) : 10 PDF/min/IP
+  // Authentification requise : évite l'abus de marque et la surcharge Puppeteer
+  // par des appels non autorisés.
+  const authUser = await requireAuthenticatedUser(req, res);
+  if (!authUser) return;
+
+  // Rate limit sur les PDF : endpoint coûteux (Puppeteer + 60s)
   const rateLimit = checkRateLimit(req, 10, 60000);
   if (!rateLimit.allowed) {
-    return json(res, 429, { error: `Trop de g\u00e9n\u00e9rations PDF, r\u00e9essayez dans ${rateLimit.retryAfter}s` });
+    return json(res, 429, { error: `Trop de générations PDF, réessayez dans ${rateLimit.retryAfter}s` });
   }
 
   try {
@@ -21,12 +27,46 @@ export default async function handler(req, res) {
       return json(res, 400, { error: 'Données du scan manquantes pour générer le PDF.' });
     }
 
-    const pdf = await generatePdf(scanData);
     const filename = buildPdfFilename(scanData);
+    // scan_id ou id identifient le scan en base — clé de cache stable par scan.
+    // Un nouveau scan sur la même URL génère toujours un nouvel id → invalidation naturelle.
+    const scanId = scanData.scan_id || scanData.id || null;
+
+    // ── Lecture du cache ────────────────────────────────────────────────────────
+    // Si un PDF a déjà été généré pour ce scan_id + cette version du template,
+    // on le retourne directement sans relancer Chromium.
+    if (scanId) {
+      const cached = await getPdfFromCache(scanId);
+      if (cached) {
+        console.log(`[PDF] Cache HIT pour scan ${scanId} — Chromium non démarré`);
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('X-Pdf-Cache', 'hit');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(cached);
+        return;
+      }
+    }
+
+    // ── Génération Chromium ─────────────────────────────────────────────────────
+    const t0 = Date.now();
+    const pdf = await generatePdf(scanData);
+    console.log(`[PDF] Généré en ${Date.now() - t0}ms pour scan ${scanId || '(no id)'}`);
+
+    // ── Mise en cache ───────────────────────────────────────────────────────────
+    // On attend savePdfToCache AVANT res.end() : sur Vercel serverless, toute
+    // Promise non résolue au moment de res.end() est immédiatement coupée.
+    // savePdfToCache a son propre timeout interne de 3 s (UPLOAD_TIMEOUT_MS) —
+    // si Supabase Storage est lent, on n'attend pas au-delà. Erreurs silencieuses.
+    if (scanId) {
+      await savePdfToCache(scanId, pdf);
+    }
 
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-Pdf-Cache', 'miss');
     res.setHeader('Cache-Control', 'no-store');
     res.end(pdf);
   } catch (error) {

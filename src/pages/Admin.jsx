@@ -13,6 +13,7 @@ import { mergeAdminScans, readLegacyScans } from '../utils/adminScanHistory';
 import { computePaymentStats, formatFcfa, getRelativeTimeLabel, isPendingPaymentStatus } from '../utils/wavePayment';
 import { supabase } from '../lib/supabaseClient';
 import { getDashboardAccessState } from '../utils/agencyAccess';
+import { PAYMENT_CONFIG } from '../config/brand';
 
 function AdminKpiCard({ value, label, tone, icon }) {
   const toneClasses = {
@@ -603,7 +604,7 @@ export default function Admin({ user, authLoading = false }) {
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                     <AdminKpiCard tone="green" value={formatFcfa(stats.dailyRevenue)} label="CA aujourd'hui" icon={<TrendingUp size={18} />} />
-                    <AdminKpiCard tone="blue" value={formatFcfa(stats.validatedTodayCount * 35000)} label="CA total validé" icon={<CreditCard size={18} />} />
+                    <AdminKpiCard tone="blue" value={formatFcfa(stats.validatedTodayCount * PAYMENT_CONFIG.premiumAmount)} label="CA total validé" icon={<CreditCard size={18} />} />
                     <AdminKpiCard tone="violet" value={stats.totalDelivered} label="Audits facturés" icon={<CheckCircle2 size={18} />} />
                   </div>
                   <div className="bg-[#111827] border border-white/10 rounded-2xl p-5">
@@ -762,13 +763,13 @@ export default function Admin({ user, authLoading = false }) {
               placeholder="Expliquez pourquoi l'abonnement n'a pas pu être activé."
               className="w-full min-h-[100px] rounded-2xl border border-white/10 bg-[#0F172A] px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-primary" />
             <div className="flex gap-3 mt-4 justify-end">
-              <button onClick={() => { setRejectingSubscription(null); setSubRejectionReason(''); }}
+              <button type="button" onClick={() => { setRejectingSubscription(null); setSubRejectionReason(''); }}
                 className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-white/70 hover:bg-white/5 transition">
                 Annuler
               </button>
-              <button onClick={handleRejectSub} disabled={actionId === rejectingSubscription.id}
-                className="rounded-xl bg-danger px-5 py-2.5 text-sm font-bold text-white hover:bg-danger/90 transition disabled:opacity-60">
-                Confirmer le refus
+              <button type="button" onClick={handleRejectSub} disabled={!subRejectionReason.trim() || actionId === rejectingSubscription.id}
+                className="rounded-xl bg-danger px-5 py-2.5 text-sm font-bold text-white hover:bg-danger/90 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                {actionId === rejectingSubscription.id ? 'En cours…' : 'Confirmer le refus'}
               </button>
             </div>
           </div>
@@ -784,13 +785,13 @@ export default function Admin({ user, authLoading = false }) {
               placeholder="Expliquez pourquoi le paiement n'a pas pu être confirmé."
               className="w-full min-h-[120px] rounded-2xl border border-white/10 bg-[#0F172A] px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-primary" />
             <div className="flex gap-3 mt-4 justify-end">
-              <button onClick={() => { setRejectingPayment(null); setRejectionReason(''); }}
+              <button type="button" onClick={() => { setRejectingPayment(null); setRejectionReason(''); }}
                 className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-white/70 hover:bg-white/5 transition">
                 Annuler
               </button>
-              <button onClick={handleReject} disabled={actionId === rejectingPayment.id}
-                className="rounded-xl bg-danger px-5 py-2.5 text-sm font-bold text-white hover:bg-danger/90 transition disabled:opacity-60">
-                Confirmer le rejet
+              <button type="button" onClick={handleReject} disabled={!rejectionReason.trim() || actionId === rejectingPayment.id}
+                className="rounded-xl bg-danger px-5 py-2.5 text-sm font-bold text-white hover:bg-danger/90 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                {actionId === rejectingPayment.id ? 'En cours…' : 'Confirmer le rejet'}
               </button>
             </div>
           </div>

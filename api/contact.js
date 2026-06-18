@@ -9,7 +9,7 @@ const SUPABASE_URL =
   process.env.SUPABASE_URL ||
   process.env.VITE_SUPABASE_URL ||
   process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const ADMIN_EMAIL = process.env.CONTACT_ADMIN_EMAIL || 'webisafe@gmail.com';
 const FROM_EMAIL = process.env.CONTACT_FROM_EMAIL || 'Webisafe <onboarding@resend.dev>';

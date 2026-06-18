@@ -79,7 +79,7 @@ export function checkRateLimit(req, maxRequests = 10, windowMs = RATE_LIMIT_WIND
 
 export function getSupabaseAdminClient() {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     return null;
@@ -188,6 +188,18 @@ export async function requireAuthenticatedUser(req, res) {
 
   if (error || !user) {
     json(res, 401, { error: 'Token invalide' });
+    return null;
+  }
+
+  // Email verification : bloque les comptes non confirmés pour les endpoints
+  // sensibles (subscribe, history, generate-pdf). Évite l'usurpation d'adresse email
+  // (ex: créer un compte avec l'email d'une victime avant qu'elle s'inscrive).
+  // Note : email_confirmed_at est null si Supabase "Confirm email" est activé côté projet
+  // ET que l'utilisateur n'a pas cliqué le lien. Si la feature est désactivée dans
+  // Supabase Dashboard, email_confirmed_at est automatiquement renseigné à l'inscription
+  // et ce check reste toujours vrai — pas de régression.
+  if (!user.email_confirmed_at) {
+    json(res, 403, { error: 'Email non vérifié. Consultez votre boîte mail pour confirmer votre compte.' });
     return null;
   }
 

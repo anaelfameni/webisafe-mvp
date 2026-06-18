@@ -5,6 +5,7 @@ import {
   readJsonBody,
   sendResendEmail,
   setCorsHeaders,
+  requireAuthenticatedUser,
 } from '../api_shared/_utils.js';
 import {
   buildAdminPaymentNotificationEmail,
@@ -54,13 +55,38 @@ export default async function handler(req, res) {
     id: body?.id ? String(body.id).trim() : null,
     payment_code: String(body?.payment_code || '').trim(),
     scan_id: String(body?.scan_id || '').trim(),
-    user_id: body?.user_id ? String(body.user_id).trim() : null,
+    // user_id : toujours extrait de la session si un token est fourni.
+    // Empêche d'associer un paiement au compte d'un autre utilisateur
+    // en envoyant un user_id arbitraire dans le body.
+    user_id: null,          // sera résolu ci-dessous
     user_email: String(body?.user_email || '').trim().toLowerCase(),
     url_to_audit: String(body?.url_to_audit || '').trim(),
     wave_phone: String(body?.wave_phone || '').trim(),
     amount: Number(body?.amount || WAVE_PAYMENT_AMOUNT),
     status: 'waiting_validation',
   };
+
+  // Si un Bearer token est présent, on l'utilise comme source de vérité pour user_id.
+  // Si pas de token (flux anonyme), user_id reste null — acceptable pour les scans gratuits.
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (token) {
+    const supabaseForAuth = getSupabaseAdminClient();
+    if (supabaseForAuth) {
+      const { data: { user: sessionUser } } = await supabaseForAuth.auth.getUser(token).catch(() => ({ data: {} }));
+      if (sessionUser?.id) {
+        payload.user_id = sessionUser.id;
+      }
+      // Si le token est invalide (expiré, falsifié), on refuse plutôt que d'accepter
+      // un user_id du body non vérifié.
+      else {
+        return json(res, 401, { success: false, error: 'Token invalide ou expiré' });
+      }
+    }
+  } else {
+    // Flux anonyme : user_id null autorisé, mais on ignore le user_id du body.
+    payload.user_id = null;
+  }
 
   const missingField = [
     'payment_code',

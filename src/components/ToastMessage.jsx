@@ -8,7 +8,7 @@ export default function ToastMessage({ toast }) {
   };
 
   return (
-    <div className="fixed right-4 top-4 z-[90] w-full max-w-sm">
+    <div className="fixed right-4 top-4 z-[200] w-full max-w-sm">
       <div
         className={`rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur-xl ${
           toneClasses[toast.type] || toneClasses.success

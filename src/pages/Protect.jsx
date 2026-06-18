@@ -47,10 +47,11 @@ const FEATURES = [
     icon: <BarChart3 size={22} />,
     tag: 'Rapport PDF complet',
     title: 'Scan Mensuel Automatique',
-    desc: 'Identique à un audit premium — même profondeur d\'analyse — mais déclenché automatiquement le 1er de chaque mois, sans aucune action de votre part.',
+    desc: 'Identique à un audit premium — même profondeur d\'analyse — déclenché automatiquement le 1er de chaque mois. Fonctionnalité en cours de déploiement pour les abonnés Protect.',
     detail: 'Performance · Sécurité · SEO · UX Mobile',
-    highlight: 'Gratuit pour vous chaque mois',
+    highlight: 'Bientôt disponible',
     color: 'blue',
+    comingSoon: true,
   },
   {
     icon: <BadgeCheck size={22} />,
@@ -235,7 +236,7 @@ export default function Protect() {
             {[
               { icon: <Activity size={15} />, value: '288×/jour', label: 'Vérifications uptime' },
               { icon: <Clock size={15} />, value: '5 min', label: 'Délai alerte max' },
-              { icon: <Zap size={15} />, value: '1/mois', label: 'Scan automatique' },
+              { icon: <Zap size={15} />, value: 'Bientôt', label: 'Scan mensuel auto' },
               { icon: <Shield size={15} />, value: 'J-14', label: 'Alerte SSL' },
             ].map((s, i) => (
               <div key={i} className="flex items-center gap-2 text-sm">
@@ -336,7 +337,12 @@ export default function Protect() {
             const c = COLORS[f.color];
             return (
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-                className={`relative overflow-hidden bg-[#0C1627] border ${c.border} rounded-2xl p-5 flex flex-col gap-3 hover:border-opacity-60 transition-all hover:-translate-y-0.5`}>
+                className={`relative overflow-hidden bg-[#0C1627] border ${c.border} rounded-2xl p-5 flex flex-col gap-3 hover:border-opacity-60 transition-all hover:-translate-y-0.5 ${f.comingSoon ? 'opacity-70' : ''}`}>
+                {f.comingSoon && (
+                  <span className="absolute top-3 right-3 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/10 text-white/40 border border-white/10">
+                    À venir
+                  </span>
+                )}
                 <div className={`w-11 h-11 ${c.bg} rounded-xl flex items-center justify-center ${c.text}`}>
                   {f.icon}
                 </div>
@@ -400,7 +406,7 @@ export default function Protect() {
           {[
             { time: 'Alerte type', event: 'Site down détecté', detail: 'Alerte envoyée en 4 min', tone: 'danger' },
             { time: 'Alerte type', event: 'SSL expire dans 14 jours', detail: 'Rappel envoyé', tone: 'warning' },
-            { time: 'Alerte type', event: 'Scan mensuel complété', detail: 'Score 84/100', tone: 'success' },
+            { time: 'Alerte type', event: 'Scan mensuel auto (à venir)', detail: 'Score 84/100 — bientôt disponible', tone: 'success' },
           ].map((item, i) => {
             const dotClass = item.tone === 'danger' ? 'bg-danger' : item.tone === 'warning' ? 'bg-warning' : 'bg-success';
             return (

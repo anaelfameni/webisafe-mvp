@@ -415,6 +415,12 @@ export default function AgencyBranding({ user, authLoading = false }) {
               </div>
 
               {/* Faux contenu */}
+              <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
+                <AlertTriangle size={11} className="flex-shrink-0 text-amber-500" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                  Aperçu — données fictives
+                </span>
+              </div>
               <h3 className="mb-1 text-lg font-bold text-slate-900">Score global : 73/100</h3>
               <p className="mb-3 text-sm text-slate-500">
                 Audit complet de exemple-client.com — 14 mai 2026

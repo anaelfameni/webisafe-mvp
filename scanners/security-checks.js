@@ -280,6 +280,39 @@ async function dohQueryTxt(name) {
     return Array.isArray(json.Answer) ? json.Answer : [];
 }
 
+async function dohQueryMx(name) {
+    try {
+        const res = await fetch(`https://1.1.1.1/dns-query?name=${encodeURIComponent(name)}&type=MX`, {
+            headers: { 'Accept': 'application/dns-json' },
+            signal: AbortSignal.timeout(4000),
+        });
+        if (!res.ok) return [];
+        const json = await res.json();
+        return Array.isArray(json.Answer) ? json.Answer.map(r => String(r.data || '').toLowerCase()) : [];
+    } catch {
+        return [];
+    }
+}
+
+function spfTemplateFromMx(mxRecords) {
+    const mx = mxRecords.join(' ');
+    if (/google\.com|googlemail\.com|gmail\.com/.test(mx))
+        return { include: 'include:_spf.google.com', provider: 'Google Workspace' };
+    if (/outlook\.com|hotmail\.com|protection\.outlook\.com|microsoft\.com/.test(mx))
+        return { include: 'include:spf.protection.outlook.com', provider: 'Microsoft 365' };
+    if (/amazonses\.com|aws/.test(mx))
+        return { include: 'include:amazonses.com', provider: 'Amazon SES' };
+    if (/sendgrid\.net/.test(mx))
+        return { include: 'include:sendgrid.net', provider: 'SendGrid' };
+    if (/mailgun\.org/.test(mx))
+        return { include: 'include:mailgun.org', provider: 'Mailgun' };
+    if (/ovh\.net|ovh\.com/.test(mx))
+        return { include: 'include:mx.ovh.com', provider: 'OVH' };
+    if (/infomaniak\.com/.test(mx))
+        return { include: 'include:_spf.infomaniak.com', provider: 'Infomaniak' };
+    return null;
+}
+
 export async function checkDNSEmailSecurity(domain) {
     if (!domain) {
         return [
@@ -290,10 +323,13 @@ export async function checkDNSEmailSecurity(domain) {
 
     const out = [];
 
-    // SPF
+    // SPF (avec détection du provider email via MX pour un conseil ciblé)
     try {
-        const ans = await dohQueryTxt(domain);
-        const flat = ans.map((r) => String(r.data || '').replace(/^"|"$/g, '').replace(/"\s*"/g, ''));
+        const [txtAns, mxRecords] = await Promise.all([
+            dohQueryTxt(domain),
+            dohQueryMx(domain),
+        ]);
+        const flat = txtAns.map((r) => String(r.data || '').replace(/^"|"$/g, '').replace(/"\s*"/g, ' '));
         const spf = flat.find((v) => v.toLowerCase().startsWith('v=spf1'));
         if (spf) {
             out.push({
@@ -309,6 +345,13 @@ export async function checkDNSEmailSecurity(domain) {
                 time_estimate: '20 minutes',
             });
         } else {
+            const detected = spfTemplateFromMx(mxRecords);
+            const spfExample = detected
+                ? `v=spf1 ${detected.include} ~all`
+                : 'v=spf1 include:<votre-fournisseur-email> ~all';
+            const providerNote = detected
+                ? `Votre fournisseur email détecté (${detected.provider}) utilise ${detected.include}.`
+                : 'Fournisseur email non détecté — consultez la documentation de votre service email pour connaître la valeur include: correcte (ex: Google Workspace → include:_spf.google.com, Microsoft 365 → include:spf.protection.outlook.com).';
             out.push({
                 check_name: 'dns_spf',
                 status: 'fail',
@@ -316,8 +359,8 @@ export async function checkDNSEmailSecurity(domain) {
                 criticality: 'major',
                 title: 'Enregistrement SPF manquant',
                 description: 'Sans SPF, n\'importe qui peut envoyer des emails en se faisant passer pour votre domaine.',
-                recommendation: 'Ajouter un enregistrement TXT SPF chez votre registrar DNS : v=spf1 include:_spf.google.com ~all (à adapter selon votre fournisseur email).',
-                technical_detail: `Aucun TXT v=spf1 trouvé sur ${domain}`,
+                recommendation: `Ajouter un enregistrement TXT SPF chez votre registrar DNS : ${spfExample} — ${providerNote}`,
+                technical_detail: `Aucun TXT v=spf1 trouvé sur ${domain}${mxRecords.length ? ` | MX détectés : ${mxRecords.slice(0,3).join(', ')}` : ''}`,
                 difficulty: '⭐⭐ Intermédiaire',
                 time_estimate: '20 minutes',
             });
@@ -330,7 +373,7 @@ export async function checkDNSEmailSecurity(domain) {
     // DMARC
     try {
         const ans = await dohQueryTxt(`_dmarc.${domain}`);
-        const flat = ans.map((r) => String(r.data || '').replace(/^"|"$/g, '').replace(/"\s*"/g, ''));
+        const flat = ans.map((r) => String(r.data || '').replace(/^"|"$/g, '').replace(/"\s*"/g, ' '));
         const dmarc = flat.find((v) => v.toLowerCase().startsWith('v=dmarc1'));
         if (dmarc) {
             const policy = (dmarc.match(/p=(reject|quarantine|none)/i) || [])[1]?.toLowerCase() || 'none';
@@ -369,7 +412,7 @@ export async function checkDNSEmailSecurity(domain) {
                 criticality: 'critical',
                 title: 'Enregistrement DMARC manquant',
                 description: `Sans DMARC, votre domaine est vulnérable aux attaques de phishing. Des cybercriminels peuvent envoyer des emails frauduleux depuis @${domain}.`,
-                recommendation: `Ajouter un enregistrement TXT sur _dmarc.${domain} : v=DMARC1; p=quarantine; rua=mailto:dmarc@${domain}`,
+                recommendation: `Ajouter un enregistrement TXT sur _dmarc.${domain} : v=DMARC1; p=quarantine; rua=mailto:dmarc@${domain} — Créez d'abord l'adresse dmarc@${domain} (ou utilisez un service tiers tel que dmarcanalyzer.com) pour recevoir les rapports, puis ajoutez l'enregistrement DNS.`,
                 technical_detail: `Aucun TXT v=DMARC1 trouvé sur _dmarc.${domain}`,
                 difficulty: '⭐⭐ Intermédiaire',
                 time_estimate: '20 minutes',
@@ -810,6 +853,202 @@ export async function checkMixedContent(url) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CHECK 8 — Cookie Security Flags (Secure, HttpOnly, SameSite)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function checkCookieFlags(url) {
+    try {
+        const res = await fetch(url, {
+            method: 'GET',
+            redirect: 'follow',
+            headers: { 'User-Agent': UA, 'Accept': 'text/html,*/*;q=0.8' },
+            signal: AbortSignal.timeout(7000),
+        });
+
+        // Les cookies sont émis via Set-Cookie. fetch() n'expose pas Set-Cookie
+        // directement pour raisons de sécurité navigateur, mais en Node.js
+        // (Vercel Serverless) on peut les lire via res.headers.getSetCookie()
+        // ou en itérant sur les headers bruts.
+        let rawCookies = [];
+        if (typeof res.headers.getSetCookie === 'function') {
+            rawCookies = res.headers.getSetCookie();
+        } else {
+            // Fallback : itération sur tous les headers (Node 18-)
+            res.headers.forEach((value, name) => {
+                if (name.toLowerCase() === 'set-cookie') rawCookies.push(value);
+            });
+        }
+
+        if (rawCookies.length === 0) {
+            return {
+                check_name: 'cookie_flags',
+                status: 'pass',
+                score_impact: 0,
+                criticality: 'minor',
+                title: 'Aucun cookie de session détecté',
+                description: 'La page principale n\'émet pas de cookies, ou ils sont émis uniquement sur les pages authentifiées.',
+                recommendation: 'Vérifiez que les cookies de session (sur /login, /account) portent bien les flags Secure, HttpOnly et SameSite.',
+                technical_detail: 'Aucun header Set-Cookie dans la réponse de la page principale.',
+                difficulty: '⭐ Facile',
+                time_estimate: '15 minutes',
+                data: { cookies_found: 0, cookies: [] },
+            };
+        }
+
+        // Analyser chaque cookie
+        const cookieAnalysis = rawCookies.map(raw => {
+            const lower = raw.toLowerCase();
+            const name = raw.split('=')[0].trim();
+            return {
+                name: name.slice(0, 60),
+                has_secure:    lower.includes('; secure') || lower.includes(';secure'),
+                has_httponly:  lower.includes('; httponly') || lower.includes(';httponly'),
+                samesite:      (lower.match(/samesite=(\w+)/) || [])[1] ?? null,
+                raw_snippet:   raw.slice(0, 120),
+            };
+        });
+
+        // Un cookie est "safe" s'il a les 3 flags recommandés
+        const unsafeCookies = cookieAnalysis.filter(c =>
+            !c.has_secure || !c.has_httponly || !c.samesite || c.samesite === 'none'
+        );
+
+        const missingFlags = [];
+        if (cookieAnalysis.some(c => !c.has_secure))   missingFlags.push('Secure');
+        if (cookieAnalysis.some(c => !c.has_httponly))  missingFlags.push('HttpOnly');
+        if (cookieAnalysis.some(c => !c.samesite || c.samesite === 'none')) missingFlags.push('SameSite');
+
+        if (unsafeCookies.length === 0) {
+            return {
+                check_name: 'cookie_flags',
+                status: 'pass',
+                score_impact: 0,
+                criticality: 'major',
+                title: `${cookieAnalysis.length} cookie(s) correctement sécurisé(s)`,
+                description: 'Tous les cookies détectés portent les flags Secure, HttpOnly et SameSite.',
+                recommendation: 'Maintenez ces flags sur tous vos cookies de session et d\'authentification.',
+                technical_detail: cookieAnalysis.map(c => `${c.name}: Secure=${c.has_secure} HttpOnly=${c.has_httponly} SameSite=${c.samesite ?? 'absent'}`).join(' | '),
+                difficulty: '⭐ Facile',
+                time_estimate: '—',
+                data: { cookies_found: cookieAnalysis.length, cookies: cookieAnalysis },
+            };
+        }
+
+        const isHighSeverity = missingFlags.includes('Secure') || missingFlags.includes('HttpOnly');
+
+        return {
+            check_name: 'cookie_flags',
+            status: 'fail',
+            score_impact: isHighSeverity ? 10 : 5,
+            criticality: isHighSeverity ? 'major' : 'minor',
+            title: `${unsafeCookies.length}/${cookieAnalysis.length} cookie(s) avec flag(s) manquant(s) : ${missingFlags.join(', ')}`,
+            description: `Cookies sans protection complète : ${unsafeCookies.map(c => c.name).join(', ')}. Les flags manquants exposent les cookies à des risques de vol (XSS, interception réseau) ou d'envoi non désiré (CSRF).`,
+            recommendation: `Ajouter les flags manquants à chaque cookie de session :\n• Secure : le cookie n'est transmis qu'en HTTPS.\n• HttpOnly : le cookie est inaccessible au JavaScript (protection XSS).\n• SameSite=Strict ou Lax : réduit le risque CSRF.`,
+            technical_detail: `${cookieAnalysis.length} cookie(s) total | ${unsafeCookies.length} non sécurisé(s) | Flags manquants : ${missingFlags.join(', ')}`,
+            difficulty: '⭐ Facile',
+            time_estimate: '15 minutes',
+            data: { cookies_found: cookieAnalysis.length, unsafe_count: unsafeCookies.length, missing_flags: missingFlags, cookies: cookieAnalysis },
+        };
+    } catch (e) {
+        console.warn('[CHECK CookieFlags] échec :', e.message);
+        return neutralError('cookie_flags', `Impossible d'analyser les cookies : ${e.message}`);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHECK 9 — Server Header Disclosure (version serveur exposée)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function checkServerHeaderDisclosure(url) {
+    try {
+        const res = await fetch(url, {
+            method: 'HEAD',
+            redirect: 'follow',
+            headers: { 'User-Agent': UA },
+            signal: AbortSignal.timeout(6000),
+        });
+
+        const server     = res.headers.get('server') || '';
+        const xPoweredBy = res.headers.get('x-powered-by') || '';
+        const xGenerator = res.headers.get('x-generator') || '';
+        const via        = res.headers.get('via') || '';
+
+        // Patterns de version précise dans un header Server (ex: Apache/2.4.41, nginx/1.18.0)
+        // On distingue :
+        //   - Disclosure critique : version exacte exposée (ex: "Apache/2.4.41 (Ubuntu)")
+        //   - Disclosure modérée : technologie exposée sans version (ex: "Apache")
+        //   - X-Powered-By : expose toujours le framework (ex: "PHP/8.1.2", "Express")
+        const VERSION_REGEX = /[\d]+\.[\d]+/; // présence d'un numéro de version (ex: 2.4, 1.18)
+
+        const disclosures = [];
+
+        if (server) {
+            if (VERSION_REGEX.test(server)) {
+                disclosures.push({ header: 'Server', value: server, level: 'critical' });
+            } else if (server.length > 0) {
+                disclosures.push({ header: 'Server', value: server, level: 'moderate' });
+            }
+        }
+
+        if (xPoweredBy) {
+            const level = VERSION_REGEX.test(xPoweredBy) ? 'critical' : 'moderate';
+            disclosures.push({ header: 'X-Powered-By', value: xPoweredBy, level });
+        }
+
+        if (xGenerator) {
+            disclosures.push({ header: 'X-Generator', value: xGenerator, level: 'moderate' });
+        }
+
+        // Via expose parfois des infos proxy/version (ex: "1.1 varnish (Varnish/6.5)")
+        if (via && VERSION_REGEX.test(via)) {
+            disclosures.push({ header: 'Via', value: via, level: 'moderate' });
+        }
+
+        if (disclosures.length === 0) {
+            return {
+                check_name: 'server_disclosure',
+                status: 'pass',
+                score_impact: 0,
+                criticality: 'minor',
+                title: 'Aucune information sensible exposée dans les headers serveur',
+                description: 'Les headers Server, X-Powered-By et X-Generator ne révèlent pas de technologie ou de version exploitable.',
+                recommendation: 'Continuez à masquer les informations serveur en production.',
+                technical_detail: `Server: "${server || '—'}" | X-Powered-By: "${xPoweredBy || '—'}"`,
+                difficulty: '⭐ Facile',
+                time_estimate: '—',
+                data: { disclosures: [] },
+            };
+        }
+
+        const hasCritical = disclosures.some(d => d.level === 'critical');
+
+        // Message d'exemple pour le premier cas critique/modéré
+        const worst = disclosures.find(d => d.level === 'critical') || disclosures[0];
+        const remediations = disclosures.map(d => {
+            if (d.header === 'Server') return 'Configurer ServerTokens Prod (Apache) ou server_tokens off (Nginx) pour masquer la version.';
+            if (d.header === 'X-Powered-By') return 'Supprimer X-Powered-By via expose_php=Off (PHP) ou app.disable("x-powered-by") (Express).';
+            if (d.header === 'X-Generator') return 'Désactiver le header X-Generator dans la configuration CMS.';
+            return `Masquer le header ${d.header}.`;
+        });
+
+        return {
+            check_name: 'server_disclosure',
+            status: 'fail',
+            score_impact: hasCritical ? 8 : 4,
+            criticality: hasCritical ? 'major' : 'minor',
+            title: `${disclosures.length} header(s) exposant des informations techniques sensibles`,
+            description: `Le header "${worst.header}: ${worst.value}" révèle ${hasCritical ? 'la version exacte du serveur — information exploitable pour cibler des CVEs connus' : 'la technologie utilisée'}. Un attaquant peut cibler des vulnérabilités spécifiques à cette version.`,
+            recommendation: [...new Set(remediations)].join('\n'),
+            technical_detail: disclosures.map(d => `${d.header}: "${d.value}" [${d.level}]`).join(' | '),
+            difficulty: '⭐ Facile',
+            time_estimate: '15 minutes',
+            data: { disclosures },
+        };
+    } catch (e) {
+        console.warn('[CHECK ServerDisclosure] échec :', e.message);
+        return neutralError('server_disclosure', `Impossible de vérifier les headers serveur : ${e.message}`);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Orchestrateur — exécute les 7 checks en parallèle (Promise.allSettled)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function runAdvancedSecurityChecks(url) {
@@ -817,17 +1056,19 @@ export async function runAdvancedSecurityChecks(url) {
     const baseUrl = extractBaseUrl(url);
 
     const settled = await Promise.allSettled([
-        checkSecurityHeaders(url),       // [] of 6
-        checkDNSEmailSecurity(domain),   // [] of 2
-        checkSensitiveFiles(baseUrl),    // []
-        checkExposedAdminPanels(baseUrl),// []
-        checkGoogleSafeBrowsing(url),    // {}
-        checkDataBreaches(domain),       // {}
-        checkMixedContent(url),          // {}
+        checkSecurityHeaders(url),         // [] of 6
+        checkDNSEmailSecurity(domain),     // [] of 2
+        checkSensitiveFiles(baseUrl),      // []
+        checkExposedAdminPanels(baseUrl),  // []
+        checkGoogleSafeBrowsing(url),      // {}
+        checkDataBreaches(domain),         // {}
+        checkMixedContent(url),            // {}
+        checkCookieFlags(url),             // {}
+        checkServerHeaderDisclosure(url),  // {}
     ]);
 
     const collected = [];
-    const labels = ['headers', 'dns', 'sensitive_files', 'admin_panels', 'safe_browsing', 'data_breaches', 'mixed_content'];
+    const labels = ['headers', 'dns', 'sensitive_files', 'admin_panels', 'safe_browsing', 'data_breaches', 'mixed_content', 'cookie_flags', 'server_disclosure'];
 
     settled.forEach((r, i) => {
         if (r.status === 'fulfilled') {

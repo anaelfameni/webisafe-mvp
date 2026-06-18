@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
-import { json, readJsonBody, sendResendEmail, setCorsHeaders, requireAdmin, escapeHtml } from '../api_shared/_utils.js';
+import { json, readJsonBody, sendResendEmail, setCorsHeaders, requireAdmin, escapeHtml, checkRateLimit } from '../api_shared/_utils.js';
 
-const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
+const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
   ? createClient(
       process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY,
+      process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY,
       { auth: { persistSession: false } }
     )
   : null;

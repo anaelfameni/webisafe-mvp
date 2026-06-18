@@ -19,10 +19,13 @@ import {
     checkHttpMethods,
     scanWordPressSecurity,
 } from '../server/scanners/securityProbes.js';
+import { detectSpa, renderSpaHtml } from '../lib/spaRenderer.js';
+import { crawlAdditionalPages } from '../lib/seoMultiCrawl.js';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey =
+    process.env.SUPABASE_SECRET_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_ANON_KEY ||
     null;
@@ -167,25 +170,6 @@ export function calibratePerformanceResult(perf) {
         };
     }
 
-    // Outlier modéré : LCP/FCP élevés MAIS CLS et TBT bons = artefact de mesure lab
-    // (typique des grands sites comme Apple, Samsung mesurés en réseau lent simulé)
-    const isModerateLabOutlier =
-        score != null && score < 65 &&
-        Number.isFinite(cls) && cls < 0.1 &&
-        Number.isFinite(tbt) && tbt < 400 &&
-        ((Number.isFinite(lcp) && lcp > 6000) || (Number.isFinite(fcp) && fcp > 3500));
-
-    if (isModerateLabOutlier) {
-        // Site avec LCP élevé mais autres métriques excellentes → réel-utilisateurs probablement OK
-        return {
-            ...perf,
-            score: Math.max(score, 70),
-            partial: true,
-            partial_reason: 'pagespeed_lab_simulation_artifact',
-            measurement_confidence: 'medium',
-        };
-    }
-
     return {
         ...perf,
         measurement_confidence: perf.measurement_confidence ?? 'high',
@@ -196,23 +180,23 @@ export function combineSecurityScores({ legacyScore, advancedScore, extendedScor
     const base = Number.isFinite(Number(legacyScore)) ? Number(legacyScore) : null;
     if (base == null) return null;
 
-    // Les scanners avancés/étendus mesurent des best practices (CSP, HSTS, security.txt, CORS...)
-    // Ces points NE DOIVENT PAS écraser le score fondamental d'un site HTTPS sain.
-    // On garde le legacyScore comme référence et on l'ajuste légèrement (±3) avec advanced/extended.
-    let blended = base;
-    if (Number.isFinite(Number(advancedScore))) {
-        const flooredAdvanced = Number(advancedScore);
-        blended = Math.round(blended * 0.95 + flooredAdvanced * 0.05);
-    }
-    if (Number.isFinite(Number(extendedScore))) {
-        const flooredExtended = Number(extendedScore);
-        blended = Math.round(blended * 0.95 + flooredExtended * 0.05);
+    const ext = Number.isFinite(Number(extendedScore)) ? Number(extendedScore) : null;
+    const adv = Number.isFinite(Number(advancedScore)) ? Number(advancedScore) : null;
+
+    // Pondération : fondamental (HTTPS/SSL/headers) 55%, étendu (email/CORS/WAF) 35%, avancé 10%.
+    // Sans Math.max(base) : les manques email et WAF tirent honnêtement le score vers le bas.
+    let score;
+    if (ext != null && adv != null) {
+        score = Math.round(base * 0.55 + adv * 0.10 + ext * 0.35);
+    } else if (ext != null) {
+        score = Math.round(base * 0.60 + ext * 0.40);
+    } else if (adv != null) {
+        score = Math.round(base * 0.80 + adv * 0.20);
+    } else {
+        score = base;
     }
 
-    let score = Math.max(base, blended);
-    // Le score reflète honnêtement la posture réelle du site.
-    // Les headers manquants sont pénalisés — les recommandations guident l'amélioration.
-    return Math.min(score, 99);
+    return Math.min(Math.max(score, 0), 99);
 }
 
 function getScanConfidence({ perf, sec, seo, ux }) {
@@ -372,14 +356,64 @@ async function saveToDb(scanId, url, score, results, userEmail = null) {
     }
 }
 
+// ── Cache ciblé PageSpeed ─────────────────────────────────────────────────────
+// Stocke uniquement le résultat PageSpeed (pas le scan entier) pour économiser
+// le quota API Google (1 000 req/jour gratuit). TTL = 24h.
+// Table Supabase : pagespeed_cache (url_hash TEXT PK, data JSONB, cached_at TIMESTAMPTZ)
+// DDL minimal : CREATE TABLE IF NOT EXISTS pagespeed_cache (
+//   url_hash TEXT PRIMARY KEY, data JSONB NOT NULL, cached_at TIMESTAMPTZ NOT NULL
+// );
+const PS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function readPageSpeedCache(url) {
+    if (!supabase) return null;
+    const hash = createHash('sha256').update(url).digest('hex');
+    try {
+        const { data, error } = await supabase
+            .from('pagespeed_cache')
+            .select('data, cached_at')
+            .eq('url_hash', hash)
+            .gte('cached_at', new Date(Date.now() - PS_CACHE_TTL_MS).toISOString())
+            .single();
+        if (error || !data) return null;
+        return { ...data.data, _from_cache: true, _cached_at: data.cached_at };
+    } catch (e) {
+        console.warn('[PS_CACHE] read error:', e.message);
+        return null;
+    }
+}
+
+async function writePageSpeedCache(url, result) {
+    if (!supabase) return;
+    const hash = createHash('sha256').update(url).digest('hex');
+    try {
+        // Exclude les champs internes avant de persister
+        const { _from_cache, _cached_at, ...toStore } = result;
+        await supabase.from('pagespeed_cache').upsert({
+            url_hash: hash,
+            data: toStore,
+            cached_at: new Date().toISOString(),
+        }, { onConflict: 'url_hash' });
+    } catch (e) {
+        console.warn('[PS_CACHE] write error:', e.message);
+    }
+}
+
 // ── Scanner Performance ───────────────────────────────────────────────────────
 async function scanPerformance(url, apiKey) {
+    // Tenter le cache avant d'appeler Google — économise le quota (1000 req/jour)
+    const cached = await readPageSpeedCache(url);
+    if (cached) {
+        console.log(`[PERF] Cache PageSpeed HIT pour ${url} (cached_at=${cached._cached_at})`);
+        return cached;
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 55_000);
     try {
         const psUrl =
             `https://www.googleapis.com/pagespeedonline/v5/runPagespeed` +
-            `?url=${encodeURIComponent(url)}&strategy=mobile&category=performance&category=accessibility&key=${apiKey}`;
+            `?url=${encodeURIComponent(url)}&strategy=mobile&category=performance&category=accessibility&category=best-practices&key=${apiKey}`;
         const res = await fetch(psUrl, { signal: controller.signal });
         if (!res.ok) throw new Error(`PageSpeed HTTP ${res.status}`);
         const data = await res.json();
@@ -438,16 +472,112 @@ async function scanPerformance(url, apiKey) {
             ? Math.max(fieldScore, cappedLabScore)
             : cappedLabScore;
 
-        // Accessibility score from Lighthouse (real WCAG-based audit)
+        // Accessibility score global (Lighthouse category score, 0-100)
         const accessibilityScore = lr.categories?.accessibility?.score != null
             ? Math.round(lr.categories.accessibility.score * 100)
             : null;
 
-        // Tap targets audit from Lighthouse
-        const tapTargetsAudit = lr.audits?.['tap-targets'];
-        const tapTargetsOk = tapTargetsAudit?.score != null ? tapTargetsAudit.score >= 0.9 : null;
+        // ── Audits Lighthouse détaillés pour le rapport UX/Accessibilité ─────
+        // Chaque audit retourne { score: 0-1 | null, details: { items: [...] } }.
+        // score = 1 → pass, score = 0 → fail, score null → non applicable.
+        // On extrait les items pour les cas d'échec afin de rendre les problèmes actionnables.
 
-        return calibratePerformanceResult({
+        function lhAuditItems(auditId) {
+            return lr.audits?.[auditId]?.details?.items ?? [];
+        }
+        function lhScore(auditId) {
+            const s = lr.audits?.[auditId]?.score;
+            return s == null ? null : Number(s);
+        }
+
+        const lighthouseA11yAudits = {
+            // 1. Contraste de couleur (WCAG AA : ratio 4.5:1 pour texte normal)
+            color_contrast: {
+                score: lhScore('color-contrast'),
+                failing_elements_count: lhAuditItems('color-contrast').length,
+                // Échantillon des 5 premiers éléments problématiques (pour le rapport)
+                failing_samples: lhAuditItems('color-contrast').slice(0, 5).map(item => ({
+                    selector: item.node?.selector?.slice(0, 120) ?? null,
+                    contrast_ratio: item.contrastRatio ?? null,
+                    required_ratio: item.requiredContrastRatio ?? 4.5,
+                    fg_color: item.node?.nodeLabel?.slice(0, 60) ?? null,
+                })),
+            },
+
+            // 2. Labels de formulaire manquants
+            form_labels: {
+                score: lhScore('label'),
+                failing_elements_count: lhAuditItems('label').length,
+                failing_samples: lhAuditItems('label').slice(0, 5).map(item => ({
+                    selector: item.node?.selector?.slice(0, 120) ?? null,
+                    type: item.node?.type ?? null,
+                })),
+            },
+
+            // 3. ARIA : attributs requis manquants
+            aria_required_attr: {
+                score: lhScore('aria-required-attr'),
+                failing_elements_count: lhAuditItems('aria-required-attr').length,
+                failing_samples: lhAuditItems('aria-required-attr').slice(0, 5).map(item => ({
+                    selector: item.node?.selector?.slice(0, 120) ?? null,
+                    role: item.node?.nodeLabel?.slice(0, 80) ?? null,
+                })),
+            },
+
+            // 4. ARIA : attributs invalides ou mal orthographiés
+            aria_valid_attr: {
+                score: lhScore('aria-valid-attr'),
+                failing_elements_count: lhAuditItems('aria-valid-attr').length,
+                failing_samples: lhAuditItems('aria-valid-attr').slice(0, 5).map(item => ({
+                    selector: item.node?.selector?.slice(0, 120) ?? null,
+                })),
+            },
+
+            // 5. Hiérarchie des headings (H1→H2→H3 sans sauts)
+            heading_order: {
+                score: lhScore('heading-order'),
+                failing_elements_count: lhAuditItems('heading-order').length,
+                failing_samples: lhAuditItems('heading-order').slice(0, 5).map(item => ({
+                    selector: item.node?.selector?.slice(0, 120) ?? null,
+                    text: item.node?.nodeLabel?.slice(0, 80) ?? null,
+                })),
+            },
+
+            // 6. Taille des zones tactiles (Lighthouse moderne : target-size / tap-targets)
+            // Essai de target-size (Lighthouse 11+) puis fallback tap-targets (Lighthouse 10)
+            tap_targets: {
+                score: lhScore('target-size') ?? lhScore('tap-targets'),
+                failing_elements_count:
+                    lhAuditItems('target-size').length || lhAuditItems('tap-targets').length,
+                failing_samples: (lhAuditItems('target-size').length
+                    ? lhAuditItems('target-size')
+                    : lhAuditItems('tap-targets')
+                ).slice(0, 5).map(item => ({
+                    selector: item.node?.selector?.slice(0, 120) ?? null,
+                    size: item.tapTargetScore ?? item.size ?? null,
+                })),
+                audit_id_used: lr.audits?.['target-size'] ? 'target-size' : 'tap-targets',
+            },
+
+            // 7. Taille de police minimale mobile (Best Practices, pas Accessibility)
+            // Présent dans best-practices category mais accessible via audits[]
+            font_size: {
+                score: lhScore('font-size'),
+                failing_elements_count: lhAuditItems('font-size').length,
+                failing_samples: lhAuditItems('font-size').slice(0, 5).map(item => ({
+                    selector: item.node?.selector?.slice(0, 120) ?? null,
+                    font_size: item.fontSize ?? null,
+                    minimum_size: '12px',
+                })),
+            },
+        };
+
+        // Tap targets ok : dérivé de l'audit Lighthouse (rétrocompatibilité)
+        const tapTargetsOk = lighthouseA11yAudits.tap_targets.score != null
+            ? lighthouseA11yAudits.tap_targets.score >= 0.9
+            : null;
+
+        const perfResult = calibratePerformanceResult({
             score: finalScore,
             raw_score: labScore,
             lab_score: cappedLabScore,
@@ -461,10 +591,17 @@ async function scanPerformance(url, apiKey) {
             opportunities,
             accessibility_score: accessibilityScore,
             tap_targets_ok: tapTargetsOk,
+            lighthouse_a11y_audits: lighthouseA11yAudits,
             partial: false,
         });
+        // Persistance asynchrone du cache (non-bloquant)
+        writePageSpeedCache(url, perfResult).catch(() => {});
+        return perfResult;
     } catch (err) {
         console.warn('[PERF] PageSpeed échoué:', err.message);
+        // PageSpeed indisponible : on mesure le TTFB brut comme métadonnée
+        // mais on ne génère PAS de score — les Core Web Vitals (LCP, CLS, TBT) sont inconnus.
+        let ttfb = null;
         try {
             const start = Date.now();
             await fetch(url, {
@@ -472,30 +609,20 @@ async function scanPerformance(url, apiKey) {
                 signal: AbortSignal.timeout(6_000),
                 headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Webisafe/1.0)' },
             });
-            const ttfb = Date.now() - start;
-            const score = ttfb < 300 ? 70 : ttfb < 600 ? 60 : ttfb < 1000 ? 50 : ttfb < 2000 ? 40 : 28;
-            return {
-                score,
-                raw_score: score,
-                lcp: null, cls: null, fcp: null, tbt: null,
-                page_weight_mb: null,
-                nb_requetes: null,
-                failed_checks: ['pagespeed_unavailable'],
-                opportunities: [],
-                partial: true,
-            };
-        } catch {
-            return {
-                score: null,
-                raw_score: null,
-                lcp: null, cls: null, fcp: null, tbt: null,
-                page_weight_mb: null,
-                nb_requetes: null,
-                failed_checks: ['pagespeed_unavailable', 'site_unreachable'],
-                opportunities: [],
-                partial: true,
-            };
-        }
+            ttfb = Date.now() - start;
+        } catch { /* site inaccessible */ }
+        return {
+            score: null,
+            raw_score: null,
+            ttfb_fallback_ms: ttfb,
+            lcp: null, cls: null, fcp: null, tbt: null,
+            page_weight_mb: null,
+            nb_requetes: null,
+            failed_checks: ttfb != null ? ['pagespeed_unavailable'] : ['pagespeed_unavailable', 'site_unreachable'],
+            opportunities: [],
+            partial: true,
+            partial_reason: 'pagespeed_unavailable',
+        };
     } finally {
         clearTimeout(timer);
     }
@@ -676,13 +803,15 @@ async function fetchSecurityHtml(url) {
 }
 
 // ── Sécurité ──────────────────────────────────────────────────────────────────
+// Points directs utilisés dans le score sécurité (total = 40).
+// Chaque header contribue sa valeur propre — plus de ratio sur 10.
 const SECURITY_HEADERS = {
-    'strict-transport-security': { points: 20, label: 'HSTS' },
-    'content-security-policy': { points: 20, label: 'CSP' },
-    'x-frame-options': { points: 15, label: 'X-Frame-Options' },
-    'x-content-type-options': { points: 10, label: 'X-Content-Type-Options' },
-    'referrer-policy': { points: 10, label: 'Referrer-Policy' },
-    'permissions-policy': { points: 10, label: 'Permissions-Policy' },
+    'strict-transport-security': { points: 10, label: 'HSTS' },
+    'content-security-policy':   { points: 10, label: 'CSP' },
+    'x-frame-options':           { points:  7, label: 'X-Frame-Options' },
+    'x-content-type-options':    { points:  5, label: 'X-Content-Type-Options' },
+    'referrer-policy':           { points:  4, label: 'Referrer-Policy' },
+    'permissions-policy':        { points:  4, label: 'Permissions-Policy' },
 };
 
 async function scanSecurity(url, vtApiKey) {
@@ -725,6 +854,7 @@ async function scanSecurity(url, vtApiKey) {
     }
 
     let malwareDetected = null;
+    let vtAnalysis = null; // Méta-données VT exposées dans le rapport
     if (vtApiKey) {
         try {
             const encoded = Buffer.from(url).toString('base64url');
@@ -735,38 +865,57 @@ async function scanSecurity(url, vtApiKey) {
             if (vtRes.ok) {
                 const vtData = await vtRes.json();
                 const stats = vtData?.data?.attributes?.last_analysis_stats ?? {};
-                malwareDetected = ((stats.malicious ?? 0) + (stats.suspicious ?? 0)) > 0;
+                const malicious  = stats.malicious  ?? 0;
+                const suspicious = stats.suspicious ?? 0;
+                const harmless   = stats.harmless   ?? 0;
+                const undetected = stats.undetected ?? 0;
+                const total      = malicious + suspicious + harmless + undetected;
+                const detections = malicious + suspicious;
+
+                // Seuil pondéré : on exige > 5% des moteurs concordants avant de conclure.
+                // Avec ~87 moteurs, cela correspond à ≥ 4-5 AV — seuil typique en SOC
+                // pour filtrer les faux positifs isolés tout en capturer les vraies menaces.
+                // 1 moteur sur 87 (~1,1%) → ignoré (faux positif probable)
+                // 5+ moteurs sur 87 (~5,7%) → malware confirmé
+                if (total > 0) {
+                    const rate = detections / total;
+                    malwareDetected = rate > 0.05;
+                    vtAnalysis = {
+                        malicious,
+                        suspicious,
+                        harmless,
+                        undetected,
+                        total,
+                        detection_rate_pct: Math.round(rate * 1000) / 10, // ex: 6.9%
+                        threshold_pct: 5,
+                        minor_detections: detections > 0 && !malwareDetected,
+                    };
+                }
             }
         } catch (e) { console.warn('[SEC] VirusTotal:', e.message); }
     }
 
-    // ── Scoring rééquilibré ────────────────────────────────────────────────
-    // Fondamentaux (85 pts) : HTTPS + SSL + Malware = vraie sécurité utilisateur
-    // Bonus headers (15 pts) : best practice, pas critique
+    // ── Scoring sécurité — répartition sur 100 pts ───────────────────────────
+    // HTTPS            : 30 pts — chiffrement en transit, fondamental mais pas suffisant seul
+    // Malware (VT)     : 30 pts — menace active (vérifié clean) / 25 pts (non vérifié)
+    // Headers (6)      : 40 pts — hygiène pro, CHAQUE header compte directement
+    //                    HSTS 10 + CSP 10 + XFO 7 + XCTO 5 + RP 4 + PP 4 = 40
     //
-    // Un site HTTPS sans malware mais sans headers OAW devrait être ~80/100 (acceptable),
-    // pas 35/100 (critique). Les headers manquants seront pénalisés une seule fois,
-    // dans runAdvancedSecurityChecks (pas en double ici).
-    // ── Répartition réaliste ────────────────────────────────────────────────
-    // Fondamentaux (90 pts) : ce qui protège VRAIMENT les utilisateurs
-    //   - HTTPS  (chiffrement TLS) : +50 → Pas de MITM possible
-    //   - SSL valide                : +10 → Certificat fiable
-    //   - Pas de malware vérifié   : +30 → Pas de menace active
-    //   (malware non vérifié = +28, bénéfice du doute si HTTPS)
-    // Bonus best practices (10 pts) : Headers (HSTS, CSP, etc.)
-    //   = pas critiques pour l'utilisateur final, juste de l'hygiène pro.
+    // Profils types :
+    //   HTTPS + clean + 0 header   →  60/100 "Acceptable" (honnête : manque tout de l'hygiène)
+    //   HTTPS + clean + HSTS + CSP →  80/100 "Très bon" (base solide)
+    //   HTTPS + clean + 6 headers  → 100/100 "Excellent" (atteignable par un site sérieux)
+    //   HTTP  + clean + 0 header   →  30/100 "Critique"
     let rawScore = 0;
-    if (isHttps) {
-        rawScore += 50; // HTTPS = chiffrement = fondamental
-        rawScore += 10; // SSL valide (implicite si HTTPS répond)
-    }
-    if (malwareDetected === false) rawScore += 30;       // Vérifié OK → max
-    else if (malwareDetected === null) rawScore += 28;   // Non vérifié → bénéfice du doute
-    // malwareDetected === true → 0 (le cap se fera plus bas)
+    if (isHttps) rawScore += 30; // HTTPS = chiffrement = fondamental
 
-    const headerPoints = headersPresent.reduce((acc, h) => acc + (SECURITY_HEADERS[h]?.points ?? 0), 0);
-    const maxHeaderPoints = Object.values(SECURITY_HEADERS).reduce((a, c) => a + c.points, 0);
-    rawScore += Math.round((headerPoints / maxHeaderPoints) * 10); // bonus 10 pts max
+    if (malwareDetected === false) rawScore += 30;      // Vérifié propre
+    else if (malwareDetected === null) rawScore += 25;  // Non vérifié → bénéfice du doute réduit
+    // malwareDetected === true → 0 (cap sévère appliqué plus bas)
+
+    // Headers : chaque header contribue ses points directement (total max = 40)
+    const headerScore = headersPresent.reduce((acc, h) => acc + (SECURITY_HEADERS[h]?.points ?? 0), 0);
+    rawScore += headerScore;
 
     rawScore = clamp(rawScore, 0, 100);
 
@@ -835,6 +984,7 @@ async function scanSecurity(url, vtApiKey) {
         score: cappedScore,
         raw_score: rawScore,
         malware_detected: malwareDetected,
+        vt_analysis: vtAnalysis,
         https: isHttps,
         final_url: finalUrl,
         ssl_grade: isHttps ? 'Non vérifié' : 'Absent',
@@ -859,24 +1009,29 @@ async function scanSecurity(url, vtApiKey) {
 }
 
 // ── SEO ───────────────────────────────────────────────────────────────────────
-async function scanSEO(url) {
-    let html = '';
+// preRenderedHtml : HTML déjà rendu par Puppeteer (SPA), passé par l'orchestrateur.
+// Null = pas de rendu disponible, on fait le fetch statique habituel.
+async function scanSEO(url, preRenderedHtml = null) {
+    let html = preRenderedHtml || '';
     let resHeaders = null;
+    let htmlSource = preRenderedHtml ? 'puppeteer' : 'static';
 
-    try {
-        const res = await fetch(url, {
-            signal: AbortSignal.timeout(10_000),
-            headers: BROWSER_HEADERS,
-            redirect: 'follow',
-        });
-        resHeaders = res.headers;
-        if (res.ok) {
-            html = await res.text();
-        } else {
-            console.warn(`[SEO] HTTP ${res.status} pour ${url}`);
+    if (!preRenderedHtml) {
+        try {
+            const res = await fetch(url, {
+                signal: AbortSignal.timeout(10_000),
+                headers: BROWSER_HEADERS,
+                redirect: 'follow',
+            });
+            resHeaders = res.headers;
+            if (res.ok) {
+                html = await res.text();
+            } else {
+                console.warn(`[SEO] HTTP ${res.status} pour ${url}`);
+            }
+        } catch (e) {
+            console.warn(`[SEO] fetch échoué: ${e.message}`);
         }
-    } catch (e) {
-        console.warn(`[SEO] fetch échoué: ${e.message}`);
     }
 
     // Si on n'a pas pu récupérer de HTML, score partiel minimal
@@ -906,22 +1061,15 @@ async function scanSEO(url) {
     const h1Count = $('h1').length;
 
     // ── Détection SPA (React, Vue, Angular, Next, Nuxt, SvelteKit) ─────────────
-    // Sur une SPA le contenu principal (H1, paragraphes…) est injecté côté client
-    // et absent du HTML statique servi par le serveur.
-    const spaRootIds = ['#root', '#app', '#__next', '#__nuxt', '#__sveltekit'];
-    const hasSpaRoot = spaRootIds.some(sel => $(sel).length > 0);
-    const bodyText = $('body').clone().find('script, style, noscript').remove().end().text().trim();
-    const isEmptyBody = bodyText.length < 200;
-    const hasScriptBundles = $('script[src*="/assets/"]').length > 0 ||
-                             $('script[src*="/chunk"]').length > 0 ||
-                             $('script[src*="/bundle"]').length > 0 ||
-                             $('script[src*="main."]').length > 0 ||
-                             $('script[src*="index."]').length > 0;
-    const isSPA = hasSpaRoot && (isEmptyBody || hasScriptBundles);
+    // detectSpa() inspecte le HTML pour déterminer si c'est une SPA côté client.
+    // Si preRenderedHtml est fourni (Puppeteer), le contenu est déjà rendu :
+    // isSPA reste informatif mais on ne compense plus les H1 manquants.
+    const isSPA = detectSpa(html, $);
+    const htmlIsRendered = Boolean(preRenderedHtml); // true = Puppeteer a tourné
 
-    // Si c'est une SPA et qu'aucun H1 n'est trouvé dans le HTML statique,
-    // on suppose qu'il est rendu côté client → on ne pénalise pas.
-    const effectiveH1Count = (isSPA && h1Count === 0) ? 1 : h1Count;
+    // Compensation H1 manquant : uniquement si HTML statique ET SPA détectée.
+    // Si Puppeteer a rendu la page, le H1 doit être présent → pas de compensation.
+    const effectiveH1Count = (!htmlIsRendered && isSPA && h1Count === 0) ? 1 : h1Count;
     const ogTitle = $('meta[property="og:title"]').attr('content');
     const ogDesc = $('meta[property="og:description"]').attr('content');
     const ogImage = $('meta[property="og:image"]').attr('content');
@@ -1008,6 +1156,8 @@ async function scanSEO(url) {
         has_favicon: technicalChecks?.favicon?.status === 'pass',
         h1_detected_in_static_html: h1Count > 0,
         spa_detected: isSPA,
+        spa_rendered: htmlIsRendered,  // true = analysé après rendu JS via Puppeteer
+        html_source: htmlSource,       // 'puppeteer' | 'static'
         has_viewport: hasViewport,
         has_open_graph: hasOpenGraph,
         has_canonical: hasCanonical,
@@ -1019,28 +1169,36 @@ async function scanSEO(url) {
         failed_checks: failedChecks,
         partial: false,
         html_snippet: html.slice(0, 5000),
+        // HTML complet conservé temporairement pour le crawl multi-pages.
+        // Supprimé du résultat final avant envoi (trop volumineux pour le client).
+        _raw_html_for_crawl: html,
     };
 }
 
 // ── UX Mobile ─────────────────────────────────────────────────────────────────
-async function scanUX(url) {
-    let html = '';
-    let resHeaders = null;
+// preRenderedHtml : HTML déjà rendu par Puppeteer (SPA), passé par l'orchestrateur.
+// Null = pas de rendu disponible, on fait le fetch statique habituel.
+// resHeadersOverride : headers HTTP récupérés lors du fetch statique initial.
+async function scanUX(url, preRenderedHtml = null, resHeadersOverride = null) {
+    let html = preRenderedHtml || '';
+    let resHeaders = resHeadersOverride;
 
-    try {
-        const res = await fetch(url, {
-            signal: AbortSignal.timeout(12_000),
-            headers: BROWSER_HEADERS,
-            redirect: 'follow',
-        });
-        resHeaders = res.headers;
-        if (res.ok) {
-            html = await res.text();
-        } else {
-            console.warn(`[UX] HTTP ${res.status} pour ${url}`);
+    if (!preRenderedHtml) {
+        try {
+            const res = await fetch(url, {
+                signal: AbortSignal.timeout(12_000),
+                headers: BROWSER_HEADERS,
+                redirect: 'follow',
+            });
+            resHeaders = res.headers;
+            if (res.ok) {
+                html = await res.text();
+            } else {
+                console.warn(`[UX] HTTP ${res.status} pour ${url}`);
+            }
+        } catch (e) {
+            console.warn(`[UX] fetch échoué: ${e.message}`);
         }
-    } catch (e) {
-        console.warn(`[UX] fetch échoué: ${e.message}`);
     }
 
     // Si on n'a pas pu récupérer de HTML, score partiel minimal
@@ -1316,12 +1474,45 @@ export default async function handler(req, res) {
 
     console.log(`[SCAN] Démarrage id=${scanId} url=${scanUrl}`);
 
+    // ── Détection SPA + rendu Puppeteer unique ────────────────────────────────
+    // On fait un fetch statique rapide pour détecter si la page est une SPA.
+    // Si oui, on lance Puppeteer UNE seule fois et on passe le HTML rendu
+    // à scanSEO et scanUX — évite deux lancements Chromium par scan.
+    // Timeout du probe statique : 8s (non-bloquant si ça échoue).
+    let preRenderedHtml = null;
+    let probeResHeaders = null;
+    let spaDetectedEarly = false;
+    try {
+        const probeRes = await fetch(scanUrl, {
+            signal: AbortSignal.timeout(8_000),
+            headers: BROWSER_HEADERS,
+            redirect: 'follow',
+        });
+        probeResHeaders = probeRes.headers;
+        if (probeRes.ok) {
+            const staticHtml = await probeRes.text();
+            const $probe = cheerio.load(staticHtml);
+            spaDetectedEarly = detectSpa(staticHtml, $probe);
+            if (spaDetectedEarly) {
+                console.log(`[SCAN] SPA détectée pour ${scanUrl} — lancement Puppeteer`);
+                preRenderedHtml = await renderSpaHtml(scanUrl);
+                if (preRenderedHtml) {
+                    console.log(`[SCAN] HTML rendu JS disponible (${preRenderedHtml.length} bytes) — partagé entre SEO et UX`);
+                } else {
+                    console.warn(`[SCAN] Puppeteer échoué — SEO et UX utiliseront le HTML statique`);
+                }
+            }
+        }
+    } catch (probeErr) {
+        console.warn(`[SCAN] Probe statique échoué: ${probeErr.message} — continue sans rendu SPA`);
+    }
+
     try {
         const [perfResult, secResult, seoResult, uxResult, geoResult, advancedSecResult, extendedSecResult] = await Promise.allSettled([
             scanPerformance(scanUrl, psKey),
             scanSecurity(scanUrl, vtKey),
-            scanSEO(scanUrl),
-            scanUX(scanUrl),
+            scanSEO(scanUrl, preRenderedHtml),
+            scanUX(scanUrl, preRenderedHtml, probeResHeaders),
             getServerLocation(domain),
             runAdvancedSecurityChecks(scanUrl),
             runExtendedSecurityChecks(scanUrl),
@@ -1337,10 +1528,133 @@ export default async function handler(req, res) {
 
         if (perf) perf.server_location = geo;
 
-        // Inject real Lighthouse accessibility & tap_targets into UX results
+        // ── Injection des audits Lighthouse dans les résultats UX ────────────
+        // Convertit chaque audit Lighthouse en issue Webisafe (pass/warning/fail)
+        // avec un message actionnable pour le client non-technique.
         if (ux && perf) {
             if (perf.accessibility_score != null) ux.accessibility_score = perf.accessibility_score;
             if (perf.tap_targets_ok != null) ux.tap_targets_ok = perf.tap_targets_ok;
+
+            const a11y = perf.lighthouse_a11y_audits ?? null;
+            if (a11y) {
+                // Attacher les audits bruts pour le rapport PDF
+                ux.lighthouse_a11y_audits = a11y;
+
+                // Convertir chaque audit en issue Webisafe si en échec (score < 0.9)
+                // Un score null = audit non applicable (pas d'issue générée)
+                const lhIssues = [];
+
+                // 1. Contraste de couleur
+                if (a11y.color_contrast.score != null && a11y.color_contrast.score < 0.9) {
+                    const n = a11y.color_contrast.failing_elements_count;
+                    lhIssues.push({
+                        severity: a11y.color_contrast.score === 0 ? 'high' : 'medium',
+                        source: 'lighthouse',
+                        audit_id: 'color-contrast',
+                        message: `${n} élément(s) avec un contraste de couleur insuffisant (WCAG AA : ratio 4.5:1 minimum)`,
+                        impact: 'Texte illisible pour les personnes malvoyantes ou en plein soleil sur mobile. Pénalité d\'accessibilité SEO.',
+                        recommendation: 'Augmentez le contraste entre la couleur du texte et celle du fond. Utilisez un outil comme WebAIM Contrast Checker.',
+                        failing_count: n,
+                    });
+                }
+
+                // 2. Labels de formulaire
+                if (a11y.form_labels.score != null && a11y.form_labels.score < 0.9) {
+                    const n = a11y.form_labels.failing_elements_count;
+                    lhIssues.push({
+                        severity: 'high',
+                        source: 'lighthouse',
+                        audit_id: 'label',
+                        message: `${n} champ(s) de formulaire sans étiquette (label) associée`,
+                        impact: 'Les lecteurs d\'écran ne peuvent pas décrire le champ à l\'utilisateur. Formulaire inutilisable pour les personnes aveugles.',
+                        recommendation: 'Associez chaque <input> à un <label for="..."> ou utilisez aria-label. Exemple : <label for="email">Email</label><input id="email" type="email">.',
+                        failing_count: n,
+                    });
+                }
+
+                // 3. ARIA : attributs requis manquants
+                if (a11y.aria_required_attr.score != null && a11y.aria_required_attr.score < 0.9) {
+                    const n = a11y.aria_required_attr.failing_elements_count;
+                    lhIssues.push({
+                        severity: 'medium',
+                        source: 'lighthouse',
+                        audit_id: 'aria-required-attr',
+                        message: `${n} élément(s) avec un rôle ARIA sans les attributs requis`,
+                        impact: 'Les technologies d\'assistance reçoivent des informations incomplètes et ne peuvent pas interpréter correctement les composants interactifs.',
+                        recommendation: 'Vérifiez que chaque attribut role="..." est accompagné de tous ses aria-* obligatoires. Ex : role="checkbox" requiert aria-checked.',
+                        failing_count: n,
+                    });
+                }
+
+                // 4. ARIA : attributs invalides
+                if (a11y.aria_valid_attr.score != null && a11y.aria_valid_attr.score < 0.9) {
+                    const n = a11y.aria_valid_attr.failing_elements_count;
+                    lhIssues.push({
+                        severity: 'medium',
+                        source: 'lighthouse',
+                        audit_id: 'aria-valid-attr',
+                        message: `${n} attribut(s) ARIA invalide(s) ou mal orthographié(s)`,
+                        impact: 'Les attributs ARIA non reconnus sont ignorés par les lecteurs d\'écran, laissant les utilisateurs sans contexte.',
+                        recommendation: 'Corrigez les fautes de frappe dans les attributs aria-* (ex: aria-lable → aria-label). Consultez la liste officielle WAI-ARIA.',
+                        failing_count: n,
+                    });
+                }
+
+                // 5. Hiérarchie des headings
+                if (a11y.heading_order.score != null && a11y.heading_order.score < 0.9) {
+                    const n = a11y.heading_order.failing_elements_count;
+                    lhIssues.push({
+                        severity: 'medium',
+                        source: 'lighthouse',
+                        audit_id: 'heading-order',
+                        message: `${n} titre(s) avec une hiérarchie incorrecte (ex: H3 après H1 sans H2 intermédiaire)`,
+                        impact: 'La navigation au clavier et les lecteurs d\'écran utilisent la hiérarchie des titres comme plan de navigation. Un saut de niveau désorganise la structure.',
+                        recommendation: 'Respectez l\'ordre H1 → H2 → H3 sans sauter de niveau. Un seul H1 par page, utilisé pour le titre principal.',
+                        failing_count: n,
+                    });
+                }
+
+                // 6. Zones tactiles trop petites
+                if (a11y.tap_targets.score != null && a11y.tap_targets.score < 0.9) {
+                    const n = a11y.tap_targets.failing_elements_count;
+                    lhIssues.push({
+                        severity: 'medium',
+                        source: 'lighthouse',
+                        audit_id: a11y.tap_targets.audit_id_used,
+                        message: `${n} zone(s) tactile(s) trop petite(s) pour une utilisation mobile confortable`,
+                        impact: 'Les boutons et liens difficiles à appuyer provoquent des erreurs de clic sur mobile. Google pénalise les sites avec des cibles trop rapprochées.',
+                        recommendation: 'Définissez une taille minimum de 48×48px pour tous les éléments cliquables (boutons, liens, icônes). Ajoutez du padding si nécessaire.',
+                        failing_count: n,
+                    });
+                }
+
+                // 7. Taille de police trop petite
+                if (a11y.font_size.score != null && a11y.font_size.score < 0.9) {
+                    const n = a11y.font_size.failing_elements_count;
+                    lhIssues.push({
+                        severity: 'low',
+                        source: 'lighthouse',
+                        audit_id: 'font-size',
+                        message: `${n} élément(s) avec une taille de police inférieure à 12px sur mobile`,
+                        impact: 'Le texte trop petit force les utilisateurs à zoomer, dégradant l\'expérience mobile et augmentant le taux de rebond.',
+                        recommendation: 'Utilisez font-size: 16px comme base de corps de texte. Ne descendez pas en-dessous de 12px. Évitez les unités px fixes, préférez rem.',
+                        failing_count: n,
+                    });
+                }
+
+                // Fusionner les issues Lighthouse dans les issues UX existantes
+                if (lhIssues.length > 0) {
+                    ux.issues = [...(ux.issues || []), ...lhIssues];
+                    ux.issues_count = ux.issues.length;
+                    ux.critical_count = ux.issues.filter(i => i.severity === 'high').length;
+                    ux.medium_count = ux.issues.filter(i => i.severity === 'medium').length;
+                    ux.low_count = ux.issues.filter(i => i.severity === 'low').length;
+
+                    // Ajouter les failed_checks Lighthouse dans la liste UX
+                    const lhFailedChecks = lhIssues.map(i => `lh_${i.audit_id.replace(/-/g, '_')}`);
+                    ux.failed_checks = [...(ux.failed_checks || []), ...lhFailedChecks];
+                }
+            }
         }
 
         if (sec && advancedSec) {
@@ -1374,6 +1688,39 @@ export default async function handler(req, res) {
                 https: sec.https,
                 malwareDetected: sec.malware_detected,
             }) ?? sec.score;
+        }
+
+        // ── Crawl SEO multi-pages ─────────────────────────────────────────────
+        // Lancé APRÈS les scanners principaux (PageSpeed déjà terminé).
+        // Budget : 18s. Séquentiel, 4 pages max, fallback si budget dépassé.
+        // Le HTML de la page principale est réutilisé directement (pas de re-fetch).
+        if (seo) {
+            const mainHtml = seo._raw_html_for_crawl || '';
+            delete seo._raw_html_for_crawl; // supprimer avant envoi client
+
+            const elapsedSoFar = Date.now() - startMs;
+            const remainingBudget = Math.max(0, 80_000 - elapsedSoFar); // garde 10s de marge
+            const crawlBudget = Math.min(18_000, remainingBudget);
+
+            if (crawlBudget > 2_000 && mainHtml) {
+                try {
+                    const multipage = await crawlAdditionalPages(
+                        scanUrl,
+                        mainHtml,
+                        seo,
+                        crawlBudget,
+                        4 // max 4 pages secondaires
+                    );
+                    seo.multipage = multipage;
+                    console.log(`[SCAN] Crawl multi-pages: ${multipage.pages.length} pages, complet=${multipage.crawl_completed}`);
+                } catch (crawlErr) {
+                    console.warn('[SCAN] Crawl multi-pages échoué (non-bloquant):', crawlErr.message);
+                    seo.multipage = null;
+                }
+            } else {
+                console.log(`[SCAN] Crawl multi-pages ignoré (budget restant: ${crawlBudget}ms)`);
+                seo.multipage = null;
+            }
         }
 
         const scores = {
@@ -1416,11 +1763,17 @@ export default async function handler(req, res) {
                 extended: extendedSecResult.status === 'rejected' ? extendedSecResult.reason?.message : null,
             },
             scan_duration_ms: scanDurationMs,
+            performance_cache: perf?._from_cache
+                ? { from_cache: true, cached_at: perf._cached_at }
+                : { from_cache: false },
             summary: {
                 https_enabled: sec?.https ?? String(scanUrl || '').startsWith('https'),
             },
             detected_technology: {
-                cms: tech.cms,
+                // Priorité à detectCms (lit headers HTTP + HTML) sur detectTechnology (HTML seul).
+                // detectCms détecte Next.js via x-powered-by et /_next/ ; detectTechnology le manque
+                // car il n'a accès qu'au html_snippet sans les headers de réponse.
+                cms: sec?.cms_detection?.primary || tech.cms,
                 technologies: tech.technologies,
                 hosting_country: geo?.country || null,
                 hosting_isp: geo?.isp || null,

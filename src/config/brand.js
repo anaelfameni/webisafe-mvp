@@ -2,12 +2,16 @@
 // Objectif : éviter les numéros/email hardcodés dispersés dans le code
 
 export const BRAND_NAME = 'Webisafe';
-export const BRAND_TAGLINE = 'Auditez la sécurité de votre site web en 60 secondes';
+export const BRAND_TAGLINE = 'Auditez la sécurité de votre site web en 30 secondes';
+
+// À mettre à jour à chaque révision réelle du contenu légal (CGU, Confidentialité).
+export const LEGAL_LAST_UPDATED = '10 mai 2026';
+export const LEGAL_VERSION = '2.0';
 
 // I.7 — Source unique de la durée de scan affichée à l'utilisateur.
 // Toute mention de durée doit utiliser ces constantes pour éviter les incohérences
 // entre Hero, FAQ, URLInput, emails, etc.
-export const SCAN_DURATION_AVG_LABEL = '60 secondes';
+export const SCAN_DURATION_AVG_LABEL = '30 secondes';
 export const SCAN_DURATION_RANGE_LABEL = '30 à 90 secondes';
 export const SCAN_DURATION_PROMISE = `Résultats en ${SCAN_DURATION_RANGE_LABEL}`;
 
@@ -57,9 +61,17 @@ export const PAYMENT_CONFIG = {
   currency: 'FCFA',
 };
 
-// Liens de paiement Wave Business (Wave for Business — demande de paiement)
+// Liens de paiement Wave Business (fallback manuel — conservé pour le mode de rattrapage)
 // Montants TTC incluant frais Wave : 35 350 FCFA (audit) / 15 150 FCFA (protect)
 export const WAVE_BUSINESS_LINKS = {
   audit: 'https://pay.wave.com/m/M_ci_5BsAxsc0BlEl/c/ci/?amount=35350',
   protect: 'https://pay.wave.com/m/M_ci_5BsAxsc0BlEl/c/ci/?amount=15150',
 };
+
+// Génère une URL de paiement Wave Checkout à partir du wave_launch_url
+// retourné par /api/checkout/create-session. Si l'API Checkout n'est pas
+// disponible, on bascule sur le lien Wave Business manuel (fallback).
+export function getWaveCheckoutUrl(wavelaunchUrl, type = 'audit') {
+  if (wavelaunchUrl) return wavelaunchUrl;
+  return WAVE_BUSINESS_LINKS[type] ?? WAVE_BUSINESS_LINKS.audit;
+}

@@ -13,8 +13,8 @@ export async function submitCorrectionRequest(payload) {
 
   const data = await res.json().catch(() => ({ error: 'Réponse invalide' }));
 
-  if (!res.ok) {
-    throw new Error(data.error || `Erreur ${res.status}`);
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.error || `Erreur ${res.status}`);
   }
 
   return data;

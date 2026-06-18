@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
-import { json, readJsonBody, sendResendEmail, setCorsHeaders, escapeHtml, checkRateLimit, requireAdmin } from '../api_shared/_utils.js';
+import { json, readJsonBody, sendResendEmail, setCorsHeaders, escapeHtml, checkRateLimit, requireAdmin, requireAuthenticatedUser } from '../api_shared/_utils.js';
 
-const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
+const supabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
   ? createClient(
       process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY,
+      process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY,
       { auth: { persistSession: false } }
     )
   : null;
@@ -58,7 +58,11 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
 
-  // H.10 — Rate limit endpoint public : 5 souscriptions/min/IP
+  // Authentification obligatoire : on ne peut souscrire que pour son propre compte.
+  const authUser = await requireAuthenticatedUser(req, res);
+  if (!authUser) return;
+
+  // Rate limit APRÈS auth pour éviter le brute-force de tokens
   const rateLimit = checkRateLimit(req, 5, 60000);
   if (!rateLimit.allowed) {
     return json(res, 429, { error: `Trop de tentatives, réessayez dans ${rateLimit.retryAfter}s` });
@@ -73,6 +77,12 @@ export default async function handler(req, res) {
 
   if (!user_id || !user_email || !site_url) {
     return json(res, 400, { error: 'user_id, user_email et site_url sont requis' });
+  }
+
+  // Isolation : le user_id du body doit correspondre à la session authentifiée.
+  // Empêche la création d'une souscription au nom d'un autre utilisateur.
+  if (user_id !== authUser.id) {
+    return json(res, 403, { error: 'Accès refusé : user_id ne correspond pas à la session' });
   }
 
   const { data: existing } = await supabase

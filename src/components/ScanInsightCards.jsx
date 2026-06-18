@@ -13,16 +13,37 @@ import {
 } from 'lucide-react';
 import { extractDomain } from '../utils/validators';
 
+const GENERIC_TECHS = new Set(['HTML','CSS','JavaScript','Google Analytics','Facebook Pixel','Hotjar','Cloudflare','Fastly']);
+
 function normalizeTechnology(scanData) {
   const tech = scanData?.detected_technology ?? scanData?.raw?.detected_technology ?? {};
-  const cms = tech?.cms || 'Technologie personnalisée';
-  const technologies = Array.isArray(tech?.technologies) && tech.technologies.length > 0
+
+  // Source 1 : detected_technology du backend
+  const rawTechs = Array.isArray(tech?.technologies) && tech.technologies.length > 0
     ? tech.technologies
     : ['HTML', 'CSS', 'JavaScript'];
 
+  // Source 2 : résultat du scanner étendu tech_cve / tech_and_dependencies
+  // — c'est lui qui détecte Next.js via les headers HTTP (x-powered-by, x-nextjs-*)
+  const allChecks = [
+    ...(Array.isArray(scanData?.metrics?.security?.extended_checks) ? scanData.metrics.security.extended_checks : []),
+    ...(Array.isArray(scanData?.metrics?.security?.extendedChecks) ? scanData.metrics.security.extendedChecks : []),
+    ...(Array.isArray(scanData?.extendedChecks) ? scanData.extendedChecks : []),
+    ...(Array.isArray(scanData?.raw?.extendedChecks) ? scanData.raw.extendedChecks : []),
+  ];
+  const techCheck = allChecks.find(c => c?.check_name === 'tech_cve' || c?.check_name === 'tech_and_dependencies');
+  const extCms = techCheck?.data?.cms_detection?.primary ?? null;
+  const extFrameworks = Array.isArray(techCheck?.data?.frameworks) ? techCheck.data.frameworks : [];
+
+  // Fusionne les sources : on préfère le CMS/framework détecté par tech_cve
+  const mergedTechs = Array.from(new Set([...extFrameworks, ...rawTechs]));
+
+  // Utilise cms en priorité : source étendue > detected_technology.cms > premier non-générique
+  const cms = extCms || tech?.cms || mergedTechs.find(t => !GENERIC_TECHS.has(t)) || null;
+
   return {
-    cms,
-    technologies: Array.from(new Set(technologies)).slice(0, 8),
+    cms: cms || 'Stack personnalisée',
+    technologies: mergedTechs.filter(Boolean).slice(0, 8),
     hostingCountry: tech?.hosting_country || scanData?.serverLocation?.country || scanData?.metrics?.performance?.server_location?.country || null,
     hostingIsp: tech?.hosting_isp || scanData?.serverLocation?.isp || scanData?.metrics?.performance?.server_location?.isp || null,
     isLocalAfrica: tech?.is_local_africa ?? scanData?.serverLocation?.is_local_africa ?? null,
@@ -136,37 +157,9 @@ export function AfricaBenchmarkCard({ url, score }) {
     };
   }, [domain, score]);
 
-  // G.2 — État vide propre quand pas assez de données de benchmark
-  if (!loading && !bench) {
-    return (
-      <motion.article
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#0b1220]/90 p-[1px] shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
-      >
-        <div className="relative h-full rounded-[27px] bg-gradient-to-br from-white/[0.04] to-transparent p-6 md:p-7">
-          <div className="flex items-start gap-4 mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white/40">
-              <BarChart3 size={22} />
-            </div>
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-white/50">
-                Benchmark Webisafe
-              </span>
-              <h3 className="mt-2 text-xl font-black text-white tracking-tight">Benchmark africain en construction</h3>
-            </div>
-          </div>
-          <p className="text-sm text-white/55 leading-relaxed">
-            Notre base de comparaison africaine s’enrichit à chaque audit. Pour garantir l’honnêteté des comparaisons, nous n’affichons un benchmark que lorsque suffisamment de sites du même pays ont été audités.
-          </p>
-          <p className="mt-3 text-xs text-white/35">
-            Repassez un audit dans quelques semaines pour voir votre site comparé à d’autres PME ivoiriennes.
-          </p>
-        </div>
-      </motion.article>
-    );
-  }
+  // Pas assez de données : on ne rend rien plutôt qu’un état "en construction"
+  // qui dévalorise le rapport aux yeux d’un client payant.
+  if (!loading && !bench) return null;
 
   const yourScore = bench?.your_score ?? Math.round(Number(score) || 0);
   const countryAvg = bench?.country_avg ?? 0;

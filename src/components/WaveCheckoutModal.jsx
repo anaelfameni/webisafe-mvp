@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Check, Lock } from 'lucide-react';
+import { PAYMENT_CONFIG } from '../config/brand';
 
 export default function WaveCheckoutModal({
   isOpen,
@@ -9,7 +10,7 @@ export default function WaveCheckoutModal({
   scanUrl = '',
   globalScore = 0,
   initialEmail = '',
-  amount = 35000,
+  amount = PAYMENT_CONFIG.premiumAmount,
 }) {
   const [email, setEmail] = useState(initialEmail);
   const [loading, setLoading] = useState(false);
