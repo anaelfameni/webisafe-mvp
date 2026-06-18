@@ -7,7 +7,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
-import { setCorsHeaders, checkRateLimit, escapeHtml, sendResendEmail } from '../api_shared/_utils.js';
+import { setCorsHeaders, checkRateLimit, escapeHtml, sendResendEmail, readJsonBody } from '../api_shared/_utils.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || null;
@@ -167,8 +167,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
-  const body = req.body || {};
-  const action = String(body.action || '').trim().toLowerCase();
+  let body;
+  try { body = await readJsonBody(req); } catch { body = {}; }
+  const action = String(body?.action || '').trim().toLowerCase();
 
   if (action === 'contact') return handleContact(req, res, body);
   if (action === 'forgot-password') return handleForgotPassword(req, res, body);

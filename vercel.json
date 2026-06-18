@@ -47,6 +47,10 @@
     "api/misc.js": {
       "memory": 256,
       "maxDuration": 15
+    },
+    "api/payment-status.js": {
+      "memory": 256,
+      "maxDuration": 10
     }
   },
   "crons": [
