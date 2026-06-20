@@ -7,7 +7,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
-import { setCorsHeaders, checkRateLimit, escapeHtml, sendResendEmail, readJsonBody } from '../api_shared/_utils.js';
+import { setCorsHeaders, checkRateLimit, escapeHtml, sendResendEmail, readJsonBody, isAdminEmail } from '../api_shared/_utils.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || null;
@@ -109,7 +109,7 @@ async function handleForgotPassword(req, res, body) {
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
 
   const { data: existingUsers, error: lookupError } = await supabase
-    .from('users').select('email').eq('email', cleanEmail).limit(1);
+    .from('profiles').select('email').eq('email', cleanEmail).limit(1);
   if (lookupError) {
     console.error('[misc/forgot-password] lookup error:', lookupError);
     return res.status(500).json({ error: 'Erreur serveur. Veuillez réessayer.' });
@@ -173,21 +173,25 @@ async function handleGetProfile(req, res) {
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return res.status(401).json({ error: 'Token invalide' });
 
+  // La table s'appelle profiles (pas users) et n'a pas de colonne role.
   const { data: profile } = await supabase
-    .from('users')
-    .select('role, name, phone, phone_country, plan, scans_today, last_scan_date')
+    .from('profiles')
+    .select('full_name, email, phone, company, country, plan')
     .eq('id', user.id)
     .single();
 
+  // Rôle dérivé : admin si email dans ADMIN_EMAILS, sinon agence si plan agency.
+  const role = isAdminEmail(user.email)
+    ? 'admin'
+    : (String(profile?.plan || '').toLowerCase() === 'agency' ? 'agence' : 'user');
+
   return res.status(200).json({
     profile: {
-      role: profile?.role || 'user',
-      name: profile?.name || null,
+      role,
+      name: profile?.full_name || null,
       phone: profile?.phone || null,
-      phone_country: profile?.phone_country || null,
+      phone_country: profile?.country || null,
       plan: profile?.plan || 'free',
-      scans_today: profile?.scans_today || 0,
-      last_scan_date: profile?.last_scan_date || null,
     }
   });
 }

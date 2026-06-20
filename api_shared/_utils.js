@@ -97,6 +97,19 @@ export function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// ── Admin identity (email-based) ───────────────────────────────────────────────
+// La table profiles ne contient pas de colonne role. L'admin est défini par une
+// liste d'emails (ADMIN_EMAILS, défaut admin@test.com). L'email est lu depuis le
+// JWT Supabase vérifié (auth.getUser) — non falsifiable côté client.
+export const ADMIN_EMAILS = String(process.env.ADMIN_EMAILS || 'admin@test.com')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+export function isAdminEmail(email) {
+  return ADMIN_EMAILS.includes(String(email || '').trim().toLowerCase());
+}
+
 // ── Admin Auth ────────────────────────────────────────────────────────────────
 export async function requireAdmin(req, res) {
   const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
@@ -121,13 +134,8 @@ export async function requireAdmin(req, res) {
     return null;
   }
 
-  const { data: publicUser } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (publicUser?.role !== 'admin') {
+  // Admin déterminé par email vérifié (pas de colonne role en base).
+  if (!isAdminEmail(user.email)) {
     json(res, 403, { error: 'Accès refusé' });
     return null;
   }

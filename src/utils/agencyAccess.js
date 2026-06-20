@@ -21,6 +21,18 @@ const TEST_BYPASS_ENABLED =
   import.meta.env.DEV === true &&
   String(import.meta.env.VITE_ENABLE_TEST_BYPASS).toLowerCase() === 'true';
 
+// Identité admin : la table profiles ne possède pas de colonne role.
+// L'admin est défini par son email (admin@test.com par défaut, ou VITE_ADMIN_EMAILS).
+// Côté serveur, ce même email est vérifié via le JWT Supabase (non falsifiable).
+const ADMIN_EMAILS = String(import.meta.env.VITE_ADMIN_EMAILS || 'admin@test.com')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+export function isAdminEmail(email) {
+  return ADMIN_EMAILS.includes(normalizeEmail(email));
+}
+
 export function isAgencyUser(user) {
   if (normalizeValue(user?.role) === 'agence' || normalizeValue(user?.plan) === 'agency') return true;
   if (TEST_BYPASS_ENABLED && normalizeEmail(user?.email) === 'agence@test.com') return true;
@@ -29,7 +41,7 @@ export function isAgencyUser(user) {
 
 export function isAdminUser(user) {
   if (normalizeValue(user?.role) === 'admin') return true;
-  if (TEST_BYPASS_ENABLED && normalizeEmail(user?.email) === 'admin@test.com') return true;
+  if (isAdminEmail(user?.email)) return true;
   return false;
 }
 
