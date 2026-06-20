@@ -123,7 +123,7 @@ export function ScanTechnologyCard({ scanData }) {
   );
 }
 
-export function AfricaBenchmarkCard({ url, score, onEmpty }) {
+export function AfricaBenchmarkCard({ url, score, onHasBench }) {
   const [bench, setBench] = useState(null);
   const [loading, setLoading] = useState(true);
   const domain = extractDomain(url);
@@ -157,10 +157,10 @@ export function AfricaBenchmarkCard({ url, score, onEmpty }) {
     };
   }, [domain, score]);
 
-  // Signale au parent que la carte est vide pour ajuster le layout
+  // Signale au parent que le benchmark est disponible pour passer en 2 colonnes
   useEffect(() => {
-    if (!loading && !bench) onEmpty?.();
-  }, [loading, bench, onEmpty]);
+    if (!loading && bench) onHasBench?.();
+  }, [loading, bench, onHasBench]);
 
   // Pas assez de données : on ne rend rien plutôt qu’un état "en construction"
   // qui dévalorise le rapport aux yeux d’un client payant.
@@ -231,13 +231,13 @@ export function AfricaBenchmarkCard({ url, score, onEmpty }) {
 }
 
 export default function ScanInsightCards({ scanData, url, score }) {
-  const [benchEmpty, setBenchEmpty] = useState(false);
+  const [hasBench, setHasBench] = useState(false);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-      <div className={benchEmpty ? "lg:col-span-2" : ""}>
+      <div className={hasBench ? "" : "lg:col-span-2"}>
         <ScanTechnologyCard scanData={scanData} />
       </div>
-      <AfricaBenchmarkCard url={url} score={score} onEmpty={() => setBenchEmpty(true)} />
+      <AfricaBenchmarkCard url={url} score={score} onHasBench={() => setHasBench(true)} />
     </div>
   );
 }
