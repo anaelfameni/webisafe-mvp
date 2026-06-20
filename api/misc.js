@@ -161,10 +161,47 @@ async function handleForgotPassword(req, res, body) {
   return res.status(200).json({ success: true });
 }
 
+
+// ── action: profile (GET /api/misc?action=profile) ────────────────────────────
+async function handleGetProfile(req, res) {
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return res.status(401).json({ error: 'Authentification requise' });
+  if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'Configuration serveur manquante' });
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) return res.status(401).json({ error: 'Token invalide' });
+
+  const { data: profile } = await supabase
+    .from('users')
+    .select('role, name, phone, phone_country, plan, scans_today, last_scan_date')
+    .eq('id', user.id)
+    .single();
+
+  return res.status(200).json({
+    profile: {
+      role: profile?.role || 'user',
+      name: profile?.name || null,
+      phone: profile?.phone || null,
+      phone_country: profile?.phone_country || null,
+      plan: profile?.plan || 'free',
+      scans_today: profile?.scans_today || 0,
+      last_scan_date: profile?.last_scan_date || null,
+    }
+  });
+}
+
 // ── Routeur principal ──────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   setCorsHeaders(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
+  // GET /api/misc?action=profile — profil utilisateur (rôle, plan, etc.)
+  if (req.method === 'GET') {
+    const action = req.url?.split('?')[1]?.split('&').find(p => p.startsWith('action='))?.split('=')[1];
+    if (action === 'profile') return handleGetProfile(req, res);
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   let body;

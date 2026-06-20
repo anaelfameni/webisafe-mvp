@@ -147,7 +147,7 @@ async function getProfile(sessionToken = null) {
       const { data } = await supabase.auth.getSession();
       token = data?.session?.access_token;
     }
-    const response = await fetch('/api/profile', {
+    const response = await fetch('/api/misc?action=profile', {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!response.ok) return null;
