@@ -250,7 +250,7 @@ export default function AgenceDashboard({ user, authLoading = false }) {
             <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-cyan-100">
               <Building2 size={14} /> Cockpit agence B2B
             </span>
-            <h1 className="mt-5 max-w-4xl text-3xl font-black leading-tight text-white lg:text-5xl">Gérez votre portefeuille client, vos audits et vos livrables marque blanche depuis un vrai studio d’agence.</h1>
+            <h1 className="mt-5 max-w-4xl text-2xl sm:text-3xl font-black leading-tight text-white lg:text-5xl">Gérez votre portefeuille client, vos audits et vos livrables marque blanche depuis un vrai studio d’agence.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-white/62">Une vue conçue pour vendre, suivre et livrer : pipeline clients, rapports prêts, widget prospect et branding PDF agence.</p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <button onClick={() => setActivePage('clients')} className="rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_30px_rgba(34,211,238,0.35)]">Voir le portefeuille</button>
@@ -395,7 +395,32 @@ export default function AgenceDashboard({ user, authLoading = false }) {
           cta={{ label: 'Auditer un site', to: '/' }}
         />
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* Vue cartes — mobile uniquement */}
+        <div className="md:hidden space-y-3">
+          {clients.map((client) => (
+            <div key={client.domain} className="rounded-2xl border border-white/10 bg-slate-950/55 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-bold text-white truncate flex-1">{client.domain}</p>
+                <button
+                  onClick={() => client.latestScan?.id && navigate(`/rapport/${encodeURIComponent(client.latestScan.id)}`, { state: { agencyBypass: true, agencyScan: client.latestScan } })}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-full border border-primary/35 px-3 py-1.5 text-xs font-bold text-primary"
+                >
+                  <ExternalLink size={12} /> Rapport
+                </button>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-white/60">
+                <span>{client.audits} audit(s)</span>
+                <span>{client.reports} rapport(s)</span>
+                <span>SEO : {client.seoAverage ?? '—'}/100</span>
+                <span>Séc : {client.securityAverage ?? '—'}/100</span>
+              </div>
+              <p className="mt-2 text-xs text-white/40">{formatDateLabel(client.lastScanAt)}</p>
+            </div>
+          ))}
+        </div>
+        {/* Vue tableau — desktop uniquement */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full min-w-[820px] text-left text-sm">
             <thead className="text-xs uppercase tracking-[0.18em] text-white/35">
               <tr><th className="py-3">Client / domaine</th><th>Audits</th><th>Rapports</th><th>SEO moyen</th><th>Sécurité moyenne</th><th>Dernier audit</th><th>Action</th></tr>
@@ -415,6 +440,7 @@ export default function AgenceDashboard({ user, authLoading = false }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </section>
   );

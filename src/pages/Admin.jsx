@@ -305,7 +305,7 @@ export default function Admin({ user, authLoading = false }) {
                         <span className="inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-orange-200">
                           <ShieldAlert size={14} /> Supervision plateforme
                         </span>
-                        <h1 className="mt-5 max-w-4xl text-3xl font-black leading-tight text-white lg:text-5xl">Centre de contrôle Webisafe : paiements, abonnements, audits et incidents en temps réel.</h1>
+                        <h1 className="mt-5 max-w-4xl text-2xl sm:text-3xl font-black leading-tight text-white lg:text-5xl">Centre de contrôle Webisafe : paiements, abonnements, audits et incidents en temps réel.</h1>
                         <p className="mt-4 max-w-2xl text-sm leading-7 text-white/62">Une vue opérateur pour prioriser les validations, sécuriser les livraisons premium et garder la plateforme sous surveillance.</p>
                         <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                           <button onClick={() => setActivePage('payments')} className="rounded-2xl bg-orange-400 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_30px_rgba(251,146,60,0.35)]">Traiter les paiements</button>
@@ -460,20 +460,20 @@ export default function Admin({ user, authLoading = false }) {
                             <thead><tr className="border-b border-white/10 text-white/40 text-xs">
                               <th className="px-4 py-3 text-left">Code</th>
                               <th className="px-4 py-3 text-left">Site</th>
-                              <th className="px-4 py-3 text-left">Email</th>
+                              <th className="px-4 py-3 text-left hidden sm:table-cell">Email</th>
                               <th className="px-4 py-3 text-left">Montant</th>
                               <th className="px-4 py-3 text-left">Statut</th>
-                              <th className="px-4 py-3 text-left">Date</th>
+                              <th className="px-4 py-3 text-left hidden sm:table-cell">Date</th>
                             </tr></thead>
                             <tbody>
                               {payments.slice(0, 20).map(p => (
                                 <tr key={p.id} className="border-t border-white/5 text-white/70 hover:bg-white/5">
                                   <td className="px-4 py-3 font-mono text-primary text-xs">{p.payment_code}</td>
                                   <td className="px-4 py-3 text-xs max-w-[160px] truncate">{p.url_to_audit}</td>
-                                  <td className="px-4 py-3 text-xs">{p.user_email}</td>
+                                  <td className="px-4 py-3 text-xs hidden sm:table-cell">{p.user_email}</td>
                                   <td className="px-4 py-3 text-xs text-success">{formatFcfa(p.amount || 0)}</td>
                                   <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${p.status === 'validated' ? 'bg-success/10 text-success' : p.status === 'rejected' ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'}`}>{p.status}</span></td>
-                                  <td className="px-4 py-3 text-xs text-white/40">{new Date(p.created_at).toLocaleDateString('fr-FR')}</td>
+                                  <td className="px-4 py-3 text-xs text-white/40 hidden sm:table-cell">{new Date(p.created_at).toLocaleDateString('fr-FR')}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -511,10 +511,10 @@ export default function Admin({ user, authLoading = false }) {
                           <thead><tr className="border-b border-white/10 text-white/40 text-xs">
                             <th className="px-4 py-3 text-left">ID</th>
                             <th className="px-4 py-3 text-left">Site</th>
-                            <th className="px-4 py-3 text-left">Email</th>
+                            <th className="px-4 py-3 text-left hidden sm:table-cell">Email</th>
                             <th className="px-4 py-3 text-left">Score</th>
                             <th className="px-4 py-3 text-left">Type</th>
-                            <th className="px-4 py-3 text-left">Date</th>
+                            <th className="px-4 py-3 text-left hidden sm:table-cell">Date</th>
                           </tr></thead>
                           <tbody>
                             {scans.map(s => (
@@ -530,7 +530,7 @@ export default function Admin({ user, authLoading = false }) {
                                 <td className="px-4 py-3 text-xs max-w-[180px] truncate">
                                   {s.paid ? <button type="button" className="hover:text-primary hover:underline">{s.url}</button> : s.url}
                                 </td>
-                                <td className="px-4 py-3 text-xs">{s.user_email || '—'}</td>
+                                <td className="px-4 py-3 text-xs hidden sm:table-cell">{s.user_email || '—'}</td>
                                 <td className="px-4 py-3 text-xs">
                                   <span className={`font-semibold ${s.score >= 70 ? 'text-success' : s.score >= 40 ? 'text-warning' : 'text-danger'}`}>
                                     {s.score ?? '—'}
@@ -541,7 +541,7 @@ export default function Admin({ user, authLoading = false }) {
                                     {s.paid ? 'Premium' : 'Gratuit'}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-xs text-white/40">
+                                <td className="px-4 py-3 text-xs text-white/40 hidden sm:table-cell">
                                   {s.scanned_at ? new Date(s.scanned_at).toLocaleDateString('fr-FR') : '—'}
                                 </td>
                               </tr>
@@ -674,17 +674,17 @@ export default function Admin({ user, authLoading = false }) {
                       <table className="min-w-full text-sm">
                         <thead><tr className="border-b border-white/10 text-white/40 text-xs">
                           <th className="px-4 py-3 text-left">Site</th>
-                          <th className="px-4 py-3 text-left">Email</th>
+                          <th className="px-4 py-3 text-left hidden sm:table-cell">Email</th>
                           <th className="px-4 py-3 text-left">Statut</th>
-                          <th className="px-4 py-3 text-left">Date</th>
+                          <th className="px-4 py-3 text-left hidden sm:table-cell">Date</th>
                         </tr></thead>
                         <tbody>
                           {subscriptions.map(s => (
                             <tr key={s.id} className="border-t border-white/5 text-white/70 hover:bg-white/5">
                               <td className="px-4 py-3 text-xs max-w-[180px] truncate">{s.site_url}</td>
-                              <td className="px-4 py-3 text-xs">{s.user_email}</td>
+                              <td className="px-4 py-3 text-xs hidden sm:table-cell">{s.user_email}</td>
                               <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${s.status === 'active' ? 'bg-success/10 text-success' : s.status === 'rejected' ? 'bg-danger/10 text-danger' : 'bg-primary/10 text-primary'}`}>{s.status}</span></td>
-                              <td className="px-4 py-3 text-xs text-white/40">{new Date(s.created_at).toLocaleDateString('fr-FR')}</td>
+                              <td className="px-4 py-3 text-xs text-white/40 hidden sm:table-cell">{new Date(s.created_at).toLocaleDateString('fr-FR')}</td>
                             </tr>
                           ))}
                         </tbody>

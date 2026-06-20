@@ -124,7 +124,7 @@ function buildSafeUserFromAuthUser(user, profile = null) {
 
   const metadata = user.user_metadata || {};
   const email = normalizeEmail(user.email);
-  const fallbackRole = email === 'admin@test.com' ? 'admin' : email === 'agence@test.com' ? 'agence' : 'user';
+  const fallbackRole = 'user'; // rôle par défaut — profile?.role prime toujours
 
   return {
     id: user.id,

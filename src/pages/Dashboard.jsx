@@ -7,7 +7,7 @@ import {
   ArrowRight, BarChart3, CheckCircle2, ExternalLink, Plus, Trash2,
   Download, TrendingUp, TrendingDown, AlertTriangle, Activity,
   Sparkles, PartyPopper, Handshake, Users, ChevronRight, Wrench,
-  Settings, KeyRound,
+  Settings, KeyRound, Eye, EyeOff, Loader2,
 } from 'lucide-react';
 import { useScans } from '../hooks/useScans';
 import { useAuth } from '../hooks/useAuth';
@@ -128,7 +128,7 @@ function PageOverview({ user, scans, isPaid, validatedPremiumMap, navigate, upti
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-emerald-200">
               <User size={14} /> Mon espace personnel
             </span>
-            <h1 className="mt-5 max-w-3xl text-3xl font-black leading-tight text-white lg:text-5xl">Bonjour {userFirstName}, pilotez la santé de votre site sans jargon technique.</h1>
+            <h1 className="mt-5 max-w-3xl text-2xl sm:text-3xl font-black leading-tight text-white lg:text-5xl">Bonjour {userFirstName}, pilotez la santé de votre site sans jargon technique.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-white/62">Votre tableau de bord client transforme chaque scan en score, priorités et actions concrètes pour sécuriser, accélérer et améliorer votre présence web.</p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <Link to="/" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-black text-white shadow-[0_0_26px_rgba(21,102,240,0.35)] transition hover:bg-primary-hover">
@@ -293,7 +293,7 @@ function PageReports({ scans, isPaid, validatedPremiumMap, navigate }) {
               <h3 className="text-white font-bold text-lg">{extractDomain(lastScan.url)}</h3>
               <p className="text-white/40 text-xs">{formatDate(lastScan.scanDate || lastScan.savedAt)} · Score : {lastScan.scores?.global ?? '—'}/100</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {isPaid(lastScan.id) && (
                 <button onClick={() => generatePDF(lastScan)} className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-semibold transition">
                   <Download size={14} /> Télécharger PDF
