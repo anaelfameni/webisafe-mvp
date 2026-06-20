@@ -123,7 +123,7 @@ export function ScanTechnologyCard({ scanData }) {
   );
 }
 
-export function AfricaBenchmarkCard({ url, score }) {
+export function AfricaBenchmarkCard({ url, score, onEmpty }) {
   const [bench, setBench] = useState(null);
   const [loading, setLoading] = useState(true);
   const domain = extractDomain(url);
@@ -156,6 +156,11 @@ export function AfricaBenchmarkCard({ url, score }) {
       cancelled = true;
     };
   }, [domain, score]);
+
+  // Signale au parent que la carte est vide pour ajuster le layout
+  useEffect(() => {
+    if (!loading && !bench) onEmpty?.();
+  }, [loading, bench, onEmpty]);
 
   // Pas assez de données : on ne rend rien plutôt qu’un état "en construction"
   // qui dévalorise le rapport aux yeux d’un client payant.
@@ -226,10 +231,13 @@ export function AfricaBenchmarkCard({ url, score }) {
 }
 
 export default function ScanInsightCards({ scanData, url, score }) {
+  const [benchEmpty, setBenchEmpty] = useState(false);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-      <ScanTechnologyCard scanData={scanData} />
-      <AfricaBenchmarkCard url={url} score={score} />
+      <div className={benchEmpty ? "lg:col-span-2" : ""}>
+        <ScanTechnologyCard scanData={scanData} />
+      </div>
+      <AfricaBenchmarkCard url={url} score={score} onEmpty={() => setBenchEmpty(true)} />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { CheckCircle2, Copy, Loader2, ShieldCheck, Smartphone, Tag, X } from 'lu
 import ToastMessage from '../components/ToastMessage';
 import { useScans } from '../hooks/useScans';
 import { fetchLatestPaymentRequest, reportPayment, unlockScanAsAdmin } from '../utils/paymentApi';
-import { canUseAgencyBypass } from '../utils/agencyAccess';
+import { isAdminUser, canUseAgencyBypass } from '../utils/agencyAccess';
 import { isValidEmail, normalizeURL } from '../utils/validators';
 import { WAVE_PAYMENT_AMOUNT, WAVE_PAYMENT_TOTAL, WAVE_PHONE_DISPLAY, formatFcfa, generateWavePaymentCode, getWaveBusinessLink } from '../utils/wavePayment';
 import { applyPromoDiscount, validatePromoCode } from '../utils/promoCodes';
@@ -235,7 +235,7 @@ export default function Payment({ user }) {
       <ToastMessage toast={toast} />
       <div className="mx-auto max-w-md rounded-[28px] border border-[#1566F0]/30 bg-card-bg p-8 shadow-2xl shadow-black/30">
         {/* Bouton bypass ADMIN uniquement */}
-        {user?.role === 'admin' && scanId && (
+        {isAdminUser(user) && scanId && (
           <div className="mb-6 rounded-2xl border-2 border-orange-500/40 bg-orange-500/10 p-5 text-center">
             <p className="inline-flex items-center gap-1.5 text-xs uppercase tracking-widest text-orange-400 font-bold mb-2"><ShieldCheck size={12} /> Mode Admin</p>
             <p className="text-sm text-white/70 mb-4">Accédez directement à l'audit premium sans paiement.</p>
