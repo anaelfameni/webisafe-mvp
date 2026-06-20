@@ -6,6 +6,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { generatePdf } from './lib/generatePdf.js'
 import { buildPdfFilename } from './lib/pdfModel.js'
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 function pdfApiPlugin() {
   return {
     name: 'webisafe-pdf-api',
@@ -45,68 +47,63 @@ function pdfApiPlugin() {
 }
 
 export default defineConfig({
-  plugins: [
-    react(),
-    pdfApiPlugin(),
-    sitemap({
-      hostname: 'https://webisafe.vercel.app',
-      dynamicRoutes: [
-        '/',
-        '/analyse',
-        '/contact',
-        '/tarifs',
-        '/protect',
-        '/protect/status',
-        '/corrections',
-        '/ressources',
-        '/white-label',
-        '/a-propos',
-        '/cgu',
-        '/confidentialite',
-        '/partenaire',
+  plugins: [react(), pdfApiPlugin(), sitemap({
+    hostname: 'https://webisafe.vercel.app',
+    dynamicRoutes: [
+      '/',
+      '/analyse',
+      '/contact',
+      '/tarifs',
+      '/protect',
+      '/protect/status',
+      '/corrections',
+      '/ressources',
+      '/white-label',
+      '/a-propos',
+      '/cgu',
+      '/confidentialite',
+      '/partenaire',
+    ],
+    exclude: ['/payment', '/admin', '/rapport/:id'],
+    lastmod: new Date(),
+    generateRobotsTxt: false,
+  }), // O.4 — Service Worker pour cache statique (PWA légère, pas d'app shell offline complète)
+  VitePWA({
+    registerType: 'autoUpdate',
+    injectRegister: 'auto',
+    includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'logo.svg', 'robots.txt', 'sitemap.xml'],
+    manifestFilename: 'manifest.webmanifest',
+    manifest: false,
+    workbox: {
+      globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+      importScripts: ['/webpush-handler.js'],
+      navigateFallbackDenylist: [/^\/api\//, /^\/admin/, /^\/dashboard/, /^\/agence/, /^\/payment/, /^\/rapport/],
+      runtimeCaching: [
+        {
+          urlPattern: /^https?:\/\/fonts\.googleapis\.com\/.*/i,
+          handler: 'StaleWhileRevalidate',
+          options: { cacheName: 'google-fonts-stylesheets' },
+        },
+        {
+          urlPattern: /^https?:\/\/fonts\.gstatic\.com\/.*/i,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'google-fonts-webfonts',
+            expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+          },
+        },
+        {
+          urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|avif)$/,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'images-cache',
+            expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
+          },
+        },
       ],
-      exclude: ['/payment', '/admin', '/rapport/:id'],
-      lastmod: new Date(),
-      generateRobotsTxt: false,
-    }),
-    // O.4 — Service Worker pour cache statique (PWA légère, pas d'app shell offline complète)
-    VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'logo.svg', 'robots.txt', 'sitemap.xml'],
-      manifestFilename: 'manifest.webmanifest',
-      manifest: false,
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-        importScripts: ['/webpush-handler.js'],
-        navigateFallbackDenylist: [/^\/api\//, /^\/admin/, /^\/dashboard/, /^\/agence/, /^\/payment/, /^\/rapport/],
-        runtimeCaching: [
-          {
-            urlPattern: /^https?:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'StaleWhileRevalidate',
-            options: { cacheName: 'google-fonts-stylesheets' },
-          },
-          {
-            urlPattern: /^https?:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-webfonts',
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
-          {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|avif)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'images-cache',
-              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
-            },
-          },
-        ],
-      },
-      devOptions: { enabled: false },
-    }),
-  ],
+    },
+    devOptions: { enabled: false },
+  }), cloudflare()],
   server: {
   port: 5173,
   hmr: {

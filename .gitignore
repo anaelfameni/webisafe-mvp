@@ -31,3 +31,9 @@ dist-ssr
 server/.env
 server/.env.local
 settings.json
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
